@@ -1,4 +1,4 @@
-# YOLO Visual Training Studio & Auto-Labeler
+# Sensorflow Studio & Auto-Labeler
 
 A production-oriented visual framework for automated object detection, training, and quality assurance in autonomous driving and computer vision pipelines. This repository contains both a command-line interface (CLI) toolset and a beautiful, self-hosted web-based Training Studio built with FastAPI, HTML5, and vanilla JavaScript.
 
@@ -110,5 +110,46 @@ python autograder.py --predictions runs/infer/predictions.json
 
 Run tests to verify server endpoints:
 ```bash
-pytest tests/test_backend.py
+pytest
 ```
+
+---
+
+## 🚦 FHWA Surrogate Safety Assessment Model (SSAM)
+
+The SSAM module processes trajectory prediction files to calculate vehicle-to-vehicle conflicts. It leverages key safety surrogates to classify risk profiles:
+*   **Time-to-Collision (TTC):** The time required for two vehicles to collide if they maintain their current speed and path. Values under **1.5 seconds** indicate high collision hazards.
+*   **Post-Encroachment Time (PET):** The time lapse between the first vehicle leaving a conflict zone and the second vehicle entering it. Values under **5.0 seconds** indicate significant lane encroachment conflicts.
+*   **Conflict Angle:** Used to classify conflict types:
+    *   **Crossing:** Angle $> 85^\circ$
+    *   **Lane Change:** Angle between $30^\circ$ and $85^\circ$
+    *   **Rear-end:** Angle $< 30^\circ$
+
+Severity Index calculation is derived as follows:
+$$severity = 1.0 - (\frac{\min(TTC, 1.5)}{1.5}) \times 0.7 - (\frac{\min(PET, 5.0)}{5.0}) \times 0.3$$
+
+---
+
+## 📂 6-Layer Accident Analysis Platform
+
+For large-scale telemetry audits, the platform employs a modular architecture:
+1.  **Ingestion Layer (`accident_importer.py`):** Automatically extracts and validates datasets from local `.csv`, `.json`, `.parquet`, `.xlsx`, REST endpoints, or SQLite connection strings.
+2.  **Validation Layer (`accident_validator.py`):** Assures column configuration, geospatial coordinates boundaries (US bounding box limits), and valid historical dates.
+3.  **Cleaning Layer (`accident_cleaner.py`):** Normalizes header schemas to `snake_case`, handles coordinate voids, and standardizes severity classifications.
+4.  **Analysis Engine (`accident_analysis.py`):** Aggregates hourly temporal curves and geospatial conflict clusters.
+5.  **Insights & Reporting (`accident_insights.py` & `accident_report.py`):** Computes overall safety recommendations and exports clean HTML summaries.
+6.  **API Routing Gateway (`main.py`):** Exposes FastAPI REST interfaces and a streaming WebSocket channel to push processing alerts.
+
+---
+
+## ⚡ NVIDIA DGX Spark Remote Cluster Configuration
+
+To execute intensive model training or inference workloads on the **NVIDIA DGX Spark** cluster:
+1.  Verify Tailscale connectivity to `dgx-spark.tail16d8d9.ts.net` (`100.113.62.112`).
+2.  Run the remote listener server environment with the following environment variables:
+    ```bash
+    export OLLAMA_HOST=0.0.0.0
+    ollama run gemma4:26b
+    ```
+3.  Execute training by selecting `dgx-spark` from the **Compute Device** dropdown in the visual panel. The backend automatically forwards instructions and streams Tailscale connection handshakes.
+
