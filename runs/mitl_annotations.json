@@ -1,0 +1,53 @@
+{
+  "dataset": "nvidia/PhysicalAI-Autonomous-Vehicles",
+  "frame_index": 4209,
+  "views": {
+    "front": "https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=800&auto=format&fit=crop",
+    "left": "https://images.unsplash.com/photo-1519074002996-a69e7ac46a42?w=800&auto=format&fit=crop",
+    "right": "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=800&auto=format&fit=crop"
+  },
+  "telemetry": {
+    "lat": 37.774929,
+    "lon": -122.419416,
+    "speed_kmh": 35.8,
+    "accel_mps2": 1.25,
+    "imu_pitch": 0.02,
+    "imu_roll": -0.01,
+    "trajectory": [
+      {
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "x": 1.1,
+        "y": 5.2
+      },
+      {
+        "x": 2.2,
+        "y": 10.4
+      },
+      {
+        "x": 3.4,
+        "y": 15.6
+      },
+      {
+        "x": 4.5,
+        "y": 20.8
+      }
+    ]
+  },
+  "coc_trace": "Human adjusted CoC reasoning trace.",
+  "annotations": [
+    {
+      "id": 1,
+      "label": "pedestrian",
+      "box": [
+        10,
+        20,
+        30,
+        40
+      ],
+      "conf": 0.95
+    }
+  ]
+}

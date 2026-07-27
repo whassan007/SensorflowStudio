@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sensorflow Studio</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Mono&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <span class="brand-logo">⚡</span>
+                <div class="brand-text">
+                    <h1>Sensorflow Studio</h1>
+                    <span class="sub">AV Sensor & Safety Platform</span>
+                </div>
+            </div>
+            
+            <nav class="stages-nav">
+                <button class="nav-btn active" data-stage="dataset">
+                    <span class="num">1</span>
+                    <span class="label">Dataset Configuration</span>
+                </button>
+                <button class="nav-btn" data-stage="model">
+                    <span class="num">2</span>
+                    <span class="label">Model Setup</span>
+                </button>
+                <button class="nav-btn" data-stage="training">
+                    <span class="num">3</span>
+                    <span class="label">Training Execution</span>
+                </button>
+                <button class="nav-btn" data-stage="inference">
+                    <span class="num">4</span>
+                    <span class="label">Auto-Labeler Inference</span>
+                </button>
+                <button class="nav-btn" data-stage="grader">
+                    <span class="num">5</span>
+                    <span class="label">Auto-Grader Quality</span>
+                </button>
+                <button class="nav-btn" data-stage="mitl">
+                    <span class="num">6</span>
+                    <span class="label">Man-in-the-Loop Review</span>
+                </button>
+                <button class="nav-btn" data-stage="benchmark">
+                    <span class="num">7</span>
+                    <span class="label">Model Benchmarking</span>
+                </button>
+                <button class="nav-btn" data-stage="export">
+                    <span class="num">8</span>
+                    <span class="label">Export & Deploy</span>
+                </button>
+                <button class="nav-btn" data-stage="mcp">
+                    <span class="num">9</span>
+                    <span class="label">MCP Settings</span>
+                </button>
+                <button class="nav-btn" data-stage="ssam">
+                    <span class="num">10</span>
+                    <span class="label">SSAM Safety</span>
+                </button>
+            </nav>
+
+            <div class="system-status">
+                <div class="status-item">
+                    <span class="status-dot green"></span>
+                    <span class="status-text">Backend Connected</span>
+                </div>
+                <div class="resource-usage">
+                    <div class="cpu-bar"><span class="fill" style="width: 30%"></span></div>
+                    <span class="res-text">CPU Usage: 30%</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="content-header">
+                <div class="title-area">
+                    <h2 id="stage-title">Dataset Configuration</h2>
+                    <p id="stage-desc">Prepare and validate your image source path and annotation files.</p>
+                </div>
+                <div class="controls-area">
+                    <button class="btn btn-secondary" id="btn-validate">Run Pre-Check</button>
+                    <button class="btn btn-primary" id="btn-global-action">Proceed to Model</button>
+                </div>
+            </header>
+
+            <!-- Stage Panels -->
+            <div class="stage-container">
+                <!-- STAGE 1: DATASET -->
+                <section class="stage-panel active" id="panel-dataset">
+                    <div class="grid-2">
+                        <div class="card card-glass">
+                            <h3>Dataset Configuration Settings</h3>
+                            <div class="form-group">
+                                <label for="select-dataset-type">Dataset Type / Source</label>
+                                <select id="select-dataset-type" title="Select between local storage directory or public autonomous vehicle telemetry datasets (Waymo, NVIDIA Alpamayo, Audi A2D2).">
+                                    <option value="local" selected title="Load training images and text labels from your local drive.">Local Directory (Default)</option>
+                                    <option value="waymo" title="Load Waymo Open Dataset camera and vehicle log records.">Waymo Open Dataset</option>
+                                    <option value="alpamayo" title="Load NVIDIA Alpamayo Physical AI AV Dataset multi-camera tracks.">NVIDIA Alpamayo (Physical AI AV Dataset)</option>
+                                    <option value="a2d2" title="Load Audi A2D2 Autonomous Driving Dataset sensor frames.">Audi A2D2 (Audi Autonomous Driving Dataset)</option>
+                                </select>
+                            </div>
+                            <!-- Dynamic Portal & Repo Links -->
+                            <div id="dataset-source-links" class="hidden" style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 12px; font-size: 13px;">
+                                <h4 style="font-size: 13px; color: var(--secondary); margin-bottom: 8px;">Official Dataset Access Portals:</h4>
+                                <div id="dataset-links-content" style="display: flex; flex-direction: column; gap: 6px;"></div>
+                            </div>
+                            <div class="form-group" style="margin-top: 15px;">
+                                <label for="data-yaml-path">Data Configuration YAML</label>
+                                <input type="text" id="data-yaml-path" value="coco8.yaml" placeholder="e.g. coco8.yaml, path/to/dataset.yaml">
+                                <span class="help-text">Contains directories for train, val, and class labels.</span>
+                            </div>
+                            <div class="form-group">
+                                <label for="dataset-source-path">Images Path (Inference Source)</label>
+                                <input type="text" id="dataset-source-path" value="data" placeholder="e.g. data, path/to/images">
+                                <span class="help-text">Folder containing raw images for inference/auto-labeling.</span>
+                            </div>
+                            <div class="actions-row" style="display: flex; gap: 12px;">
+                                <button class="btn btn-primary" id="btn-save-dataset">Save Config</button>
+                                <button class="btn btn-secondary" id="btn-preprocess-dataset">Load & Preprocess Dataset</button>
+                            </div>
+                        </div>
+
+                        <div class="card card-glass">
+                            <h3>Workspace Status</h3>
+                            <div class="info-list">
+                                <div class="info-row">
+                                    <span class="lbl">Base Workspace:</span>
+                                    <span class="val font-mono">/DrivingRepo</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="lbl">Train script:</span>
+                                    <span class="val font-mono green">Found (train.py)</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="lbl">Infer script:</span>
+                                    <span class="val font-mono green">Found (infer.py)</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="lbl">Auto-Grader script:</span>
+                                    <span class="val font-mono green">Found (autograder.py)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- YAML Config Editor Card -->
+                        <div class="card card-glass flex-col">
+                            <h3>Dataset Configuration Editor</h3>
+                            <p style="font-size: 12px; margin-bottom: 12px; color: var(--text-muted);">Edit active dataset configurations (classes, paths) directly in the YAML file.</p>
+                            <textarea id="dataset-yaml-editor" style="flex-grow: 1; min-height: 200px; background: #04060b; border: 1px solid var(--border); color: #00ffaa; font-family: var(--font-mono); font-size: 12px; padding: 12px; border-radius: 6px; resize: vertical; outline: none;"></textarea>
+                            <div style="margin-top: 12px; display: flex; justify-content: flex-end; gap: 12px;">
+                                <button class="btn btn-secondary" id="btn-yaml-reload">Reload</button>
+                                <button class="btn btn-primary" id="btn-yaml-save">Save YAML</button>
+                            </div>
+                            <div id="yaml-save-status" class="status-msg hidden" style="margin-top: 10px;"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- STAGE 2: MODEL -->
+                <section class="stage-panel" id="panel-model">
+                    <div class="grid-2">
+                        <div class="card card-glass">
+                            <h3>Base Model Selection</h3>
+                            <div class="model-grid">
+                                <div class="model-card active" data-model="yolov8n.pt">
+                                    <span class="icon">⚡</span>
+                                    <h4>YOLOv8 Nano (n)</h4>
+                                    <p>Fastest, ultra-lightweight. Ideal for local testing and mobile/edge devices.</p>
+                                    <span class="badge">6.5 MB</span>
+                                </div>
+                                <div class="model-card" data-model="yolov8s.pt">
+                                    <span class="icon">🚀</span>
+                                    <h4>YOLOv8 Small (s)</h4>
+                                    <p>Good trade-off between throughput and accuracy.</p>
+                                    <span class="badge">22.5 MB</span>
+                                </div>
+                                <div class="model-card" data-model="yolov8m.pt">
+                                    <span class="icon">🧠</span>
+                                    <h4>YOLOv8 Medium (m)</h4>
+                                    <p>Recommended standard. Balanced accuracy/speed profile.</p>
+                                    <span class="badge">52.1 MB</span>
+                                </div>
+                                <div class="model-card" data-model="nvidia/Alpamayo-R1-10B">
+                                    <span class="icon">🌌</span>
+                                    <h4>Alpamayo-R1-10B</h4>
+                                    <p>Reasoning-focused autonomous driving model with Chain-of-Causation traces.</p>
+                                    <span class="badge">10B Params</span>
+                                </div>
+                                <div class="model-card" data-model="nvidia/Alpamayo-1.5-10B">
+                                    <span class="icon">🏎️</span>
+                                    <h4>Alpamayo-1.5-10B</h4>
+                                    <p>High-performance trajectory generation and lane-following control model.</p>
+                                    <span class="badge">10B Params</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card card-glass">
+                            <h3>Execution Device</h3>
+                            <div class="form-group">
+                                <label for="select-device">Compute Device</label>
+                                <select id="select-device" title="Select the execution device architecture for training and inference workloads.">
+                                    <option value="cpu" title="Use host CPU. Highly safe fallback, slower execution.">CPU (Safe/Local Fallback)</option>
+                                    <option value="0" selected title="Use local GPU (MPS on Mac, CUDA on Linux).">GPU 0 (NVIDIA/Apple Silicon MPS)</option>
+                                    <option value="dgx-spark" title="Execute workloads remotely on the NVIDIA DGX Spark cluster via Tailscale net bridge.">NVIDIA DGX Spark Remote Cluster (dgx-spark.tail16d8d9.ts.net)</option>
+                                </select>
+                            </div>
+                            <!-- DGX Remote Setup Instructions -->
+                            <div id="dgx-setup-instructions" class="hidden" style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 12px; font-size: 12px;">
+                                <h4 style="font-size: 13px; color: var(--warning); margin-bottom: 8px;">NVIDIA DGX Spark Remote Cluster Setup:</h4>
+                                <p style="color: var(--text-muted); margin-bottom: 8px;">Follow these commands to configure the libraries on your remote node:</p>
+                                <pre style="background: #04060b; color: #3b82f6; padding: 10px; border-radius: 6px; font-family: var(--font-mono); font-size: 11px; overflow-x: auto; white-space: pre-wrap;">
+# 1. Start Tailscale on the DGX node & login
+sudo tailscale up
+
+# 2. Setup python virtual environment and activate
+python3 -m venv .venv
+source .venv/bin/activate
+
+# 3. Install PyTorch with CUDA 12 support
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+
+# 4. Install Ultralytics and Hugging Face dependencies
+pip install ultralytics huggingface_hub
+
+# 5. Enable Ollama server host mapping for remote Gemma 4:
+export OLLAMA_HOST=0.0.0.0
+ollama run gemma4:26b
+                                </pre>
+                            </div>
+                            <div class="info-list">
+                                <div class="info-row">
+                                    <span class="lbl">Selected weights:</span>
+                                    <span class="val font-mono" id="selected-weights-display">yolov8n.pt</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- STAGE 3: TRAINING -->
+                <section class="stage-panel" id="panel-training">
+                    <div class="grid-1-2">
+                        <div class="card card-glass flex-col">
+                            <h3>Training Controls</h3>
+                            <div class="form-group">
+                                <label for="train-epochs">Epochs</label>
+                                <input type="number" id="train-epochs" value="10" min="1" max="500">
+                            </div>
+                            <div class="form-group">
+                                <label for="train-batch">Batch Size</label>
+                                <input type="number" id="train-batch" value="16" min="1" max="128">
+                            </div>
+                            <div class="actions-col">
+                                <button class="btn btn-success btn-large" id="btn-start-train">▶ Start Training</button>
+                                <button class="btn btn-danger btn-large hidden" id="btn-stop-train">⏹ Stop Training</button>
+                            </div>
+                            <div class="train-progress-container hidden" id="train-progress-section">
+                                <span class="progress-label">Training Progress: <strong id="progress-percent">0%</strong></span>
+                                <div class="progress-bar-wrapper">
+                                    <div class="progress-bar-fill" id="train-progress-bar" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card card-glass">
+                            <h3>Real-time Output Logs & Curves</h3>
+                            <div class="tabs-sub">
+                                <button class="tab-sub-btn active" data-tab="logs">Console Logs</button>
+                                <button class="tab-sub-btn" data-tab="plots">Metrics & Loss Curves</button>
+                            </div>
+                            <div class="tab-sub-content active" id="subtab-logs">
+                                <pre class="terminal" id="terminal-logs">Waiting for training to start...</pre>
+                            </div>
+                            <div class="tab-sub-content" id="subtab-plots">
+                                <div class="plots-grid">
+                                    <canvas id="loss-chart" width="400" height="250"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- STAGE 4: INFERENCE -->
+                <section class="stage-panel" id="panel-inference">
+                    <div class="grid-1-2">
+                        <div class="card card-glass flex-col">
+                            <h3>Auto-Labeler Parameters</h3>
+                            <div class="form-group">
+                                <label for="infer-weights">Weights Path</label>
+                                <input type="text" id="infer-weights" value="runs/detect/coco_finetuned/weights/best.pt">
+                            </div>
+                            <div class="form-group">
+                                <label for="infer-conf">Confidence Threshold</label>
+                                <input type="range" id="infer-conf" min="0.05" max="1" step="0.05" value="0.25">
+                                <span class="range-val" id="val-infer-conf">0.25</span>
+                            </div>
+                            <div class="form-group">
+                                <label for="infer-iou">IoU NMS Threshold</label>
+                                <input type="range" id="infer-iou" min="0.05" max="1" step="0.05" value="0.45">
+                                <span class="range-val" id="val-infer-iou">0.45</span>
+                            </div>
+                            <button class="btn btn-primary btn-large" id="btn-run-infer">⚡ Run Auto-Labeler</button>
+                        </div>
+
+                        <div class="card card-glass">
+                            <h3>Interactive Predictions Explorer</h3>
+                            <div class="image-select-row">
+                                <label for="select-infer-image">Image Select:</label>
+                                <select id="select-infer-image">
+                                    <option value="">No images processed yet</option>
+                                </select>
+                            </div>
+                            <div class="canvas-wrapper">
+                                <div class="canvas-container">
+                                    <img id="prediction-img" src="" alt="Run inference to display image" style="max-width: 100%; max-height: 400px; display: block; margin: 0 auto; border-radius: 8px;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- STAGE 5: AUTO-GRADER -->
+                <section class="stage-panel" id="panel-grader">
+                    <div class="grid-2">
+                        <div class="card card-glass">
+                            <h3>Quality Score Summary</h3>
+                            <div class="score-radial-container">
+                                <div class="score-radial">
+                                    <span class="score-num" id="grader-score">--</span>
+                                    <span class="score-lbl">Quality Score</span>
+                                </div>
+                            </div>
+                            <div class="grader-stats">
+                                <div class="stat-box">
+                                    <span class="num" id="stat-total-imgs">--</span>
+                                    <span class="lbl">Images</span>
+                                </div>
+                                <div class="stat-box">
+                                    <span class="num" id="stat-total-preds">--</span>
+                                    <span class="lbl">Detections</span>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary width-full" id="btn-run-grader" style="margin-top: 15px;">Run Quality Diagnostics</button>
+                        </div>
+
+                        <div class="card card-glass">
+                            <h3>Issue Diagnostics & Recommendations</h3>
+                            <div class="issues-list" id="grader-issues-list">
+                                <div class="empty-state">No issues scanned. Run auto-grader diagnostics.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Copilot Triage Assistant -->
+                    <div class="card card-glass copilot-card" style="margin-top: 24px;">
+                        <div class="copilot-header">
+                            <div class="copilot-title-wrapper">
+                                <span class="copilot-logo">🤖</span>
+                                <div class="copilot-title-text">
+                                    <h3>AI Triage Copilot</h3>
+                                    <span class="sub">Deep audit of the pipeline, data, and quality issues using Gemma 4 (26B)</span>
+                                </div>
+                            </div>
+                            <button class="btn btn-secondary" id="btn-copilot-ask">Ask AI Triage Copilot</button>
+                        </div>
+                        <div class="copilot-body" id="copilot-response-container">
+                            <div class="empty-state">No analysis generated yet. Click "Ask AI Triage Copilot" to run the LLM evaluation.</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- STAGE 6: MAN-IN-THE-LOOP TRIAGE -->
+                <section class="stage-panel" id="panel-mitl">
+                    <div class="grid-1-2" style="grid-template-columns: 1.2fr 1.8fr;">
+                        <!-- Left Side: Views and Telemetry -->
+                        <div class="flex-col" style="gap: 20px;">
+                            <div class="card card-glass">
+                                <h3>Multi-Camera Viewport</h3>
+                                <div class="camera-select-row" style="margin-top: 10px; margin-bottom: 12px; display: flex; gap: 8px;">
+                                    <button class="btn btn-secondary btn-small active" data-view="front">Front Camera</button>
+                                    <button class="btn btn-secondary btn-small" data-view="left">Left Side</button>
+                                    <button class="btn btn-secondary btn-small" data-view="right">Right Side</button>
+                                </div>
+                                <div style="position: relative; border-radius: 8px; overflow: hidden; background: #000;">
+                                    <img id="mitl-camera-img" src="" alt="Select dataset to load image" style="width: 100%; display: block; max-height: 280px; object-fit: cover;">
+                                    <div class="camera-overlay-label" id="mitl-camera-label">FRONT_CAM</div>
+                                </div>
+                            </div>
+
+                            <div class="card card-glass">
+                                <h3>NuRec Telemetry & Kinematics</h3>
+                                <div class="info-list" style="margin-top: 10px;">
+                                    <div class="info-row">
+                                        <span class="lbl">GPS Position:</span>
+                                        <span class="val font-mono" id="mitl-telemetry-gps">--</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="lbl">Velocity:</span>
+                                        <span class="val font-mono" id="mitl-telemetry-speed">--</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="lbl">Acceleration:</span>
+                                        <span class="val font-mono" id="mitl-telemetry-accel">--</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="lbl">IMU Orientation (P/R):</span>
+                                        <span class="val font-mono" id="mitl-telemetry-imu">--</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Side: Annotations and CoC reasoning -->
+                        <div class="flex-col" style="gap: 20px;">
+                            <div class="card card-glass">
+                                <h3>Human Bounding Box Triage</h3>
+                                <div style="max-height: 220px; overflow-y: auto; margin-top: 10px; margin-bottom: 12px;">
+                                    <table class="mitl-table" style="width: 100%; text-align: left; border-collapse: collapse;">
+                                        <thead>
+                                            <tr style="border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-muted);">
+                                                <th style="padding: 6px;">ID</th>
+                                                <th style="padding: 6px;">Class Label</th>
+                                                <th style="padding: 6px;">Box Coordinates [x, y, w, h]</th>
+                                                <th style="padding: 6px;">Conf</th>
+                                                <th style="padding: 6px; text-align: right;">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="mitl-box-rows">
+                                            <!-- Dynamically generated -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <button class="btn btn-secondary btn-small" id="btn-mitl-add-box">+ Add Bounding Box</button>
+                            </div>
+
+                            <div class="card card-glass">
+                                <h3>Chain-of-Causation (CoC) Reasoner</h3>
+                                <div class="form-group" style="margin-top: 10px;">
+                                    <label for="mitl-coc-trace">Reasoning / Decision Explanation Path</label>
+                                    <textarea id="mitl-coc-trace" style="width: 100%; height: 80px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 8px; font-family: var(--font-sans); font-size: 13px; resize: none;"></textarea>
+                                </div>
+                                <div class="actions-row" style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center;">
+                                    <button class="btn btn-success" id="btn-mitl-save">✓ Save Human Edits</button>
+                                    <button class="btn btn-secondary" id="btn-mitl-audit">Ask Gemma 4 Critique</button>
+                                </div>
+                                <div id="mitl-audit-results" class="hidden" style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 12px;">
+                                    <h4 style="font-size: 13px; color: var(--primary); margin-bottom: 6px;">Gemma 4 Audit Critique:</h4>
+                                    <div id="mitl-audit-text" style="font-size: 12px; line-height: 1.5; color: var(--text-muted);"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- STAGE 7: MODEL BENCHMARKING -->
+                <section class="stage-panel" id="panel-benchmark">
+                    <!-- Compare Selectors -->
+                    <div class="card card-glass" style="margin-bottom: 24px;">
+                        <div style="display: flex; gap: 24px; align-items: center;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label for="benchmark-model-a" style="margin-bottom: 4px;">Primary Model (A)</label>
+                                <select id="benchmark-model-a">
+                                    <option value="yolov8m.pt" selected>YOLOv8 Medium (m)</option>
+                                    <option value="nvidia/Alpamayo-1.5-10B">Alpamayo-1.5-10B</option>
+                                    <option value="nvidia/Alpamayo-R1-10B">Alpamayo-R1-10B (VLM)</option>
+                                </select>
+                            </div>
+                            <span style="font-size: 20px; color: var(--text-dim); margin-top: 18px;">vs</span>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label for="benchmark-model-b" style="margin-bottom: 4px;">Compare Model (B)</label>
+                                <select id="benchmark-model-b">
+                                    <option value="yolov8m.pt">YOLOv8 Medium (m)</option>
+                                    <option value="nvidia/Alpamayo-1.5-10B">Alpamayo-1.5-10B</option>
+                                    <option value="nvidia/Alpamayo-R1-10B" selected>Alpamayo-R1-10B (VLM)</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary" id="btn-run-benchmark" style="margin-top: 18px;">Compute Verification Metrics</button>
+                        </div>
+                    </div>
+
+                    <div class="grid-2">
+                        <!-- Left side: Side-by-Side Visual Comparison Viewports -->
+                        <div class="card card-glass flex-col" style="gap: 16px;">
+                            <h3>Side-by-Side Annotation Boundary Comparators</h3>
+                            <div style="display: flex; gap: 16px; width: 100%;">
+                                <div style="flex: 1; position: relative; background: #000; border-radius: 8px; overflow: hidden;">
+                                    <img id="benchmark-viewport-a" src="https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=800&auto=format&fit=crop" style="width: 100%; display: block; max-height: 220px; object-fit: cover;">
+                                    <div class="camera-overlay-label" style="top: 8px; left: 8px; background: rgba(59, 130, 246, 0.9);" id="benchmark-lbl-a">YOLOv8-M</div>
+                                </div>
+                                <div style="flex: 1; position: relative; background: #000; border-radius: 8px; overflow: hidden;">
+                                    <img id="benchmark-viewport-b" src="https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=800&auto=format&fit=crop" style="width: 100%; display: block; max-height: 220px; object-fit: cover;">
+                                    <div class="camera-overlay-label" style="top: 8px; left: 8px; background: rgba(168, 85, 247, 0.9);" id="benchmark-lbl-b">Alpamayo-R1</div>
+                                </div>
+                            </div>
+                            <div style="font-size: 11px; color: var(--text-dim); text-align: center;">Visual annotation overlay comparing bounding box predictions at frame coordinate intersections.</div>
+                        </div>
+
+                        <!-- Right side: Custom Comparison Bar Chart -->
+                        <div class="card card-glass flex-col">
+                            <h3>Key Safety & Quality Metrics</h3>
+                            <div style="flex-grow: 1; display: flex; align-items: center; justify-content: center;">
+                                <canvas id="benchmark-comparison-chart" width="400" height="200"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Comparison Table -->
+                    <div class="card card-glass" style="margin-top: 24px;">
+                        <h3>SOTA Annotation Metrics Reference</h3>
+                        <div style="overflow-x: auto; margin-top: 12px;">
+                            <table class="mitl-table" style="width: 100%; border-collapse: collapse; text-align: left;">
+                                <thead>
+                                    <tr style="border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-muted);">
+                                        <th style="padding: 10px;">Annotation Model</th>
+                                        <th style="padding: 10px;">Type</th>
+                                        <th style="padding: 10px;">Latency (ms)</th>
+                                        <th style="padding: 10px;">mAP [50]</th>
+                                        <th style="padding: 10px;">Risk-Weighted Recall</th>
+                                        <th style="padding: 10px;">Recall @ Critical Distance</th>
+                                        <th style="padding: 10px;">VRU Recall (Pedestrians)</th>
+                                        <th style="padding: 10px;">CoC Traces</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="benchmark-table-rows">
+                                    <!-- Dynamically generated -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- STAGE 8: EXPORT -->
+                <section class="stage-panel" id="panel-export">
+                    <div class="grid-2">
+                        <div class="card card-glass">
+                            <h3>Export Deployment Engine</h3>
+                            <p>Serialize your trained model weights for production deployment and inference acceleration.</p>
+                            <div class="form-group" style="margin-top: 15px;">
+                                <label>Target Format</label>
+                                <div class="radio-group">
+                                    <label class="radio-label">
+                                        <input type="radio" name="export-format" value="onnx" checked> ONNX Engine (Standard CPU/GPU)
+                                    </label>
+                                    <label class="radio-label">
+                                        <input type="radio" name="export-format" value="engine"> TensorRT (.engine)
+                                    </label>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary" id="btn-export-weights">Build & Export Weights</button>
+                            <div id="export-status-box" class="status-msg hidden">Exporting model...</div>
+                        </div>
+
+                        <div class="card card-glass">
+                            <h3>Finetuned Weights Details</h3>
+                            <div class="info-list">
+                                <div class="info-row">
+                                    <span class="lbl">Best Weights File:</span>
+                                    <span class="val font-mono" id="best-weights-loc">runs/detect/coco_finetuned/weights/best.pt</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="lbl">Last Weights File:</span>
+                                    <span class="val font-mono" id="last-weights-loc">runs/detect/coco_finetuned/weights/last.pt</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- STAGE 9: MCP CONFIGURATION -->
+                <section class="stage-panel" id="panel-mcp">
+                    <div class="grid-2">
+                        <!-- Left card: Server Toggles -->
+                        <div class="card card-glass flex-col" style="gap: 16px;">
+                            <h3>IDE Model Context Protocol Servers</h3>
+                            <p>Enable or disable active plugins and external compute layers directly in <code>mcp_config.json</code>.</p>
+                            <div id="mcp-servers-list" style="display: flex; flex-direction: column; gap: 16px; margin-top: 12px;">
+                                <!-- Dynamically populated toggle controls -->
+                            </div>
+                        </div>
+
+                        <!-- Right card: Raw JSON Inspector -->
+                        <div class="card card-glass flex-col">
+                            <h3>Raw config file: <code>mcp_config.json</code></h3>
+                            <p style="font-size: 12px; margin-bottom: 12px;">Path: <span id="mcp-file-path-lbl" style="font-family: var(--font-mono); color: var(--secondary);">~/.gemini/config/mcp_config.json</span></p>
+                            <textarea id="mcp-raw-textarea" style="flex-grow: 1; min-height: 250px; background: #04060b; border: 1px solid var(--border); color: #00ffaa; font-family: var(--font-mono); font-size: 12px; padding: 12px; border-radius: 6px; resize: vertical; outline: none;"></textarea>
+                            <div style="margin-top: 15px; display: flex; justify-content: flex-end; gap: 12px;">
+                                <button class="btn btn-secondary" id="btn-mcp-refresh">Reload File</button>
+                                <button class="btn btn-primary" id="btn-mcp-save">Save Raw JSON</button>
+                            </div>
+                            <div id="mcp-save-status" class="status-msg hidden" style="margin-top: 10px;"></div>
+                        </div>
+                </section>
+
+                <!-- STAGE 10: STATEWIDE SSAM SAFETY GIS DASHBOARD -->
+                <section class="stage-panel" id="panel-ssam">
+                    <!-- Summary KPI Cards -->
+                    <div class="ssam-kpi-row">
+                        <div class="ssam-kpi-card ssam-kpi-total">
+                            <span class="ssam-kpi-num" id="ssam-kpi-total">0</span>
+                            <span class="ssam-kpi-label">Total Conflicts</span>
+                        </div>
+                        <div class="ssam-kpi-card ssam-kpi-critical">
+                            <span class="ssam-kpi-num" id="ssam-kpi-critical">0</span>
+                            <span class="ssam-kpi-label">Critical</span>
+                        </div>
+                        <div class="ssam-kpi-card ssam-kpi-high">
+                            <span class="ssam-kpi-num" id="ssam-kpi-high">0</span>
+                            <span class="ssam-kpi-label">High</span>
+                        </div>
+                        <div class="ssam-kpi-card ssam-kpi-medium">
+                            <span class="ssam-kpi-num" id="ssam-kpi-medium">0</span>
+                            <span class="ssam-kpi-label">Medium</span>
+                        </div>
+                        <div class="ssam-kpi-card ssam-kpi-low">
+                            <span class="ssam-kpi-num" id="ssam-kpi-low">0</span>
+                            <span class="ssam-kpi-label">Low</span>
+                        </div>
+                    </div>
+
+                    <!-- Global Filter Bar -->
+                    <div class="ssam-filter-bar card card-glass">
+                        <div class="ssam-filter-row">
+                            <div class="ssam-filter-group">
+                                <label for="ssam-filter-search">Search</label>
+                                <input type="text" id="ssam-filter-search" placeholder="Street name or county…" autocomplete="off">
+                            </div>
+                            <div class="ssam-filter-group">
+                                <label for="ssam-filter-county">County</label>
+                                <select id="ssam-filter-county" multiple>
+                                    <!-- Dynamically populated -->
+                                </select>
+                            </div>
+                            <div class="ssam-filter-group">
+                                <label>Conflict Type</label>
+                                <div class="ssam-checkbox-row" id="ssam-filter-conflict-types">
+                                    <label class="ssam-chip"><input type="checkbox" value="Crossing" checked><span>Crossing</span></label>
+                                    <label class="ssam-chip"><input type="checkbox" value="Rear-end" checked><span>Rear-end</span></label>
+                                    <label class="ssam-chip"><input type="checkbox" value="Lane-change" checked><span>Lane-change</span></label>
+                                </div>
+                            </div>
+                            <div class="ssam-filter-group">
+                                <label>Severity</label>
+                                <div class="ssam-checkbox-row" id="ssam-filter-severity">
+                                    <label class="ssam-chip ssam-chip-critical"><input type="checkbox" value="Critical" checked><span>Critical</span></label>
+                                    <label class="ssam-chip ssam-chip-high"><input type="checkbox" value="High" checked><span>High</span></label>
+                                    <label class="ssam-chip ssam-chip-medium"><input type="checkbox" value="Medium" checked><span>Medium</span></label>
+                                    <label class="ssam-chip ssam-chip-low"><input type="checkbox" value="Low" checked><span>Low</span></label>
+                                </div>
+                            </div>
+                            <div class="ssam-filter-group ssam-filter-ttc">
+                                <label for="ssam-filter-ttc">Max TTC ≤ <span id="ssam-ttc-val">1.5</span>s</label>
+                                <input type="range" id="ssam-filter-ttc" min="0.1" max="2.0" step="0.1" value="1.5">
+                            </div>
+                            <div class="ssam-filter-group ssam-filter-actions">
+                                <button class="btn btn-primary btn-small" id="ssam-apply-filters">Apply Filters</button>
+                                <button class="btn btn-secondary btn-small" id="ssam-reset-filters">Reset</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Map + Data Grid Layout -->
+                    <div class="ssam-main-layout">
+                        <!-- Left: Interactive Map Canvas -->
+                        <div class="ssam-map-container card card-glass">
+                            <div class="ssam-map-header">
+                                <h3>California Statewide Conflict Map</h3>
+                                <div class="ssam-map-controls">
+                                    <button class="btn btn-secondary btn-small" id="ssam-map-zoom-in" title="Zoom In">+</button>
+                                    <button class="btn btn-secondary btn-small" id="ssam-map-zoom-out" title="Zoom Out">−</button>
+                                    <button class="btn btn-secondary btn-small" id="ssam-map-reset" title="Reset View">⟲</button>
+                                </div>
+                            </div>
+                            <div class="ssam-map-wrapper">
+                                <canvas id="ssam-map-canvas" width="620" height="700"></canvas>
+                                <div class="ssam-map-tooltip hidden" id="ssam-map-tooltip"></div>
+                            </div>
+                            <div class="ssam-map-legend">
+                                <span class="legend-dot legend-critical"></span> Critical
+                                <span class="legend-dot legend-high"></span> High
+                                <span class="legend-dot legend-medium"></span> Medium
+                                <span class="legend-dot legend-low"></span> Low
+                            </div>
+                        </div>
+
+                        <!-- Right: Data Grid + Pagination -->
+                        <div class="ssam-grid-container card card-glass">
+                            <h3>Conflict Analysis Data Grid (FHWA SSAM)</h3>
+                            <div class="ssam-grid-scroll">
+                                <table class="ssam-data-table">
+                                    <thead>
+                                        <tr>
+                                            <th data-sort="street_name" class="sortable">Street Interface ⇅</th>
+                                            <th data-sort="county" class="sortable">County ⇅</th>
+                                            <th data-sort="conflict_type">Type</th>
+                                            <th data-sort="min_ttc" class="sortable">Min TTC ⇅</th>
+                                            <th data-sort="min_pet" class="sortable">Min PET ⇅</th>
+                                            <th data-sort="max_speed" class="sortable">Max ΔS ⇅</th>
+                                            <th data-sort="severity_index" class="sortable">Severity ⇅</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="ssam-grid-body">
+                                        <!-- Dynamically rendered rows -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="ssam-pagination">
+                                <button class="btn btn-secondary btn-small" id="ssam-page-prev">← Prev</button>
+                                <span class="ssam-page-info" id="ssam-page-info">Page 1 / 1</span>
+                                <button class="btn btn-secondary btn-small" id="ssam-page-next">Next →</button>
+                                <select id="ssam-page-size" title="Rows per page" style="margin-left:12px;">
+                                    <option value="10">10 / page</option>
+                                    <option value="25" selected>25 / page</option>
+                                    <option value="50">50 / page</option>
+                                    <option value="100">100 / page</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Severity Annotation Drawer (slides in from right) -->
+                    <div class="ssam-drawer hidden" id="ssam-severity-drawer">
+                        <div class="ssam-drawer-header">
+                            <h4 id="ssam-drawer-title">Street Detail</h4>
+                            <button class="btn btn-secondary btn-small" id="ssam-drawer-close">✕ Close</button>
+                        </div>
+                        <div class="ssam-drawer-body">
+                            <div class="ssam-drawer-metrics" id="ssam-drawer-metrics"></div>
+                            <div class="form-group" style="margin-top:16px;">
+                                <label for="ssam-drawer-annotation">Severity Annotation Notes</label>
+                                <textarea id="ssam-drawer-annotation" placeholder="Enter safety comments or audit notes…" style="width:100%; min-height:120px; background:#04060b; border:1px solid var(--border); color:#fff; padding:12px; border-radius:6px; resize:vertical; outline:none; font-size:13px;"></textarea>
+                            </div>
+                            <button class="btn btn-primary" id="ssam-drawer-save" style="margin-top:12px;">Save Annotation</button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+    <!-- Glassmorphism Pipeline Tools Configuration Wizard Modal -->
+    <div id="pipeline-wizard-modal" class="modal-wrapper hidden">
+        <div class="modal-card card-glass">
+            <div class="modal-header">
+                <h3>🛠️ Preprocessing Complete: Configure Pipeline Tools</h3>
+                <p>Select the preferred methodologies and frameworks to execute for the preprocessed dataset.</p>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="wizard-annotation-tool">Annotation Methodology / Tool</label>
+                    <select id="wizard-annotation-tool">
+                        <option value="CVAT (Self-Hosted)">CVAT (Self-Hosted)</option>
+                        <option value="Encord AI-Assisted">Encord AI-Assisted</option>
+                        <option value="Scale AI Enterprise">Scale AI Enterprise</option>
+                        <option value="VLM Chain-of-Causation Auto-Labeler">VLM Chain-of-Causation Auto-Labeler</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="wizard-training-framework">Training Engine / Framework</label>
+                    <select id="wizard-training-framework">
+                        <option value="PyTorch SOTA Model Suite">PyTorch SOTA Model Suite</option>
+                        <option value="TensorFlow AV Model Garden">TensorFlow AV Model Garden</option>
+                        <option value="NVIDIA TensorRT Optimisation Layer">NVIDIA TensorRT Optimisation Layer</option>
+                        <option value="Alpamayo-10B Parameter Trajectory Model">Alpamayo-10B Parameter Trajectory Model</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="wizard-validation-method">Validation & QA Methodology</label>
+                    <select id="wizard-validation-method">
+                        <option value="K-Fold Cross-Validation (mAP)">K-Fold Cross-Validation (mAP)</option>
+                        <option value="Real-time Simulation Triage Loops">Real-time Simulation Triage Loops</option>
+                        <option value="Auto-Grader Critical Boundary Quality Gates">Auto-Grader Critical Boundary Quality Gates</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="btn-wizard-submit">Save Pipeline Configuration</button>
+            </div>
+        </div>
+    </div>
+    <!-- Floating Onscreen Help Guide Button -->
+    <button id="floating-help-btn" class="floating-btn" title="Open Interactive Guide" style="position: fixed; bottom: 20px; right: 20px; width: 45px; height: 45px; border-radius: 50%; background: var(--primary); color: #000; border: none; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0, 200, 150, 0.4); z-index: 999; transition: transform 0.2s ease;">❓</button>
+
+    <!-- Onscreen Help Guide Drawer -->
+    <div id="help-drawer" class="drawer-wrapper hidden" style="position: fixed; top: 0; right: -400px; width: 380px; height: 100%; background: rgba(10, 15, 25, 0.95); border-left: 1px solid var(--border); box-shadow: -10px 0 30px rgba(0,0,0,0.5); z-index: 1000; transition: right 0.3s ease; padding: 24px; box-sizing: border-box; overflow-y: auto; backdrop-filter: blur(12px);">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 20px;">
+            <h3 style="margin: 0; font-size: 18px; color: #fff; display: flex; align-items: center; gap: 8px;">📖 Guidance Panel</h3>
+            <button id="close-drawer-btn" style="background: none; border: none; color: var(--text-muted); font-size: 24px; cursor: pointer; line-height: 1;">&times;</button>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 20px;">
+            <div>
+                <h4 style="margin: 0 0 6px 0; color: var(--secondary); font-size: 14px;">📂 Dataset Configuration YAML</h4>
+                <p style="margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.5;">Sensorflow Studio uses the standard Ultralytics YOLO configuration format. Specify the root <code>path</code>, <code>train</code> path, <code>val</code> path, and class labels mapping index values to strings.</p>
+            </div>
+            <div>
+                <h4 style="margin: 0 0 6px 0; color: var(--warning); font-size: 14px;">🚦 FHWA SSAM Safety Surrogates</h4>
+                <p style="margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.5;">Conflict assessment monitors vehicle trajectories to calculate metrics:</p>
+                <ul style="margin: 6px 0 0 0; padding-left: 16px; font-size: 12px; color: var(--text-muted); line-height: 1.5;">
+                    <li style="margin-bottom: 4px;"><strong>TTC (Time-to-Collision):</strong> Time until crash if speed remains constant. Hazard threshold is <strong>&lt; 1.5 seconds</strong>.</li>
+                    <li><strong>PET (Post-Encroachment Time):</strong> Passage interval between two vehicles crossing the same interface area. Hazard threshold is <strong>&lt; 5.0 seconds</strong>.</li>
+                </ul>
+            </div>
+            <div>
+                <h4 style="margin: 0 0 6px 0; color: var(--primary); font-size: 14px;">⚡ Remote Cluster Training (DGX Spark)</h4>
+                <p style="margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.5;">Allows routing heavy GPU execution to remote systems. Make sure you activate Tailscale, setup dependencies, and verify host resolution before executing.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

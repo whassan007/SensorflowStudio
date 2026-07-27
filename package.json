@@ -1,0 +1,31 @@
+{
+  "name": "driving-repo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@deck.gl/core": "^8.9.30",
+    "@deck.gl/geo-layers": "^8.9.30",
+    "@deck.gl/layers": "^8.9.30",
+    "@deck.gl/react": "^8.9.30",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "react-map-gl": "^7.1.6",
+    "lucide-react": "^0.453.0",
+    "@mui/material": "^5.16.0",
+    "@emotion/react": "^11.13.0",
+    "@emotion/styled": "^11.13.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0",
+    "@vitejs/plugin-react": "^4.5.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.2",
+    "@types/node": "^22.5.0"
+  }
+}

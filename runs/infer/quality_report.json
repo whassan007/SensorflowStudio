@@ -1,0 +1,25 @@
+{
+  "total_predictions": 3,
+  "total_images": 1,
+  "quality_score": 99.0,
+  "issues_by_severity": {
+    "WARNING": 1
+  },
+  "issue_summary": {
+    "low_confidence": 1
+  },
+  "flagged_issues": [
+    {
+      "severity": "WARNING",
+      "type": "low_confidence",
+      "image": "test.jpg",
+      "detection_id": 2,
+      "confidence": 0.29409101605415344,
+      "threshold": 0.5,
+      "message": "Detection confidence 0.294 below threshold 0.5"
+    }
+  ],
+  "recommendations": [
+    "High number of low-confidence detections. Consider retraining or adjusting confidence threshold."
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "yaml_path": "coco8.yaml",
+  "source_path": "data",
+  "dataset_type": "local",
+  "model_type": "yolov8",
+  "annotation_tool": "CVAT (Self-Hosted)",
+  "training_framework": "PyTorch SOTA Model Suite",
+  "validation_method": "K-Fold Cross-Validation (mAP)"
+}
