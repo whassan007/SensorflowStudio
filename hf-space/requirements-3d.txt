@@ -1,0 +1,13 @@
+# 3D Perception Pipeline dependencies (install alongside requirements.txt)
+-r requirements.txt
+
+scipy>=1.11
+filterpy>=1.4.5
+segment-anything>=1.0
+plotly>=5.0
+
+# Optional: Waymo Open Dataset (heavy, install separately if needed)
+# waymo-open-dataset
+
+# Optional: point cloud utilities
+# open3d>=0.18

@@ -1,0 +1,21 @@
+# Ultralytics YOLO 🚀, AGPL-3.0 license
+# COCO8 dataset by Ultralytics
+# Documentation: https://docs.ultralytics.com/datasets/detect/coco8/
+
+# Dataset root directory
+path: ./datasets/coco8
+
+# Train and val images
+train: images/train
+val: images/val
+
+# Classes
+names:
+  0: person
+  1: bicycle
+  2: car
+  3: motorcycle
+  4: airplane
+  5: bus
+  6: train
+  7: truck
