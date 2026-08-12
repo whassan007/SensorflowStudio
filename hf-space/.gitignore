@@ -65,6 +65,7 @@ temp/
 # Generated runtime/test artifacts
 runs/labeleval/
 runs/megaeval/
+runs/platform/
 runs/pipeline/frame_test/
 runs/pipeline/qg_test/
 runs/pipeline/roundtrip/

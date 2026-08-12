@@ -20,6 +20,7 @@ import {
 import { useLabelEval } from '../context/LabelEvalContext';
 import EvidencePanel from '../components/labeleval/EvidencePanel';
 import CopilotDrawer from '../components/labeleval/CopilotDrawer';
+import GateStatusPanel from '../components/platform/GateStatusPanel';
 import { SectionCard, StatusChip, LoadingBox, ErrorNote, fmtNum, fmtPct } from '../components/labeleval/shared';
 
 const PAGE_SIZE = 15;
@@ -90,6 +91,7 @@ export default function EvaluationPage() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <GateStatusPanel candidateRunId={null} baselineRunId={null} />
       <SectionCard title="Evaluation Record Explorer">
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
           <Typography variant="body2" sx={{ color: '#8a949e' }}>

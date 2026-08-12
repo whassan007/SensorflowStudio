@@ -40,6 +40,9 @@ import CompareTab from '../components/megaeval/CompareTab';
 import ReviewTab from '../components/megaeval/ReviewTab';
 import ShiftTab from '../components/megaeval/ShiftTab';
 import LineageCard from '../components/megaeval/LineageCard';
+import ContainerQualityPanel from '../components/platform/ContainerQualityPanel';
+import ModelComparePanel from '../components/platform/ModelComparePanel';
+import GateStatusPanel from '../components/platform/GateStatusPanel';
 
 const ACTIVE_STATUSES: RunStatus[] = ['created', 'queued', 'running', 'reducing', 'materializing'];
 
@@ -49,6 +52,7 @@ type TabId =
   | 'containers'
   | 'investigation'
   | 'compare'
+  | 'gates'
   | 'review'
   | 'shift'
   | 'lineage';
@@ -290,28 +294,49 @@ export default function CommandCenterPage() {
             <Tab label="Containers" value="containers" />
             <Tab label="Investigation" value="investigation" />
             <Tab label="Compare" value="compare" />
+            <Tab label="Gates" value="gates" />
             <Tab label="Review" value="review" />
             <Tab label="Shift" value="shift" />
             <Tab label="Lineage" value="lineage" />
           </Tabs>
 
           {tab === 'quality' ? (
-            <QualityTab runId={selectedRun.run_id} runs={runs} refreshKey={publishTick} />
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <QualityTab runId={selectedRun.run_id} runs={runs} refreshKey={publishTick} />
+              <ContainerQualityPanel runId={selectedRun.run_id} refreshKey={publishTick} />
+            </Box>
           ) : null}
           {tab === 'cohorts' ? <CohortTab runId={selectedRun.run_id} refreshKey={publishTick} /> : null}
           {tab === 'containers' ? (
-            <ContainersTab
-              runId={selectedRun.run_id}
-              refreshKey={publishTick}
-              drillContainerId={drillContainerId}
-              onDrill={setDrillContainerId}
-            />
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <ContainerQualityPanel runId={selectedRun.run_id} refreshKey={publishTick} />
+              <ContainersTab
+                runId={selectedRun.run_id}
+                refreshKey={publishTick}
+                drillContainerId={drillContainerId}
+                onDrill={setDrillContainerId}
+              />
+            </Box>
           ) : null}
           {tab === 'investigation' ? (
             <InvestigationTab runId={selectedRun.run_id} onOpenContainer={openContainer} />
           ) : null}
           {tab === 'compare' ? (
-            <CompareTab runId={selectedRun.run_id} baselineRunId={baselineRunId} refreshKey={publishTick} />
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <ModelComparePanel
+                runId={selectedRun.run_id}
+                baselineRunId={baselineRunId}
+                refreshKey={publishTick}
+              />
+              <CompareTab runId={selectedRun.run_id} baselineRunId={baselineRunId} refreshKey={publishTick} />
+            </Box>
+          ) : null}
+          {tab === 'gates' ? (
+            <GateStatusPanel
+              candidateRunId={selectedRun.run_id}
+              baselineRunId={baselineRunId}
+              refreshKey={publishTick}
+            />
           ) : null}
           {tab === 'review' ? (
             <ReviewTab runId={selectedRun.run_id} review={review} onReview={setReview} />
