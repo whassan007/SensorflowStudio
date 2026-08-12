@@ -1,0 +1,17 @@
+Copyright (c) 2026 Dr. Waël
+All rights reserved.
+
+This repository is released under the **Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY‑NC‑SA 4.0)** license.
+
+**Key terms**:
+- You may **share** and **adapt** the code for any purpose, provided you give appropriate credit to the author (Dr. Waël) and indicate if changes were made.
+- **Non‑commercial**: The software may not be used for commercial purposes without explicit permission from the author.
+- **ShareAlike**: If you modify or build upon the code, you must distribute your contributions under the same license.
+
+**Dataset attribution and compliance**:
+- This project incorporates data from the Alpamayo, Waymo, Audi, and other datasets. Their usage is subject to the respective dataset licenses. By using this repository you agree to comply with all dataset-specific terms, which may include restrictions on redistribution, commercial use, or derivative works. Please refer to the original dataset licenses for full details.
+
+**Disclaimer**:
+- The author provides the software as‑is, without any warranty. The author is not responsible for any misuse of the included datasets.
+
+For the full legal text of CC BY‑NC‑SA 4.0, see https://creativecommons.org/licenses/by-nc-sa/4.0/

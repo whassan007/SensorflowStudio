@@ -1,0 +1,15 @@
+# Slim dependency set for the Hugging Face Space (CPU, limited build time).
+# Heavy GPU/vision deps from requirements.txt (torch, ultralytics, opencv) are
+# lazily imported inside route handlers and intentionally excluded here.
+# Versions mirror the working local .venv where pinned in requirements.txt.
+fastapi==0.140.0
+uvicorn==0.51.0
+pydantic==2.13.4
+httpx==0.28.1
+numpy==2.5.1
+scipy
+pandas==3.0.5
+PyYAML==6.0.3
+python-multipart==0.0.32
+scikit-learn
+requests==2.34.2
