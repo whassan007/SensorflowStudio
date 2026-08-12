@@ -1,0 +1,12 @@
+node_modules/
+.venv/
+.git/
+runs/
+dist/
+models/
+*.pt
+__pycache__/
+**/__pycache__/
+.pytest_cache/
+.claude/
+.DS_Store

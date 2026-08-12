@@ -1,0 +1,17 @@
+[Unit]
+Description=Sensorflow Studio Backend (YOLOv8 Training/Inference)
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=sensorflow
+WorkingDirectory=/opt/sensorflow/studio
+ExecStart=/opt/sensorflow/studio/venv/bin/uvicorn app_backend:app --host 127.0.0.1 --port 8001 --workers 4
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

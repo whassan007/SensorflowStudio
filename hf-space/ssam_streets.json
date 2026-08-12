@@ -1,0 +1,26 @@
+[
+  {
+    "street_name": "Market St & 4th St",
+    "min_ttc": 0.8,
+    "min_pet": 1.2,
+    "max_speed": 12.5,
+    "conflict_type": "Crossing",
+    "manual_annotation": "Test ssam annotation note"
+  },
+  {
+    "street_name": "Broadway Blvd",
+    "min_ttc": 1.6,
+    "min_pet": 4.5,
+    "max_speed": 8.0,
+    "conflict_type": "Rear-end",
+    "manual_annotation": "High rear-end conflict frequency during commute hours"
+  },
+  {
+    "street_name": "Mission St & 16th St",
+    "min_ttc": 0.5,
+    "min_pet": 0.9,
+    "max_speed": 15.0,
+    "conflict_type": "Lane-change",
+    "manual_annotation": ""
+  }
+]
