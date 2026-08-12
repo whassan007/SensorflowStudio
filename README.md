@@ -6,17 +6,24 @@ A production-oriented visual framework for automated object detection, training,
 
 ## Key Features
 
-1. **Visual Pipeline (FastAPI Web UI)**: A 6-stage interactive environment to:
+1. **3D Perception Pipeline** (`sensorflow/`): Automated 5-stage pipeline for exabyte-scale sensor data:
+   - **Ingest & Fusion**: Alpamayo + Waymo unified schema with six-axis taxonomy stratification
+   - **3D Perception**: Local SAM masks lifted to LiDAR 3D bounding box proposals
+   - **Temporal Tracking**: Kalman + Hungarian association for ID-smooth multi-frame tracks
+   - **Quality Gate**: mAP, orientation error, ID swap rate, `process_units` benchmarking
+   - **Launch Gate**: Safety threshold validation blocking export until passed
+2. **Visual Pipeline (FastAPI Web UI)**: A 15-stage interactive environment including legacy 2D YOLO workflow:
    - Configure datasets and verify directories.
    - Choose base weights (`yolov8n`, `yolov8s`, `yolov8m`).
    - Run training locally with real-time logs and dynamic loss curves.
    - Run inference, explore predictions, and overlay bounding boxes on images.
    - Evaluate annotations using automated quality metrics.
    - Export models to high-performance ONNX formats.
-2. **Robust CLI Tools**:
+3. **Robust CLI Tools**:
    - `train.py`: Fine-tune models with custom epochs, batch sizes, and hardware parameters.
    - `infer.py`: Batch prediction script generating structured JSON output.
    - `autograder.py`: Algorithmic review auditing prediction boxes for overlap, anomalies, and low confidence.
+   - `sensorflow/cli/`: 3D pipeline CLIs (`ingest`, `auto_label`, `track`, `benchmark`).
 
 ---
 
@@ -24,18 +31,25 @@ A production-oriented visual framework for automated object detection, training,
 
 ```
 DrivingRepo/
-├── app_backend.py       # FastAPI backend serving UI and running subprocesses
+├── app_backend.py       # FastAPI backend serving UI and pipeline APIs
+├── sensorflow/          # 3D perception pipeline package
+│   ├── dataset_fusion_engine.py
+│   ├── perception_automator.py
+│   ├── temporal_tracker.py
+│   ├── quality_gate.py
+│   ├── launch_gate_evaluator.py
+│   ├── mitl_copilot.py
+│   ├── adapters/        # Alpamayo + Waymo normalization
+│   ├── metrics/         # 3D/temporal/resource metrics
+│   └── cli/             # Pipeline CLI entrypoints
 ├── train.py             # CLI training entrypoint
 ├── infer.py             # CLI batch inference entrypoint
 ├── autograder.py        # Quality assurance diagnostics script
 ├── static/              # Visual Studio frontend folder
-│   ├── index.html       # Studio layout and stages template
-│   ├── style.css        # Glassmorphism dark mode style definitions
-│   └── app.js           # Controller handling chart plotting and API requests
-├── tests/
-│   └── test_backend.py  # Automated tests for the Studio server
-├── requirements.txt     # Global workspace dependencies
-└── runs/                # Output directory for weights, inference, and reports
+├── tests/test_pipeline/ # 3D pipeline integration tests
+├── requirements.txt     # Base dependencies
+├── requirements-3d.txt  # 3D pipeline dependencies (SAM, scipy, filterpy)
+└── runs/pipeline/       # 3D pipeline artifacts (manifests, tracks, benchmarks)
 ```
 
 ---
@@ -46,7 +60,8 @@ DrivingRepo/
 Ensure you have Python 3.8+ installed, then run:
 ```bash
 pip install -r requirements.txt
-pip install fastapi uvicorn httpx pytest
+pip install -r requirements-3d.txt   # For 3D perception pipeline
+bash deploy/download-models.sh .       # Downloads YOLO + SAM ViT-B weights
 ```
 
 ### 2. Start the Studio Server
@@ -61,7 +76,38 @@ Navigate to:
 
 ---
 
-## Detailed Visual Stages
+## 3D Perception Pipeline
+
+### CLI Usage
+
+```bash
+# Stage 1: Ingest & fuse Alpamayo + Waymo data
+python -m sensorflow.cli.ingest --vendors alpamayo waymo --sequence-id seq_001
+
+# Stage 2: SAM auto-labeling (use --no-sam for dev without checkpoint)
+python -m sensorflow.cli.auto_label --manifest runs/pipeline/seq_001/manifest.json --no-sam
+
+# Stage 3: Temporal tracking
+python -m sensorflow.cli.track --proposals-dir runs/pipeline/seq_001/proposals
+
+# Stage 4: Quality gate benchmark
+python -m sensorflow.cli.benchmark --manifest runs/pipeline/seq_001/manifest.json
+```
+
+### API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/dataset/ingest` | Fuse multi-vendor sensor data |
+| `POST /api/perception/auto-label` | SAM + LiDAR 3D proposals |
+| `POST /api/perception/track` | Kalman temporal tracking |
+| `POST /api/gates/quality` | Benchmark against vendor GT |
+| `POST /api/gates/launch` | Validate export thresholds |
+| `GET /api/pipeline/status` | Stage completion flags |
+
+Export is blocked (`HTTP 403`) until the launch gate passes.
+
+---
 
 ### Stage 1: Dataset Configuration
 Configure your training config (e.g. `coco8.yaml`) and inference image folder. Click **Run Pre-Check** to verify script path locations on the filesystem.

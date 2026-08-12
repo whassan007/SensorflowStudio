@@ -5,5 +5,10 @@
   "model_type": "yolov8",
   "annotation_tool": "CVAT (Self-Hosted)",
   "training_framework": "PyTorch SOTA Model Suite",
-  "validation_method": "K-Fold Cross-Validation (mAP)"
+  "validation_method": "K-Fold Cross-Validation (mAP)",
+  "pipeline_mode": "3d",
+  "sam_checkpoint": "models/sam_vit_b.pth",
+  "vendors": ["alpamayo", "waymo"],
+  "gate_thresholds_path": "runs/pipeline/gate_thresholds.json",
+  "sequence_id": "seq_001"
 }

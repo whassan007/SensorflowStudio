@@ -36,18 +36,40 @@
       }
     ]
   },
-  "coc_trace": "Human adjusted CoC reasoning trace.",
+  "coc_trace": "The vehicle is approaching a signalized intersection. Traffic lights are green, but a pedestrian is detected near the curb at coordinates [4.5, 20.8] moving towards the crosswalk. Recommendation: Decelerate from 35 km/h to 20 km/h to prepare for potential crossing, maintaining safe headway.",
   "annotations": [
     {
       "id": 1,
       "label": "pedestrian",
       "box": [
-        10,
-        20,
-        30,
-        40
+        120,
+        240,
+        60,
+        120
+      ],
+      "conf": 0.89
+    },
+    {
+      "id": 2,
+      "label": "car",
+      "box": [
+        340,
+        220,
+        150,
+        100
       ],
       "conf": 0.95
+    },
+    {
+      "id": 3,
+      "label": "traffic_light",
+      "box": [
+        500,
+        80,
+        30,
+        60
+      ],
+      "conf": 0.92
     }
   ]
 }

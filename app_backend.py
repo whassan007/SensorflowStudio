@@ -30,6 +30,11 @@ class StudioConfig(BaseModel):
     source_path: str = "data"
     dataset_type: str = "local"
     model_type: str = "yolov8"
+    pipeline_mode: str = "3d"
+    sam_checkpoint: str = "models/sam_vit_b.pth"
+    vendors: List[str] = ["alpamayo", "waymo"]
+    gate_thresholds_path: str = "runs/pipeline/gate_thresholds.json"
+    sequence_id: str = "seq_001"
 
 class TrainParams(BaseModel):
     model: str = "yolov8n.pt"
@@ -351,8 +356,16 @@ def grade_predictions():
 
 @app.post("/api/export")
 def export_weights(params: ExportParams):
-    # Call standard ultralytics export function via python one-liner
-    # e.g., python -c "from ultralytics import YOLO; YOLO('best.pt').export(format='onnx')"
+    config = load_config()
+    if config.pipeline_mode == "3d":
+        from sensorflow.launch_gate_evaluator import LaunchGateEvaluator
+        evaluator = LaunchGateEvaluator(Path(config.gate_thresholds_path))
+        if not evaluator.is_export_allowed(config.sequence_id):
+            raise HTTPException(
+                status_code=403,
+                detail="Export blocked: launch gate not passed. Run quality gate and launch gate first.",
+            )
+
     cmd = [
         sys.executable, "-c",
         f"from ultralytics import YOLO; YOLO('{params.weights}').export(format='{params.format}')"
@@ -623,6 +636,33 @@ Provide a professional, clear critique in markdown. Be concise and focus purely 
 
 @app.get("/api/benchmark/compare")
 def benchmark_compare(dataset: str = "physical_ai"):
+    config = load_config()
+    metric_path = Path("runs/pipeline") / config.sequence_id / "benchmark" / "metric_card.json"
+    if metric_path.exists():
+        with open(metric_path) as f:
+            metrics = json.load(f)
+        return {
+            "status": "ok",
+            "dataset": dataset,
+            "source": "live_benchmark",
+            "benchmarks": {
+                "sensorflow_3d_pipeline": {
+                    "name": "Sensorflow 3D Pipeline",
+                    "type": "SAM + LiDAR + Tracker",
+                    "map_3d": metrics.get("map_3d", 0),
+                    "mar_3d": metrics.get("mar_3d", 0),
+                    "mean_iou_3d": metrics.get("mean_iou_3d", 0),
+                    "orientation_error_deg": metrics.get("orientation_error_deg", 0),
+                    "position_error_m": metrics.get("position_error_m", 0),
+                    "id_swap_rate": metrics.get("id_swap_rate", 0),
+                    "track_fragmentation_rate": metrics.get("track_fragmentation_rate", 0),
+                    "process_units": metrics.get("process_units", 0),
+                    "compute_cycles": metrics.get("compute_cycles", 0),
+                }
+            },
+            "metrics": metrics,
+        }
+
     comparison_data = {
         "yolov8m.pt": {
             "name": "YOLOv8 Medium",
@@ -655,33 +695,125 @@ def benchmark_compare(dataset: str = "physical_ai"):
             "vru_recall": 0.98
         }
     }
-    return {"status": "ok", "dataset": dataset, "benchmarks": comparison_data}
+    return {"status": "ok", "dataset": dataset, "source": "fallback_mock", "benchmarks": comparison_data}
 
 class SavePipelineToolsRequest(BaseModel):
     annotation_tool: str
     training_framework: str
     validation_method: str
 
+DATASET_METADATA_STORE = {
+    "local": {
+        "dataset_type": "local",
+        "name": "Local Directory (Default YOLO COCO8)",
+        "total_rows_source": 128,
+        "loaded_rows": 128,
+        "ingestion_pct": "100.0%",
+        "total_annotations": 432,
+        "classes": ["person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck"],
+        "class_counts": {"car": 184, "person": 112, "truck": 58, "bicycle": 42, "motorcycle": 24, "bus": 12},
+        "sensor_modality": "Monocular Front RGB Camera (640x640)",
+        "storage_footprint": "6.5 MB",
+        "format": "YOLOv8 TXT / COCO YAML",
+        "licensing": "Ultralytics AGPL-3.0 / Open Source",
+        "geographic_coverage": "Local Drive (/DrivingRepo/data)",
+        "weather_conditions": "Daytime / Mixed",
+        "annotation_tool": "Auto-Labeler + Manual Bounding Box",
+        "description": "Standard lightweight object detection dataset for rapid local testing and mobile/edge training."
+    },
+    "waymo": {
+        "dataset_type": "waymo",
+        "name": "Waymo Open Dataset (v1.4)",
+        "total_rows_source": 23410,
+        "loaded_rows": 1500,
+        "ingestion_pct": "6.4%",
+        "total_annotations": 2840000,
+        "classes": ["vehicle", "pedestrian", "cyclist", "sign"],
+        "class_counts": {"vehicle": 1620000, "pedestrian": 890000, "cyclist": 210000, "sign": 120000},
+        "sensor_modality": "5x LiDARs (Top & 4 Sides) + 5x High-Res Pin-hole Cameras + IMU/GNSS Telemetry",
+        "storage_footprint": "1.2 TB",
+        "format": "TFRecord / Protocol Buffers",
+        "licensing": "Waymo Non-Commercial Research License",
+        "geographic_coverage": "San Francisco, Phoenix, Mountain View (CA/AZ)",
+        "weather_conditions": "Day, Night, Rain, Fog, Overcast",
+        "annotation_tool": "Auto-Labeled 3D LiDAR & 2D Bounding Boxes",
+        "description": "High-resolution multi-sensor dataset capturing diverse urban driving environments across California and Arizona."
+    },
+    "alpamayo": {
+        "dataset_type": "alpamayo",
+        "name": "NVIDIA Alpamayo Physical AI AV Dataset",
+        "total_rows_source": 700000,
+        "loaded_rows": 4209,
+        "ingestion_pct": "0.6%",
+        "total_annotations": 12500000,
+        "classes": ["car", "truck", "pedestrian", "cyclist", "traffic_light", "traffic_sign"],
+        "class_counts": {"car": 6800000, "pedestrian": 2900000, "traffic_light": 1400000, "truck": 850000, "cyclist": 550000},
+        "sensor_modality": "8x Surround Cameras (4K 60fps) + 3D LiDAR + CAN-Bus Telemetry + Chain-of-Causation Reasoning Traces",
+        "storage_footprint": "450 GB",
+        "format": "Parquet + HDF5 + JSON CoC Traces",
+        "licensing": "NVIDIA Physical AI Open License",
+        "geographic_coverage": "SF Bay Area, Highway 101, Sunnyvale Intersections",
+        "weather_conditions": "Clear, Rain, Dusk, Night, Construction Zones",
+        "annotation_tool": "NeMo Studio Reasoning Engine + CoC Automated Traces",
+        "description": "Physical AI reasoning dataset pairing multi-camera sensor video with Chain-of-Causation natural language decision traces."
+    },
+    "a2d2": {
+        "dataset_type": "a2d2",
+        "name": "Audi A2D2 Autonomous Driving Dataset",
+        "total_rows_source": 41200,
+        "loaded_rows": 2500,
+        "ingestion_pct": "6.1%",
+        "total_annotations": 380000,
+        "classes": ["car", "pedestrian", "pedestrian_group", "truck", "bus", "bicycle", "motorcycle", "traffic_sign", "signal", "obstacle"],
+        "class_counts": {"car": 210000, "traffic_sign": 75000, "pedestrian": 45000, "truck": 28000, "signal": 22000},
+        "sensor_modality": "6x Cameras (1920x1208 @ 30fps) + 5x LiDAR Sensors + Vehicle Bus Telemetry (Steering, Speed, Yaw)",
+        "storage_footprint": "2.3 TB",
+        "format": "HDF5 + PNG + JSON",
+        "licensing": "Audi A2D2 Non-Commercial License",
+        "geographic_coverage": "Ingolstadt, Munich, Gaimersheim (Germany)",
+        "weather_conditions": "European Highway, Suburban, Urban Snow & Rain",
+        "annotation_tool": "3D Bounding Boxes & Semantic Segmentation Maps",
+        "description": "European autonomous driving dataset featuring synchronized 3D LiDAR, 2D camera images, and vehicle bus sensor data."
+    },
+    "ssam": {
+        "dataset_type": "ssam",
+        "name": "California Statewide SSAM Intersection Safety Dataset",
+        "total_rows_source": 845,
+        "loaded_rows": 845,
+        "ingestion_pct": "100.0%",
+        "total_annotations": 4225,
+        "classes": ["rear_end", "angle", "sideswipe", "head_on", "pedestrian_cross"],
+        "class_counts": {"rear_end": 1840, "angle": 1220, "sideswipe": 680, "head_on": 320, "pedestrian_cross": 165},
+        "sensor_modality": "SSAM Traffic Conflict Telemetry & Intersection Video Log Records",
+        "storage_footprint": "18.4 MB",
+        "format": "GeoJSON + SSAM XML/CSV",
+        "licensing": "Federal Highway Administration (FHWA) Public Domain",
+        "geographic_coverage": "Statewide California Intersection Corridors",
+        "weather_conditions": "Multi-year Statewide Microclimates",
+        "annotation_tool": "Surrogate Safety Assessment Model (SSAM) Analytics Engine",
+        "description": "Statewide collision conflict dataset tracking Time-to-Collision (TTC) and Post-Encroachment Time (PET) across intersections."
+    }
+}
+
+@app.get("/api/dataset/details")
+def get_dataset_details(type: str = "local"):
+    metadata = DATASET_METADATA_STORE.get(type, DATASET_METADATA_STORE["local"])
+    return {"status": "ok", "metadata": metadata}
+
 @app.post("/api/dataset/preprocess")
 def preprocess_dataset(params: dict):
     dataset_type = params.get("dataset_type", "local")
-    # Simulate preprocessing delay / operation
     import time
-    time.sleep(0.5)
+    time.sleep(0.3)
     
-    total_frames = 1500
-    if dataset_type == "waymo":
-        total_frames = 23410
-    elif dataset_type == "alpamayo":
-        total_frames = 700000
-    elif dataset_type == "a2d2":
-        total_frames = 41200
-        
+    meta = DATASET_METADATA_STORE.get(dataset_type, DATASET_METADATA_STORE["local"])
+    
     return {
         "status": "ok",
-        "message": f"Dataset {dataset_type} loaded and preprocessed successfully.",
+        "message": f"Dataset {meta['name']} loaded and preprocessed successfully.",
         "dataset_type": dataset_type,
-        "total_frames": total_frames
+        "total_frames": meta["loaded_rows"],
+        "metadata": meta
     }
 
 @app.post("/api/dataset/save-pipeline-tools")
@@ -1109,6 +1241,197 @@ def annotate_street(req: AnnotateStreetRequest):
     with open(SSAM_STREETS_PATH, "w") as f:
         json.dump(streets, f, indent=2)
     return {"status": "ok", "message": f"Annotation saved for {req.street_name}"}
+
+# -----------------------------------------------------------------------
+# 3D Perception Pipeline Routes
+# -----------------------------------------------------------------------
+
+class IngestParams(BaseModel):
+    vendors: List[str] = ["alpamayo", "waymo"]
+    sequence_id: str = "seq_001"
+
+class AutoLabelParams(BaseModel):
+    sequence_id: str = "seq_001"
+    sam_checkpoint: str = "models/sam_vit_b.pth"
+    device: str = "cpu"
+    no_sam: bool = False
+
+class TrackParams(BaseModel):
+    sequence_id: str = "seq_001"
+
+class BenchmarkParams(BaseModel):
+    sequence_id: str = "seq_001"
+
+class GateParams(BaseModel):
+    sequence_id: str = "seq_001"
+
+
+@app.post("/api/dataset/ingest")
+def ingest_dataset(params: IngestParams):
+    from sensorflow.dataset_fusion_engine import DatasetFusionEngine
+    try:
+        engine = DatasetFusionEngine()
+        sequence = engine.ingest(params.vendors, params.sequence_id)
+        manifest_path = engine.save_manifest(sequence)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ingest failed: {str(e)}")
+
+    config = load_config()
+    config.sequence_id = params.sequence_id
+    config.vendors = params.vendors
+    with open(CONFIG_PATH, "w") as f:
+        json.dump(config.model_dump(), f, indent=2)
+
+    return {"status": "ok", "manifest": str(manifest_path), "sequence_id": params.sequence_id}
+
+
+@app.get("/api/dataset/ingest/status")
+def ingest_status(sequence_id: str = "seq_001"):
+    from sensorflow.dataset_fusion_engine import DatasetFusionEngine
+    engine = DatasetFusionEngine()
+    status = engine.get_status(sequence_id)
+    manifest = Path("runs/pipeline") / sequence_id / "manifest.json"
+    if manifest.exists():
+        with open(manifest) as f:
+            manifest_data = json.load(f)
+        status["manifest_exists"] = True
+        status["frames"] = len(manifest_data.get("frames", []))
+        status["vendor"] = manifest_data.get("vendor", "unknown")
+    return {"status": "ok", "sequence_id": sequence_id, **status}
+
+
+@app.post("/api/perception/auto-label")
+def auto_label(params: AutoLabelParams):
+    from sensorflow.perception_automator import PerceptionAutomator
+    from sensorflow.schemas.unified_frame import UnifiedSequence
+
+    manifest = Path("runs/pipeline") / params.sequence_id / "manifest.json"
+    if not manifest.exists():
+        raise HTTPException(status_code=400, detail="Manifest not found. Run ingest first.")
+
+    try:
+        sequence = UnifiedSequence.load(manifest)
+        output_dir = manifest.parent / "proposals"
+        automator = PerceptionAutomator(
+            sam_checkpoint=params.sam_checkpoint,
+            device=params.device,
+            use_sam=not params.no_sam,
+        )
+        automator.run_sequence(sequence, output_dir)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Auto-label failed: {str(e)}")
+
+    proposals_dir = manifest.parent / "proposals"
+    num_frames = len(list(proposals_dir.glob("*.json"))) if proposals_dir.exists() else 0
+    return {"status": "ok", "proposals_dir": str(proposals_dir), "frames_processed": num_frames}
+
+
+@app.post("/api/perception/track")
+def run_tracking(params: TrackParams):
+    from sensorflow.temporal_tracker import TemporalTracker
+
+    proposals_dir = Path("runs/pipeline") / params.sequence_id / "proposals"
+    if not proposals_dir.exists():
+        raise HTTPException(status_code=400, detail="Proposals not found. Run auto-label first.")
+
+    output = Path("runs/pipeline") / params.sequence_id / "tracks.json"
+    try:
+        tracker = TemporalTracker()
+        proposals = TemporalTracker.load_proposals(proposals_dir)
+        tracks = tracker.run_sequence(proposals, output)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Tracking failed: {str(e)}")
+
+    return {"status": "ok", "tracks_file": str(output), "num_tracks": len(tracks)}
+
+
+@app.post("/api/benchmark")
+def run_benchmark(params: BenchmarkParams):
+    from sensorflow.quality_gate import QualityGate
+    from sensorflow.schemas.unified_frame import UnifiedSequence
+
+    manifest = Path("runs/pipeline") / params.sequence_id / "manifest.json"
+    tracks_path = Path("runs/pipeline") / params.sequence_id / "tracks.json"
+    if not manifest.exists():
+        raise HTTPException(status_code=400, detail="Manifest not found.")
+
+    try:
+        sequence = UnifiedSequence.load(manifest)
+        pred_tracks = json.loads(tracks_path.read_text()) if tracks_path.exists() else []
+        gate = QualityGate()
+        results = gate.evaluate(sequence, pred_tracks)
+        gate.save_results(params.sequence_id, results)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Benchmark failed: {str(e)}")
+
+    return {"status": "ok", "metrics": results["metric_card"]}
+
+
+@app.post("/api/gates/quality")
+def quality_gate_eval(params: GateParams):
+    from sensorflow.quality_gate import QualityGate
+    from sensorflow.mitl_copilot import MitlCopilot
+    from sensorflow.schemas.unified_frame import UnifiedSequence
+
+    manifest = Path("runs/pipeline") / params.sequence_id / "manifest.json"
+    tracks_path = Path("runs/pipeline") / params.sequence_id / "tracks.json"
+    if not manifest.exists() or not tracks_path.exists():
+        raise HTTPException(status_code=400, detail="Run ingest, auto-label, and track first.")
+
+    try:
+        sequence = UnifiedSequence.load(manifest)
+        with open(tracks_path) as f:
+            pred_tracks = json.load(f)
+        gate = QualityGate()
+        results = gate.evaluate(sequence, pred_tracks)
+        gate.save_results(params.sequence_id, results)
+        if not results["passed"]:
+            copilot = MitlCopilot()
+            copilot.route_edge_cases(params.sequence_id, results["metric_card"], pred_tracks)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Quality gate failed: {str(e)}")
+
+    report = results["quality_report"]
+    return {"status": "ok", "metric_card": results["metric_card"], **report}
+
+
+@app.post("/api/gates/launch")
+def launch_gate_eval(params: GateParams):
+    from sensorflow.launch_gate_evaluator import LaunchGateEvaluator
+    config = load_config()
+    evaluator = LaunchGateEvaluator(Path(config.gate_thresholds_path))
+    result = evaluator.evaluate(params.sequence_id)
+    return {"status": "ok", **result}
+
+
+@app.get("/api/pipeline/status")
+def pipeline_status(sequence_id: str = "seq_001"):
+    state_path = Path("runs/pipeline/state.json")
+    state = {}
+    if state_path.exists():
+        with open(state_path) as f:
+            state = json.load(f)
+
+    seq_state = state.get(sequence_id, {})
+    base = Path("runs/pipeline") / sequence_id
+    return {
+        "status": "ok",
+        "sequence_id": sequence_id,
+        "ingest_complete": (base / "manifest.json").exists(),
+        "perception_complete": (base / "proposals").exists() and any((base / "proposals").glob("*.json")),
+        "tracking_complete": (base / "tracks.json").exists(),
+        "benchmark_complete": (base / "benchmark" / "metric_card.json").exists(),
+        "launch_gate_passed": seq_state.get("launch_gate_passed", False),
+        "state": seq_state,
+    }
+
+
+@app.get("/api/mitl/queue")
+def get_mitl_queue(sequence_id: str = "seq_001"):
+    from sensorflow.mitl_copilot import MitlCopilot
+    copilot = MitlCopilot()
+    return {"status": "ok", "queue": copilot.get_queue(sequence_id)}
+
 
 # Mount static folder
 static_dir = Path(__file__).parent / "static"

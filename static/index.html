@@ -24,40 +24,60 @@
                     <span class="num">1</span>
                     <span class="label">Dataset Configuration</span>
                 </button>
-                <button class="nav-btn" data-stage="model">
+                <button class="nav-btn" data-stage="ingest">
                     <span class="num">2</span>
-                    <span class="label">Model Setup</span>
+                    <span class="label">3D Ingest & Fusion</span>
+                </button>
+                <button class="nav-btn" data-stage="perception">
+                    <span class="num">3</span>
+                    <span class="label">3D Perception</span>
+                </button>
+                <button class="nav-btn" data-stage="tracking">
+                    <span class="num">4</span>
+                    <span class="label">Temporal Tracking</span>
+                </button>
+                <button class="nav-btn" data-stage="quality-gate">
+                    <span class="num">5</span>
+                    <span class="label">Quality Gate</span>
+                </button>
+                <button class="nav-btn" data-stage="launch-gate">
+                    <span class="num">6</span>
+                    <span class="label">Launch Gate</span>
+                </button>
+                <button class="nav-btn" data-stage="model">
+                    <span class="num">7</span>
+                    <span class="label">Model Setup (2D)</span>
                 </button>
                 <button class="nav-btn" data-stage="training">
-                    <span class="num">3</span>
+                    <span class="num">8</span>
                     <span class="label">Training Execution</span>
                 </button>
                 <button class="nav-btn" data-stage="inference">
-                    <span class="num">4</span>
+                    <span class="num">9</span>
                     <span class="label">Auto-Labeler Inference</span>
                 </button>
                 <button class="nav-btn" data-stage="grader">
-                    <span class="num">5</span>
+                    <span class="num">10</span>
                     <span class="label">Auto-Grader Quality</span>
                 </button>
                 <button class="nav-btn" data-stage="mitl">
-                    <span class="num">6</span>
+                    <span class="num">11</span>
                     <span class="label">Man-in-the-Loop Review</span>
                 </button>
                 <button class="nav-btn" data-stage="benchmark">
-                    <span class="num">7</span>
+                    <span class="num">12</span>
                     <span class="label">Model Benchmarking</span>
                 </button>
                 <button class="nav-btn" data-stage="export">
-                    <span class="num">8</span>
+                    <span class="num">13</span>
                     <span class="label">Export & Deploy</span>
                 </button>
                 <button class="nav-btn" data-stage="mcp">
-                    <span class="num">9</span>
+                    <span class="num">14</span>
                     <span class="label">MCP Settings</span>
                 </button>
                 <button class="nav-btn" data-stage="ssam">
-                    <span class="num">10</span>
+                    <span class="num">15</span>
                     <span class="label">SSAM Safety</span>
                 </button>
             </nav>
@@ -158,10 +178,160 @@
                             </div>
                             <div id="yaml-save-status" class="status-msg hidden" style="margin-top: 10px;"></div>
                         </div>
+
+                        <!-- Dataset Row Statistics & Technical Metadata Card -->
+                        <div class="card card-glass flex-col" id="card-dataset-metadata" style="grid-column: span 2;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 16px;">
+                                <div>
+                                    <h3 style="margin: 0; font-size: 16px; color: var(--fg); display: flex; align-items: center; gap: 8px;">
+                                        <span>📊</span> Dataset Row Statistics & Technical Metadata
+                                    </h3>
+                                    <p id="ds-meta-desc" style="font-size: 12px; color: var(--text-muted); margin: 4px 0 0 0;">
+                                        Comprehensive metrics on raw source rows vs loaded records, sensor modalities, and class breakdown.
+                                    </p>
+                                </div>
+                                <span id="ds-meta-badge" class="badge" style="background: rgba(0, 255, 170, 0.15); color: #00ffaa; border: 1px solid rgba(0, 255, 170, 0.3); padding: 4px 10px; font-weight: 600; font-size: 11px;">
+                                    100.0% Loaded
+                                </span>
+                            </div>
+
+                            <!-- Row Count KPI Summary Cards -->
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px;">
+                                <div style="background: rgba(11, 19, 43, 0.7); border: 1px solid var(--border); padding: 14px; border-radius: 8px;">
+                                    <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Source Rows in Dataset</div>
+                                    <div id="ds-kpi-total-rows" style="font-size: 24px; font-weight: 800; color: #38bdf8; margin-top: 4px;">128</div>
+                                    <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Total records in raw source</div>
+                                </div>
+
+                                <div style="background: rgba(11, 19, 43, 0.7); border: 1px solid var(--border); padding: 14px; border-radius: 8px;">
+                                    <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Rows Ingested / Loaded</div>
+                                    <div id="ds-kpi-loaded-rows" style="font-size: 24px; font-weight: 800; color: #00ffaa; margin-top: 4px;">128</div>
+                                    <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Active frames in memory/cache</div>
+                                </div>
+
+                                <div style="background: rgba(11, 19, 43, 0.7); border: 1px solid var(--border); padding: 14px; border-radius: 8px;">
+                                    <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Ingestion Sampling Rate</div>
+                                    <div id="ds-kpi-ingest-pct" style="font-size: 24px; font-weight: 800; color: #a855f7; margin-top: 4px;">100.0%</div>
+                                    <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Loaded / Source ratio</div>
+                                </div>
+
+                                <div style="background: rgba(11, 19, 43, 0.7); border: 1px solid var(--border); padding: 14px; border-radius: 8px;">
+                                    <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Total Labeled Objects</div>
+                                    <div id="ds-kpi-total-annotations" style="font-size: 24px; font-weight: 800; color: #fbbf24; margin-top: 4px;">432</div>
+                                    <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Bounding boxes / Labels</div>
+                                </div>
+                            </div>
+
+                            <!-- Technical Metadata Details Table -->
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; font-size: 13px;">
+                                <div style="background: rgba(4, 6, 11, 0.5); padding: 14px; border-radius: 8px; border: 1px solid var(--border);">
+                                    <h4 style="margin: 0 0 10px 0; font-size: 12px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px;">Sensor & Capture Metadata</h4>
+                                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                                        <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Sensor Modality:</span><span id="ds-meta-sensors" style="font-weight: 600; color: var(--fg);">Monocular Front RGB Camera</span></div>
+                                        <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Geographic Location:</span><span id="ds-meta-geo" style="font-weight: 600; color: var(--fg);">Local Drive</span></div>
+                                        <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Weather & Lighting:</span><span id="ds-meta-weather" style="font-weight: 600; color: var(--fg);">Daytime / Mixed</span></div>
+                                        <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Annotation Methodology:</span><span id="ds-meta-annotator" style="font-weight: 600; color: var(--fg);">Auto-Labeler + Manual</span></div>
+                                    </div>
+                                </div>
+
+                                <div style="background: rgba(4, 6, 11, 0.5); padding: 14px; border-radius: 8px; border: 1px solid var(--border);">
+                                    <h4 style="margin: 0 0 10px 0; font-size: 12px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px;">Storage & Format Specs</h4>
+                                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                                        <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Storage Footprint:</span><span id="ds-meta-footprint" style="font-weight: 600; color: var(--fg);">6.5 MB</span></div>
+                                        <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">File Format:</span><span id="ds-meta-format" style="font-weight: 600; color: var(--fg);">YOLOv8 TXT / COCO YAML</span></div>
+                                        <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Licensing Terms:</span><span id="ds-meta-license" style="font-weight: 600; color: var(--fg);">Ultralytics AGPL-3.0</span></div>
+                                        <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Dataset Type ID:</span><span id="ds-meta-type-id" style="font-family: var(--font-mono); color: #00ffaa;">local</span></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Class Breakdown Pills -->
+                            <div>
+                                <h4 style="margin: 0 0 10px 0; font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Class Object Frequencies (Loaded Rows)</h4>
+                                <div id="ds-class-pills" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                    <!-- Rendered dynamically -->
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
-                <!-- STAGE 2: MODEL -->
+                <!-- STAGE 2: 3D INGEST -->
+                <section class="stage-panel" id="panel-ingest">
+                    <div class="card card-glass">
+                        <h3>Exabyte Ingest, Fusion & Stratification</h3>
+                        <p class="text-muted">Fuse Alpamayo and Waymo LiDAR/camera data with six-axis taxonomy stratification.</p>
+                        <div class="form-group">
+                            <label>Vendors</label>
+                            <div style="display:flex;gap:12px;">
+                                <label><input type="checkbox" id="ingest-vendor-alpamayo" checked> Alpamayo</label>
+                                <label><input type="checkbox" id="ingest-vendor-waymo" checked> Waymo</label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="ingest-sequence-id">Sequence ID</label>
+                            <input type="text" id="ingest-sequence-id" value="seq_001" class="input-field">
+                        </div>
+                        <button class="btn btn-primary" id="btn-ingest-run">Run Ingest & Fusion</button>
+                        <div id="ingest-status" class="status-box" style="margin-top:16px;"></div>
+                    </div>
+                </section>
+
+                <!-- STAGE 3: 3D PERCEPTION -->
+                <section class="stage-panel" id="panel-perception">
+                    <div class="card card-glass">
+                        <h3>Automated 3D Perception (SAM + LiDAR)</h3>
+                        <p class="text-muted">Generate 2D SAM masks and lift to 3D bounding box proposals.</p>
+                        <div class="form-group">
+                            <label for="perception-sam-checkpoint">SAM Checkpoint</label>
+                            <input type="text" id="perception-sam-checkpoint" value="models/sam_vit_b.pth" class="input-field">
+                        </div>
+                        <div class="form-group">
+                            <label for="perception-device">Device</label>
+                            <select id="perception-device" class="input-field">
+                                <option value="cpu">CPU</option>
+                                <option value="cuda">CUDA</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" id="btn-perception-run">Run Auto-Label</button>
+                        <div id="perception-status" class="status-box" style="margin-top:16px;"></div>
+                    </div>
+                </section>
+
+                <!-- STAGE 4: TEMPORAL TRACKING -->
+                <section class="stage-panel" id="panel-tracking">
+                    <div class="card card-glass">
+                        <h3>Temporal Tracking & Consistency</h3>
+                        <p class="text-muted">Kalman + Hungarian association for ID-smooth multi-frame tracks.</p>
+                        <button class="btn btn-primary" id="btn-tracking-run">Run Temporal Tracker</button>
+                        <div id="tracking-status" class="status-box" style="margin-top:16px;"></div>
+                        <div id="tracking-tracks-table" style="margin-top:16px;"></div>
+                    </div>
+                </section>
+
+                <!-- STAGE 5: QUALITY GATE -->
+                <section class="stage-panel" id="panel-quality-gate">
+                    <div class="card card-glass">
+                        <h3>Quality Gate & Comparative Analytics</h3>
+                        <p class="text-muted">Benchmark against vendor GT: mAP, orientation error, ID swaps, process_units.</p>
+                        <button class="btn btn-primary" id="btn-quality-gate-run">Run Quality Gate</button>
+                        <div id="quality-gate-status" class="status-box" style="margin-top:16px;"></div>
+                        <div id="quality-gate-metrics" style="margin-top:16px;"></div>
+                    </div>
+                </section>
+
+                <!-- STAGE 6: LAUNCH GATE -->
+                <section class="stage-panel" id="panel-launch-gate">
+                    <div class="card card-glass">
+                        <h3>Launch Gate Validation</h3>
+                        <p class="text-muted">Verify safety thresholds before export is allowed.</p>
+                        <button class="btn btn-primary" id="btn-launch-gate-run">Evaluate Launch Gate</button>
+                        <div id="launch-gate-status" class="status-box" style="margin-top:16px;"></div>
+                        <div id="launch-gate-badge" style="margin-top:16px;"></div>
+                    </div>
+                </section>
+
+                <!-- STAGE 7: MODEL -->
                 <section class="stage-panel" id="panel-model">
                     <div class="grid-2">
                         <div class="card card-glass">

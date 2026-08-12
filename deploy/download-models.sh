@@ -23,3 +23,14 @@ if [ ! -f "$MODEL_DIR/yolov8m.pt" ]; then
 fi
 
 echo "Models ready at $MODEL_DIR"
+
+# SAM ViT-B checkpoint for 3D perception pipeline
+SAM_DIR="$MODEL_DIR/models"
+mkdir -p "$SAM_DIR"
+if [ ! -f "$SAM_DIR/sam_vit_b.pth" ]; then
+    echo "Downloading SAM ViT-B checkpoint..."
+    wget -q https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth -O "$SAM_DIR/sam_vit_b.pth"
+    echo "✓ sam_vit_b.pth downloaded"
+fi
+
+echo "All models ready."

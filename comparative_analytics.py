@@ -50,6 +50,34 @@ class PerformanceMetrics:
 
 
 @dataclass
+class Perception3DMetrics(PerformanceMetrics):
+    """3D perception and temporal tracking metrics."""
+    map_3d: Optional[float] = None
+    mar_3d: Optional[float] = None
+    mean_iou_3d: Optional[float] = None
+    orientation_error_deg: Optional[float] = None
+    position_error_m: Optional[float] = None
+    id_swap_rate: Optional[float] = None
+    track_fragmentation_rate: Optional[float] = None
+    process_units: Optional[int] = None
+    compute_cycles: Optional[int] = None
+
+    @classmethod
+    def from_metric_card(cls, card: Dict[str, Any]) -> "Perception3DMetrics":
+        return cls(
+            map_3d=card.get("map_3d"),
+            mar_3d=card.get("mar_3d"),
+            mean_iou_3d=card.get("mean_iou_3d"),
+            orientation_error_deg=card.get("orientation_error_deg"),
+            position_error_m=card.get("position_error_m"),
+            id_swap_rate=card.get("id_swap_rate"),
+            track_fragmentation_rate=card.get("track_fragmentation_rate"),
+            process_units=card.get("process_units"),
+            compute_cycles=card.get("compute_cycles"),
+        )
+
+
+@dataclass
 class ExperimentResult:
     """Single experiment result"""
     dataset: str

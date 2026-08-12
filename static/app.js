@@ -10,7 +10,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const nextBtn = document.getElementById('btn-global-action');
 
     const STAGE_METADATA = {
-        dataset: { title: 'Dataset Configuration', desc: 'Prepare and validate your image source path and annotation files.', next: 'model', nextLabel: 'Proceed to Model' },
+        dataset: { title: 'Dataset Configuration', desc: 'Prepare and validate your image source path and annotation files.', next: 'ingest', nextLabel: 'Proceed to 3D Ingest' },
+        ingest: { title: '3D Ingest & Fusion', desc: 'Fuse Alpamayo and Waymo LiDAR/camera data with six-axis taxonomy stratification.', next: 'perception', nextLabel: 'Proceed to 3D Perception', gateKey: 'ingest_complete' },
+        perception: { title: '3D Perception', desc: 'SAM-based 2D masks lifted to 3D bounding box proposals.', next: 'tracking', nextLabel: 'Proceed to Tracking', gateKey: 'perception_complete' },
+        tracking: { title: 'Temporal Tracking', desc: 'Kalman + Hungarian association for ID-smooth multi-frame tracks.', next: 'quality-gate', nextLabel: 'Proceed to Quality Gate', gateKey: 'tracking_complete' },
+        'quality-gate': { title: 'Quality Gate', desc: 'Benchmark automated tracks against vendor GT with 3D and temporal metrics.', next: 'launch-gate', nextLabel: 'Proceed to Launch Gate', gateKey: 'benchmark_complete' },
+        'launch-gate': { title: 'Launch Gate', desc: 'Validate safety thresholds before export is allowed.', next: 'model', nextLabel: 'Proceed to Model Setup', gateKey: 'launch_gate_passed' },
         model: { title: 'Model Setup', desc: 'Choose a YOLOv8 base model and compute device architecture.', next: 'training', nextLabel: 'Proceed to Training' },
         training: { title: 'Training Execution', desc: 'Fine-tune the selected YOLO model on your configured dataset.', next: 'inference', nextLabel: 'Proceed to Inference' },
         inference: { title: 'Auto-Labeler Inference', desc: 'Run predictions on raw images using your fine-tuned weights.', next: 'grader', nextLabel: 'Proceed to Auto-Grader' },
@@ -21,6 +26,47 @@ document.addEventListener('DOMContentLoaded', () => {
         mcp: { title: 'MCP Settings', desc: 'View, edit, and toggle Model Context Protocol servers in mcp_config.json.', next: 'ssam', nextLabel: 'Proceed to SSAM Safety' },
         ssam: { title: 'SSAM Safety', desc: 'View street conflict metrics and add automated or manual severity annotations.', next: 'dataset', nextLabel: 'Back to Start' }
     };
+
+    let pipelineState = {};
+    let currentSequenceId = 'seq_001';
+
+    async function refreshPipelineStatus() {
+        try {
+            const res = await fetch(`${API_BASE}/api/pipeline/status?sequence_id=${currentSequenceId}`);
+            const data = await res.json();
+            pipelineState = data;
+            updateGateBadges();
+        } catch (e) { /* backend offline */ }
+    }
+
+    function updateGateBadges() {
+        navButtons.forEach(btn => {
+            const stage = btn.dataset.stage;
+            const meta = STAGE_METADATA[stage];
+            if (!meta || !meta.gateKey) return;
+            const passed = pipelineState[meta.gateKey];
+            let badge = btn.querySelector('.gate-badge');
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'gate-badge';
+                badge.style.cssText = 'margin-left:6px;font-size:10px;padding:2px 6px;border-radius:4px;';
+                btn.appendChild(badge);
+            }
+            if (passed === true) {
+                badge.textContent = 'PASS';
+                badge.style.background = '#00ffaa33';
+                badge.style.color = '#00ffaa';
+            } else if (passed === false) {
+                badge.textContent = 'FAIL';
+                badge.style.background = '#ff444433';
+                badge.style.color = '#ff4444';
+            } else {
+                badge.textContent = '';
+            }
+        });
+    }
+
+    refreshPipelineStatus();
 
     function switchStage(stageId) {
         // Update nav buttons
@@ -56,6 +102,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     nextBtn.addEventListener('click', () => {
+        const currentStage = document.querySelector('.nav-btn.active')?.dataset.stage;
+        const meta = STAGE_METADATA[currentStage];
+        if (meta && meta.gateKey && pipelineState[meta.gateKey] === false) {
+            alert('Launch gate not passed. Complete the quality gate first.');
+            return;
+        }
         switchStage(nextBtn.dataset.next);
     });
 
@@ -1741,5 +1793,132 @@ document.addEventListener('DOMContentLoaded', () => {
     // Populate initial default dataset if loaded
     if (selectDatasetType.value !== 'local') {
         loadNvidiaDataset(selectDatasetType.value);
+    }
+
+    // --- 3D PERCEPTION PIPELINE ---
+    const btnIngestRun = document.getElementById('btn-ingest-run');
+    const btnPerceptionRun = document.getElementById('btn-perception-run');
+    const btnTrackingRun = document.getElementById('btn-tracking-run');
+    const btnQualityGateRun = document.getElementById('btn-quality-gate-run');
+    const btnLaunchGateRun = document.getElementById('btn-launch-gate-run');
+
+    if (btnIngestRun) {
+        btnIngestRun.addEventListener('click', async () => {
+            const vendors = [];
+            if (document.getElementById('ingest-vendor-alpamayo')?.checked) vendors.push('alpamayo');
+            if (document.getElementById('ingest-vendor-waymo')?.checked) vendors.push('waymo');
+            currentSequenceId = document.getElementById('ingest-sequence-id')?.value || 'seq_001';
+            const statusEl = document.getElementById('ingest-status');
+            statusEl.textContent = 'Running ingest & fusion...';
+            try {
+                const res = await fetch(`${API_BASE}/api/dataset/ingest`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ vendors, sequence_id: currentSequenceId }),
+                });
+                const data = await res.json();
+                statusEl.textContent = data.status === 'ok'
+                    ? `Ingested -> ${data.manifest}`
+                    : `Error: ${data.detail || JSON.stringify(data)}`;
+                await refreshPipelineStatus();
+            } catch (e) {
+                statusEl.textContent = `Error: ${e.message}`;
+            }
+        });
+    }
+
+    if (btnPerceptionRun) {
+        btnPerceptionRun.addEventListener('click', async () => {
+            const statusEl = document.getElementById('perception-status');
+            statusEl.textContent = 'Running SAM auto-label...';
+            try {
+                const res = await fetch(`${API_BASE}/api/perception/auto-label`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sequence_id: currentSequenceId,
+                        sam_checkpoint: document.getElementById('perception-sam-checkpoint')?.value || 'models/sam_vit_b.pth',
+                        device: document.getElementById('perception-device')?.value || 'cpu',
+                        no_sam: true,
+                    }),
+                });
+                const data = await res.json();
+                statusEl.textContent = data.status === 'ok'
+                    ? `Processed ${data.frames_processed} frames -> ${data.proposals_dir}`
+                    : `Error: ${data.detail || JSON.stringify(data)}`;
+                await refreshPipelineStatus();
+            } catch (e) {
+                statusEl.textContent = `Error: ${e.message}`;
+            }
+        });
+    }
+
+    if (btnTrackingRun) {
+        btnTrackingRun.addEventListener('click', async () => {
+            const statusEl = document.getElementById('tracking-status');
+            statusEl.textContent = 'Running temporal tracker...';
+            try {
+                const res = await fetch(`${API_BASE}/api/perception/track`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sequence_id: currentSequenceId }),
+                });
+                const data = await res.json();
+                statusEl.textContent = data.status === 'ok'
+                    ? `Tracked ${data.num_tracks} objects -> ${data.tracks_file}`
+                    : `Error: ${data.detail || JSON.stringify(data)}`;
+                await refreshPipelineStatus();
+            } catch (e) {
+                statusEl.textContent = `Error: ${e.message}`;
+            }
+        });
+    }
+
+    if (btnQualityGateRun) {
+        btnQualityGateRun.addEventListener('click', async () => {
+            const statusEl = document.getElementById('quality-gate-status');
+            const metricsEl = document.getElementById('quality-gate-metrics');
+            statusEl.textContent = 'Running quality gate benchmark...';
+            try {
+                const res = await fetch(`${API_BASE}/api/gates/quality`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sequence_id: currentSequenceId }),
+                });
+                const data = await res.json();
+                if (data.metric_card) {
+                    statusEl.textContent = data.passed ? 'Quality gate PASSED' : 'Quality gate FAILED';
+                    metricsEl.innerHTML = `<pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:8px;overflow:auto;">${JSON.stringify(data.metric_card, null, 2)}</pre>`;
+                } else {
+                    statusEl.textContent = `Error: ${data.detail || JSON.stringify(data)}`;
+                }
+                await refreshPipelineStatus();
+            } catch (e) {
+                statusEl.textContent = `Error: ${e.message}`;
+            }
+        });
+    }
+
+    if (btnLaunchGateRun) {
+        btnLaunchGateRun.addEventListener('click', async () => {
+            const statusEl = document.getElementById('launch-gate-status');
+            const badgeEl = document.getElementById('launch-gate-badge');
+            statusEl.textContent = 'Evaluating launch gate...';
+            try {
+                const res = await fetch(`${API_BASE}/api/gates/launch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sequence_id: currentSequenceId }),
+                });
+                const data = await res.json();
+                statusEl.textContent = data.passed ? 'Launch gate PASSED - export allowed' : 'Launch gate FAILED - export blocked';
+                badgeEl.innerHTML = data.passed
+                    ? '<span style="color:#00ffaa;font-weight:600;">EXPORT AUTHORIZED</span>'
+                    : `<span style="color:#ff4444;font-weight:600;">EXPORT BLOCKED</span><pre style="margin-top:8px;">${JSON.stringify(data.failures, null, 2)}</pre>`;
+                await refreshPipelineStatus();
+            } catch (e) {
+                statusEl.textContent = `Error: ${e.message}`;
+            }
+        });
     }
 });
