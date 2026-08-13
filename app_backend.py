@@ -1503,6 +1503,12 @@ app.include_router(agentic_router)
 from sensorflow.studio_ux.api import router as studio_ux_router
 app.include_router(studio_ux_router)
 
+# Next-gen AV perception evaluation: counterfactual simulation + validity
+# gating, closed-loop behavioral evaluation, safety-informed metrics,
+# compute dedup + launch-eval gauntlet scheduling.
+from sensorflow.nextgen.api import router as nextgen_router
+app.include_router(nextgen_router)
+
 # Multimodal rare-event mining & perception QA (costumed-pedestrian miner).
 from sensorflow.raremine.api import router as raremine_router
 app.include_router(raremine_router)

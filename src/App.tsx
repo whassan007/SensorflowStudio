@@ -41,6 +41,7 @@ import {
   Sparkles,
   LineChart,
   Layers,
+  RefreshCcwDot,
   Shapes,
   Network,
   LayoutGrid,
@@ -82,6 +83,7 @@ import BevFusionPage from './pages/engines/BevFusionPage';
 import ScenarioComposerPage from './pages/studio/ScenarioComposerPage';
 import PipelineBuilderPage from './pages/studio/PipelineBuilderPage';
 import MyDashboardPage from './pages/studio/MyDashboardPage';
+import ClosedLoopLabPage from './pages/nextgen/ClosedLoopLabPage';
 import RetroAnalyzerPage from './pages/retro/RetroAnalyzerPage';
 import LaunchReadinessPage from './pages/agentic/LaunchReadinessPage';
 import PageIntro from './components/help/PageIntro';
@@ -125,6 +127,7 @@ const STUDIO_NAV: NavItem[] = [
 const ENGINES_NAV: NavItem[] = [
   { id: 'seqeval', label: 'Sequential Regression', icon: <LineChart size={18} /> },
   { id: 'bevfusion', label: 'Perception Engines', icon: <Layers size={18} /> },
+  { id: 'closed-loop-lab', label: 'Closed-Loop Lab', icon: <RefreshCcwDot size={18} /> },
 ];
 
 const SAFETY_NAV: NavItem[] = [
@@ -179,6 +182,7 @@ const PAGE_TITLES: Record<PageId, string> = {
   'pipeline-builder': 'Pipeline Builder',
   'my-dashboard': 'My Dashboard',
   retro: 'Retrospective Safety Analyzer',
+  'closed-loop-lab': 'Closed-Loop Lab',
   'launch-readiness': 'Launch Readiness (Agentic Triage)',
   legacy: 'Legacy Studio',
 };
@@ -432,6 +436,7 @@ export default function App() {
               {page === 'my-dashboard' ? <MyDashboardPage /> : null}
               {page === 'retro' ? <RetroAnalyzerPage /> : null}
               {page === 'launch-readiness' ? <LaunchReadinessPage /> : null}
+              {page === 'closed-loop-lab' ? <ClosedLoopLabPage /> : null}
             </Box>
           )}
         </Box>

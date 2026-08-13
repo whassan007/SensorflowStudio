@@ -227,6 +227,18 @@ export const PAGE_HELP: Record<PageId, PageHelpEntry> = {
     dataFlow:
       'Scenes and engines come read-only from the bevfusion package; sequential verdicts use seqeval\u2019s anytime-valid tests when importable (local paired-t fallback otherwise). Runs persist under runs/vitis/. Generated variants are evaluation-set supplements tagged evaluation-only (never training-eligible) and are offered to the raremine candidate flow when that package is available.',
   },
+  'closed-loop-lab': {
+    subtitle:
+      'Next-generation evaluation: counterfactual scenario generation with a validity gate, closed-loop behavioral metrics with causal replay, safety-informed metrics, and a priority-scheduled launch gauntlet with compute deduplication.',
+    purpose:
+      'Open-loop metrics (mAP/recall) cannot tell you whether a perception error would have changed vehicle behavior, and aggregate recall can improve while safety-critical recall degrades. This lab generates labeled counterfactual scenarios, runs the full perception→planner→vehicle loop, and answers the causal question directly: replay the same scenario with corrected perception and diff the outcomes.',
+    reading:
+      'Every datum carries a REAL / REPLAYED / SIMULATED / GENERATED / COUNTERFACTUAL provenance label. Counterfactuals show fidelity / validity / realism scores from the gate; low-fidelity scenarios are weight-capped so they cannot dominate launch decisions. The causal replay banner is the key verdict: METRIC_ONLY (visible in metrics, no behavioral change) vs BEHAVIORALLY_CONSEQUENTIAL (the error changes the safety outcome). The Gauntlet tab shows priority strata (safety-critical first), anytime-valid early-stop events, and measured compute savings.',
+    actions:
+      'Build transformation recipes and generate counterfactuals; run the validity gate; run closed-loop replays and causal comparisons with planted perception faults; run the safety-metric divergence demo; launch a 100k-unit gauntlet against a candidate profile and inspect the launch recommendation; read the architecture decision docs.',
+    dataFlow:
+      'Counterfactuals are transformations of bevfusion scenes; safety math reuses the SSAM extensions; sequential early stopping delegates to seqeval; distribution similarity delegates to the mega-eval statistics. Artifacts persist under runs/nextgen/. A run with incomplete lineage is marked INVALID for launch purposes.',
+  },
   ssam: {
     subtitle:
       'Surrogate-safety analysis of real intersections: conflicts ranked by TTC / PET / severity on an interactive map — the safety context the label platform feeds.',

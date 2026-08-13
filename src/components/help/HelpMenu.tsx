@@ -201,6 +201,7 @@ const PAGE_ORDER: PageId[] = [
   'safety-scenarios',
   'safety-search',
   'retro',
+  'closed-loop-lab',
   'launch-readiness',
   'legacy',
 ];
@@ -239,6 +240,7 @@ const PAGE_NAMES: Record<PageId, string> = {
   'pipeline-builder': 'Pipeline Builder',
   'my-dashboard': 'My Dashboard',
   retro: 'Retrospective Analyzer',
+  'closed-loop-lab': 'Closed-Loop Lab',
   'launch-readiness': 'Launch Readiness',
   legacy: 'Legacy Studio',
 };

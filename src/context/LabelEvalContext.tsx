@@ -35,6 +35,7 @@ export type PageId =
   | 'pipeline-builder'
   | 'my-dashboard'
   | 'retro'
+  | 'closed-loop-lab'
   | 'launch-readiness'
   | 'legacy';
 
@@ -72,6 +73,7 @@ export const ALL_PAGE_IDS: PageId[] = [
   'pipeline-builder',
   'my-dashboard',
   'retro',
+  'closed-loop-lab',
   'launch-readiness',
   'legacy',
 ];

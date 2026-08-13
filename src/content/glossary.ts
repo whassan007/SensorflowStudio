@@ -37,6 +37,7 @@ export type GlossaryCategory =
   | 'Sequential testing'
   | 'Perception fusion'
   | 'Retrospective safety'
+  | 'Closed-loop evaluation'
   | 'Launch readiness';
 
 export const GLOSSARY: Record<string, GlossaryEntry> = {
@@ -1014,6 +1015,58 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     detail: 'Records carry a monotonically increasing sequence number and a prev_hash → hash chain; any edit, deletion or reordering breaks recomputation and is reported as a broken chain. The log is append-only by construction.',
   },
 
+  data_label: {
+    term: 'Data provenance label',
+    category: 'Closed-loop evaluation',
+    short: 'Every evaluation datum is labeled REAL / REPLAYED / SIMULATED / GENERATED / COUNTERFACTUAL — carried through all reports.',
+    detail: 'Simulation is evidence, not reality. The label states exactly how a scenario came to exist: REAL sensor data, REPLAYED logs, SIMULATED synthetic scenes, GENERATED novel scenarios, or COUNTERFACTUAL transformations of an existing scene. Launch recommendations list the labels of every stratum that fed them.',
+    caveat: 'A COUNTERFACTUAL result never carries the evidentiary weight of a REAL one — the validity gate quantifies (fidelity, realism) but cannot erase the gap.',
+  },
+  counterfactual_scenario: {
+    term: 'Counterfactual scenario',
+    category: 'Closed-loop evaluation',
+    short: 'A recorded scene deterministically transformed ("what if it were foggy / the lead car braked") with full provenance: source scene, recipe, seed.',
+    detail: 'Transformations cover environment (fog, rain, night, glare), actor behavior (sudden brake, swerve, crossing, occluded emergence), and scene structure (construction zone, pedestrian density, occlusion). Same recipe + seed reproduces the identical scenario.',
+    caveat: 'Only gate-accepted counterfactuals enter evaluation suites, and low-fidelity ones are weight-capped.',
+  },
+  validity_gate: {
+    term: 'Counterfactual validity gate',
+    category: 'Closed-loop evaluation',
+    short: 'Five deterministic checks — physical plausibility, temporal consistency, sensor consistency, identity/trajectory consistency, distribution similarity — before a generated scenario may enter a suite.',
+    detail: 'Produces simulation_fidelity_score, counterfactual_validity, and realism_confidence. Realism measures the shift ADDED by the transformation relative to the source scene (PSI/JS via the mega-eval statistics), so a valid transformation of an unusual scene is not unfairly penalized.',
+  },
+  scr: {
+    term: 'Safety-Critical Recall (SCR)',
+    category: 'Closed-loop evaluation',
+    short: 'Recall restricted to objects inside the parameterized safety-critical region — where a miss can actually change the outcome.',
+    detail: 'The region is NOT naive stopping distance: d_crit(v) = v·t_react + v²/(2·min(brake, μg)) + buffer, with a lateral band scaled by per-class encroachment speed and a projected-TTC criterion for crossing actors. All parameters (reaction time, brake capability, friction) are explicit and reported with every result.',
+    caveat: 'Overall recall can improve while SCR degrades — the divergence demo on the Closed-Loop Lab page constructs exactly that case.',
+  },
+  causal_replay: {
+    term: 'Causal counterfactual replay',
+    category: 'Closed-loop evaluation',
+    short: 'Run the same scenario twice — actual perception vs GT-corrected — and diff behavior to classify a regression as METRIC_ONLY or BEHAVIORALLY_CONSEQUENTIAL.',
+    detail: 'The causal chain is answered stepwise: would correct perception change the planner output? would that change vehicle behavior? would that change the safety outcome? Only a yes on the final step makes an error behaviorally consequential.',
+    caveat: 'Verdicts are relative to the simplified deterministic planner/controller; a production planner may react differently. The verdict is evidence for triage, not proof.',
+  },
+  behavioral_metrics: {
+    term: 'Closed-loop behavioral metrics',
+    category: 'Closed-loop evaluation',
+    short: 'Detection latency, TTC, stopping distance, deceleration, planner interventions, minimum separation, safety margin — measured by running the full perception→planner→vehicle loop.',
+    detail: 'Complementary to open-loop metrics, never a replacement: every closed-loop report also carries frame recall. Safety math (TTC, stopping distance) reuses the SSAM safety extensions.',
+  },
+  anytime_valid_stopping: {
+    term: 'Anytime-valid early stopping',
+    category: 'Closed-loop evaluation',
+    short: 'The gauntlet stops a stratum early only on evidence measures that remain valid under continuous monitoring (e-process / confidence sequences via seqeval).',
+    detail: 'Naive repeated significance testing inflates false alarms; the scheduler delegates every stop/continue decision to seqeval sequential tests, so a catastrophic-regression halt after 2k of 12k units carries the same statistical guarantee as a full run.',
+  },
+  compute_dedup: {
+    term: 'Compute deduplication',
+    category: 'Closed-loop evaluation',
+    short: 'Content-addressed caching of shared pipeline stages (BEV rasters, projections, backbone features) so N models re-run only their heads.',
+    detail: 'Cache keys hash (scenario, sensor_version, preprocessing_version, backbone_version, feature_schema_version); any version bump changes the key, so stale cross-version reuse is structurally impossible. Savings are measured, not estimated.',
+  },
 };
 
 export type GlossaryKey = keyof typeof GLOSSARY;
