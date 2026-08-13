@@ -1,0 +1,206 @@
+/**
+ * Page-level explanation content: one entry per screen, rendered by
+ * <PageIntro> (header subtitle + expandable "About this page" panel) and
+ * reused by the global help menu's page index.
+ */
+import type { PageId } from '../context/LabelEvalContext';
+
+export interface PageHelpEntry {
+  /** 1–2 sentence header subtitle: what this screen shows, where it sits. */
+  subtitle: string;
+  /** Why this page exists. */
+  purpose: string;
+  /** How to read the visualizations on it. */
+  reading: string;
+  /** What the user can do here. */
+  actions: string;
+  /** How data flows in and out of this stage. */
+  dataFlow: string;
+}
+
+export const PAGE_HELP: Record<PageId, PageHelpEntry> = {
+  command: {
+    subtitle:
+      'Aggregate-first quality cockpit for mega-scale evaluation runs: population-level metrics, cohorts and containers first — individual annotations only at the deepest drill-down.',
+    purpose:
+      'At 300k+ objects per run, browsing records is useless. This page inverts the model: it answers "where is the model failing and how badly" from pre-aggregated statistics (the metric cube), and lets you drill Dataset → Cohort → Container → Annotation only where the aggregates point.',
+    reading:
+      'Hero tiles show headline metrics; when a run has human reviews, a sampling-verified estimate with a 95% CI appears under the automated value. Badges on each panel show query provenance (cache / cube / scan) and latency. "exact" vs "approx" tags mark whether a number is a true count or a sketch estimate. Tabs: Quality (by class, errors, funnel, trend), Cohorts (drill-down explorer with the Why? decomposition), Containers (per-scene table with sort presets), Investigation (error-index search), Compare (model vs model with promotion verdict), Review (statistical sampling with CIs), Shift (train-vs-eval mix), Lineage (reproducibility record).',
+    actions:
+      'Switch population / evaluation run / baseline in the header. Generate a new population or launch an asynchronous evaluation run (progress streams live). Drill cohorts, sort containers, search errors, run Why? decompositions, build and execute review sampling plans, compare runs for promotion decisions.',
+    dataFlow:
+      'Populations are generated or ingested upstream; evaluation runs score them against a model version and materialize cube + error index + sketches. Review verdicts flow back into the cube as verified counters, and comparison verdicts feed the Regression page and alerting.',
+  },
+  overview: {
+    subtitle:
+      'Single-glance health of the whole label-evaluation pipeline: live counters, headline quality metrics, stage status and active alerts.',
+    purpose:
+      'The morning-coffee page: is the pipeline running, how much has been processed, are the headline metrics moving, and is anything alerting?',
+    reading:
+      'Counters track every label\u2019s lifecycle (processed → auto-labeled → auto-graded / flagged → verified / rejected). Quality metrics are computed against the active dataset\u2019s reference GT. Stage cards show each pipeline service\u2019s live state; alert rows carry severity chips — hover any metric or status for its definition.',
+    actions:
+      'Monitor only — start pipelines from Datasets / Label Generation, and investigate alerts on their source pages (rare events, regression, shift).',
+    dataFlow:
+      'All numbers stream in live over SSE from the pipeline services. Alerts originate from anomaly detection, regression tracking and distribution-shift checks, and deep-link to their source pages.',
+  },
+  datasets: {
+    subtitle:
+      'Registry of ingested datasets and their per-group evaluation results — the entry point of the pipeline.',
+    purpose:
+      'Select the active dataset, inspect its composition (sensor groups, frame counts, GT availability) and per-group quality metrics.',
+    reading:
+      'The table lists datasets with GT type and coverage — the confidence chip reflects how trustworthy evaluations against that dataset are (human-verified / gold > vendor > pseudo). Group detail shows precision/recall/F1/IoU per sensor group; hover metric names for exact definitions.',
+    actions:
+      'Ingest a synthetic dataset, set the active dataset (all other pages follow it), and drill into per-group metrics.',
+    dataFlow:
+      'Datasets arrive from ingestion (synthetic generator here). Frames flow into Label Generation; evaluation results per group come back from the evaluation engines and are summarized here.',
+  },
+  'label-generation': {
+    subtitle:
+      'Auto-labeling stage: the queue that turns raw frames into candidate labels, with live throughput and per-class output mix.',
+    purpose:
+      'Watch the auto-labeler consume frames from the active dataset, monitor queue depth / throughput / failures, and check the class mix of produced labels.',
+    reading:
+      'Queue tiles show pending / processing / completed / failed message counts and instantaneous throughput. The class distribution shows what the labeler is emitting — a sudden mix change is an early warning of upstream drift.',
+    actions:
+      'Start or re-run label generation for the active dataset; monitor progress live.',
+    dataFlow:
+      'Frames come from the active dataset; produced candidate labels flow to the Quality Engine and evaluation engines for gating and triage.',
+  },
+  'rare-events': {
+    subtitle:
+      'Anomaly-ensemble mining for the long tail: find the rare, risky samples worth human attention and training data.',
+    purpose:
+      'Rare events are where AV perception fails and where training value concentrates. This page configures the detector ensemble, visualizes the population as a needle-in-haystack projection, and benchmarks detector performance.',
+    reading:
+      'The haystack scatter is a 2D embedding: gray = nominal population, colored = anomaly-flagged candidates; clusters of color indicate systematic blind spots. The four-column config maps detectors → features → fusion strategy → thresholds. Benchmark bars compare per-technique precision/recall/rare-recall on labeled evaluation data.',
+    actions:
+      'Tune detector parameters (KNN, LOF, Isolation Forest, OC-SVM, DBSCAN), pick the ensemble fusion strategy (max / mean / vote), boost minority classes, re-run detection, and benchmark techniques against each other.',
+    dataFlow:
+      'Feature vectors come from evaluated labels. Flagged candidates flow into Triage (ANOMALY reason) and the Human Review queue; confirmed rare events are prioritized into Training datasets — the flywheel\u2019s scarcest fuel.',
+  },
+  quality: {
+    subtitle:
+      'GT-free structural validation: geometry, sensor-consistency and plausibility checks that run on every label — no reference truth required.',
+    purpose:
+      'Most labels have no reference GT. This engine checks each label against physics and sensor evidence instead: box geometry vs class priors, LiDAR point support, ground contact, camera–LiDAR agreement.',
+    reading:
+      'Each validation panel shows pass/fail distributions per check. Hover any check name for what it measures and its threshold source (quality policy).',
+    actions: 'Inspect failing checks and their example labels; thresholds themselves are managed by the quality policy.',
+    dataFlow:
+      'Labels arrive from Label Generation; per-label check verdicts feed the Triage gates (geometric_validation, sensor_consistency) and are stored as evidence for review.',
+  },
+  regression: {
+    subtitle:
+      'Model-version watchdog: tracks per-slice metric deltas across versions and blocks silent quality drops.',
+    purpose:
+      'Every new model version is compared to its baseline per class and slice, so a regression in pedestrian-at-night cannot hide inside a stable global average.',
+    reading:
+      'The matrix shows metric deltas per class/slice: green = improved, red = regressed beyond tolerance. Status chips (improved / regressed / baseline) hover-explain the comparison rule that produced them.',
+    actions:
+      'Review regressed slices, drill into the affected cohorts, and use the verdicts to gate model promotion (see also Command Center → Compare).',
+    dataFlow:
+      'Evaluation results per model version stream in from the evaluation engines; REGRESSED verdicts raise alerts on Overview and can block auto-grading via the MODEL_REGRESSION policy gate.',
+  },
+  triage: {
+    subtitle:
+      'Deterministic decision layer: every evaluated label is auto-graded, flagged for review, or rejected — with full gate-line evidence.',
+    purpose:
+      'Convert evaluation evidence into an auditable routing decision at machine speed, reserving humans for the cases that actually need them.',
+    reading:
+      'The decision panel shows status counts and per-reason breakdowns. Every decision lists its gate lines: measured value vs policy threshold vs verdict. Hover a status or failure reason for its definition; the policy ID ties the decision to the exact threshold set used.',
+    actions:
+      'Inspect decisions and their evidence. Decisions are deterministic — to change outcomes, change the quality policy, not individual rows.',
+    dataFlow:
+      'Evidence arrives from the evaluation engines (geometry, anomaly, consensus, tracking). AUTO_GRADED labels proceed toward training eligibility; FLAGGED labels enter the Human Review queue with their evidence attached; decisions and policy IDs go to the Audit trail.',
+  },
+  review: {
+    subtitle:
+      'Human-in-the-loop review: the prioritized queue of flagged labels, each with camera / LiDAR / BEV / temporal evidence for a verify-correct-reject verdict.',
+    purpose:
+      'Humans are the scarcest resource in the loop. This queue focuses them on the labels automation could not settle, with all evidence in one place.',
+    reading:
+      'Queue rows are ordered by severity and safety criticality; each task shows its failure reasons. The detail view renders synchronized camera, LiDAR 3D, bird\u2019s-eye and temporal strips plus the gate lines that flagged it. Hover reasons and metrics for definitions.',
+    actions:
+      'Claim a task, inspect evidence across views, then verify (label correct), correct (fix geometry/class — becomes new GT), or reject (label wrong). Escalation routes hard cases to senior graders.',
+    dataFlow:
+      'Tasks arrive from Triage (FLAGGED) and from statistical review sampling. Verdicts return to the pipeline: VERIFIED/corrected labels become training-eligible ground truth and recalibrate automated metrics; rejects feed auto-labeler error analysis.',
+  },
+  training: {
+    subtitle:
+      'The flywheel\u2019s closing loop: verified labels become training datasets, new models train on them, and every new model is evaluated back through this platform.',
+    purpose:
+      'Turn review output into model improvement: assemble verified-only training sets, launch training jobs, and watch loss / rare-recall / safety-recall converge.',
+    reading:
+      'The flywheel diagram shows the loop stage-by-stage. Job tiles show live loss and recall trajectories; the log viewer streams training output. Only VERIFIED labels are dataset-eligible — hover the eligibility note for why.',
+    actions:
+      'Build a training dataset from verified labels, configure and launch a training job, monitor progress, and hand the resulting model to Models / Evaluation for scoring.',
+    dataFlow:
+      'Verified labels flow in from Human Review; trained model versions flow out to the Models registry and are evaluated by Evaluation / Command Center runs — closing the data flywheel.',
+  },
+  models: {
+    subtitle:
+      'Model registry: every trained version with its evaluation metrics, promotion state and comparison baseline.',
+    purpose: 'One place to see what models exist, how they score, and which one is deployed as baseline.',
+    reading:
+      'Cards list versions with headline metrics (precision, recall, mAP 3D, safety / rare recall — hover each for definitions). The promotion chip reflects the promotion policy verdict against the baseline.',
+    actions: 'Inspect versions, set comparison baselines, and follow deep links into evaluation runs and regression views.',
+    dataFlow:
+      'Versions register here after Training; evaluation metrics attach from evaluation runs; promotion verdicts come from the compare policy (Command Center → Compare, Regression page).',
+  },
+  evaluation: {
+    subtitle:
+      'Record-level evaluation browser: individual evaluation records with their full per-gate evidence — the forensic complement to the aggregate Command Center.',
+    purpose:
+      'When an aggregate points at a specific label, this page shows that record\u2019s complete evaluation: every engine\u2019s measurements and every gate verdict.',
+    reading:
+      'Each record lists geometry, sensor, anomaly, consensus and tracking evidence with pass/fail chips. Hover any metric or gate for its definition and threshold source.',
+    actions: 'Search / filter records, inspect evidence, follow links into Triage decisions and Review tasks.',
+    dataFlow:
+      'Records are written by the evaluation engines per label; Triage consumes them for decisions; the Command Center aggregates them into the cube.',
+  },
+  audit: {
+    subtitle:
+      'Accountability layer: immutable decision trail plus process-unit consumption — who/what decided, under which policy, at what cost.',
+    purpose:
+      'Every automated decision must be reconstructible: this page exposes the decision log (label, status, reasons, policy ID, timestamp) and normalized compute cost tracking.',
+    reading:
+      'Process-unit tiles normalize cost per verified event / per million frames. The trail table is append-only; hover column headers and statuses for definitions.',
+    actions: 'Filter/inspect the trail; export for compliance review.',
+    dataFlow: 'Entries stream in from Triage and Review verdicts; process units aggregate from every pipeline stage\u2019s reported consumption.',
+  },
+  pipeline: {
+    subtitle:
+      'Architecture map of the platform: stages, queues and data flows from raw frames to the training flywheel.',
+    purpose:
+      'Orientation: see how Input → Evaluation Engines → Quality Gate → Triage → HITL → Training connect, and which services implement each stage.',
+    reading:
+      'Boxes are stages (live status chips), arrows are data flows. Hover a stage for its role; click through to its page.',
+    actions: 'Navigate to any stage\u2019s page; use it as the mental model for the rest of the app.',
+    dataFlow: 'This page is the map, not a stage: it visualizes the flows the other pages implement.',
+  },
+  ssam: {
+    subtitle:
+      'Surrogate-safety analysis of real intersections: conflicts ranked by TTC / PET / severity on an interactive map — the safety context the label platform feeds.',
+    purpose:
+      'Identify dangerous intersections and conflict patterns from trajectory data using surrogate safety measures (no crashes required).',
+    reading:
+      'Map markers are intersections sized/colored by severity; the drawer ranks conflicts (critical / high / medium / low) with TTC, PET and speeds — hover the column headers for definitions. The grid lists individual conflict events.',
+    actions: 'Filter by county / conflict type / severity, inspect intersections, drill into conflict events.',
+    dataFlow:
+      'Trajectories come from perception output upstream; hotspots identified here define the safety-critical scenarios that evaluation cohorts and rare-event mining prioritize.',
+  },
+  legacy: {
+    subtitle:
+      'The original vanilla-JS studio, embedded unchanged — kept for workflows not yet migrated to the React platform.',
+    purpose: 'Access legacy tooling during the migration period.',
+    reading: 'The iframe below is the old UI as-is; features may overlap with the new pages.',
+    actions: 'Use legacy workflows; open in a new tab for full-window work.',
+    dataFlow: 'Talks to the same backend and datasets as the new platform.',
+  },
+};
+
+/** Short one-liner per page for the global help menu index. */
+export function pageOneLiner(id: PageId): string {
+  return PAGE_HELP[id].subtitle;
+}

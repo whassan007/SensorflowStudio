@@ -161,6 +161,32 @@ pytest
 
 ---
 
+## 🗺️ SSAM Safety Dashboard (React + deck.gl)
+
+An interactive statewide dashboard for exploring SSAM conflict data on a map, backed by the FastAPI `/api/ssam/statewide` endpoint.
+
+**Features**: severity-colored deck.gl map of California intersections, county/conflict-type/severity filters, TTC and speed sliders, full-text search, sortable paginated data grid, and a detail drawer with analyst annotations (persisted via `/api/ssam/annotate`).
+
+### Run in development
+
+```bash
+# Terminal 1: start the FastAPI backend (serves the SSAM APIs on :8000)
+python app_backend.py
+
+# Terminal 2: start the Vite dev server (proxies /api to :8000)
+npm install
+npm run dev            # opens http://localhost:5173
+```
+
+### Production build & type check
+
+```bash
+npm run typecheck      # tsc --noEmit
+npm run build          # outputs dist/
+```
+
+---
+
 ## 🚦 FHWA Surrogate Safety Assessment Model (SSAM)
 
 The SSAM module processes trajectory prediction files to calculate vehicle-to-vehicle conflicts. It leverages key safety surrogates to classify risk profiles:

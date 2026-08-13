@@ -1,0 +1,215 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: #101418;
+  color: #e6e9ec;
+  font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+}
+
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* When the SSAM dashboard is embedded inside the app shell, size it to the
+   container (full height under the app bar) instead of the whole viewport. */
+.ssam-embed {
+  height: 100%;
+}
+
+.ssam-embed .dashboard {
+  height: 100%;
+}
+
+/* ---- Pipeline architecture graph ---- */
+@keyframes pipeline-dash-flow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+.pipeline-edge-active {
+  stroke-dasharray: 6 6;
+  animation: pipeline-dash-flow 0.8s linear infinite;
+}
+
+@keyframes pipeline-node-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.pipeline-node-running {
+  animation: pipeline-node-pulse 1.2s ease-in-out infinite;
+}
+
+/* ---- Filter bar ---- */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #232a31;
+  background: #161b21;
+  z-index: 10;
+}
+
+.filter-bar-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: 8px;
+}
+
+.slider-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 110px;
+}
+
+.summary-chips {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+/* ---- Main area: map + drawer ---- */
+.main-area {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.map-canvas {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.map-tooltip {
+  position: absolute;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(16, 20, 24, 0.92);
+  border: 1px solid #2c353e;
+  font-size: 12px;
+  z-index: 20;
+  max-width: 260px;
+}
+
+.map-loading {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 20;
+}
+
+.map-attribution {
+  position: absolute;
+  bottom: 4px;
+  right: 8px;
+  font-size: 10px;
+  color: #8a949e;
+  z-index: 20;
+}
+
+.map-attribution a {
+  color: #aab4be;
+}
+
+/* ---- Data grid ---- */
+.data-grid {
+  display: flex;
+  flex-direction: column;
+  height: 34vh;
+  min-height: 220px;
+  border-top: 1px solid #232a31;
+  background: #12171d;
+}
+
+.data-grid-message {
+  align-items: center;
+  justify-content: center;
+}
+
+.severity-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  color: #10151a;
+  font-weight: 700;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* ---- Severity drawer ---- */
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.severity-block {
+  margin-top: 16px;
+}
+
+.severity-value {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.severity-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #10151a;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.metric-list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.metric-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.metric-list dt {
+  color: #8a949e;
+  font-size: 13px;
+}
+
+.metric-list dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+}
