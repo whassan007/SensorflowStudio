@@ -38,7 +38,8 @@ export type GlossaryCategory =
   | 'Perception fusion'
   | 'Retrospective safety'
   | 'Closed-loop evaluation'
-  | 'Launch readiness';
+  | 'Launch readiness'
+  | 'Release governance';
 
 export const GLOSSARY: Record<string, GlossaryEntry> = {
   // ------------------------------------------------------------ detection metrics
@@ -1067,6 +1068,45 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     short: 'Content-addressed caching of shared pipeline stages (BEV rasters, projections, backbone features) so N models re-run only their heads.',
     detail: 'Cache keys hash (scenario, sensor_version, preprocessing_version, backbone_version, feature_schema_version); any version bump changes the key, so stale cross-version reuse is structurally impossible. Savings are measured, not estimated.',
   },
+
+  // ------------------------------------------------------------ Release governance (Studio 2.0)
+  release_decision: {
+    term: 'Release decision (GO / REVIEW / NO-GO)',
+    category: 'Release governance',
+    short: 'One deterministic decision composed from safety gates, the seqeval regression verdict, the megaeval shift report, and (when available) agentic policy and closed-loop verdicts.',
+    detail: 'Computed by the studio2 ReleaseGate as a pure function of the subsystem inputs plus a content-hash-versioned policy. Any blocking condition (safety BLOCKED, seqeval REGRESSION, agentic stop-ship, failing critical hardware combination) → NO-GO; missing inputs or open questions → REVIEW with the gap named; only complete, clean evidence → GO. Every decision records the full evidence tuple it was computed from.',
+    caveat: 'GO is a recommendation, never a deployment: authorization is a separate recorded human approval.',
+  },
+  evidence_completeness: {
+    term: 'Evidence completeness',
+    category: 'Release governance',
+    short: 'The fraction of configured release-gate subsystems that actually contributed evidence to a decision.',
+    detail: 'Required subsystems (safety gates, sequential regression, distribution shift) and configured optional ones (agentic policy, closed loop, hardware matrix) each count once. A missing subsystem lowers completeness and forces REVIEW — absence of evidence can never make a decision look stronger.',
+  },
+  reproducibility_tuple: {
+    term: 'Reproducibility tuple',
+    category: 'Release governance',
+    short: 'The seven components needed to replay an evaluation run exactly: model, dataset, scenario, config, calibration, seed and policy versions.',
+    detail: 'Recorded on every EvaluationRun in the studio2 registry. The verdict is computed, not declared: a run missing any component is marked NON_REPRODUCIBLE with the missing parts listed (most retroactively ingested runs are, honestly, non-reproducible — e.g. megaeval lineage lacks scenario and calibration components).',
+  },
+  dataset_role: {
+    term: 'Dataset role',
+    category: 'Release governance',
+    short: 'Every dataset version carries a role: TRAINING, VALIDATION, TEST, REGRESSION, LAUNCH or MONITORING.',
+    detail: 'TEST, REGRESSION and LAUNCH are protected evaluation roles: they decide launches, so moving them across the training/evaluation boundary (in either direction) requires an explicitly recorded governance override (who + why), enforced by the registry\u2019s role-transition rules — the same contamination-guard pattern as the raremine lineage LeakageError.',
+  },
+  hardware_gate_matrix: {
+    term: 'Hardware gate matrix',
+    category: 'Release governance',
+    short: 'Metric thresholds evaluated per hardware/domain combination (region × compute platform × sensor generation), not just globally.',
+    detail: 'Combination metrics come from real megaeval cube cohorts; platform evidence exists only where vitis HIL runs exist; region strata are proxied from road_type (the derivation is shown per row). A failing launch-critical combination blocks the release even when the global aggregate passes; combinations without enough support are INSUFFICIENT and never count as passing.',
+  },
+  human_deployment_approval: {
+    term: 'Human deployment approval',
+    category: 'Release governance',
+    short: 'The separate recorded action (approver + rationale) that authorizes deployment after a GO decision.',
+    detail: 'Only GO decisions can be approved; REVIEW and NO-GO must be re-evaluated after their conditions are resolved. The approval is a first-class registry entity and lands in the append-only audit trail — the gate recommends, humans authorize.',
+  },
 };
 
 export type GlossaryKey = keyof typeof GLOSSARY;
@@ -1147,4 +1187,5 @@ export const GLOSSARY_CATEGORIES: GlossaryCategory[] = [
   'Perception fusion',
   'Retrospective safety',
   'Launch readiness',
+  'Release governance',
 ];

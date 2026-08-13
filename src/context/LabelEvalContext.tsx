@@ -37,6 +37,7 @@ export type PageId =
   | 'retro'
   | 'closed-loop-lab'
   | 'launch-readiness'
+  | 'studio2'
   | 'legacy';
 
 export const ALL_PAGE_IDS: PageId[] = [
@@ -75,6 +76,7 @@ export const ALL_PAGE_IDS: PageId[] = [
   'retro',
   'closed-loop-lab',
   'launch-readiness',
+  'studio2',
   'legacy',
 ];
 

@@ -42,6 +42,7 @@ import {
   LineChart,
   Layers,
   RefreshCcwDot,
+  ClipboardCheck,
   Shapes,
   Network,
   LayoutGrid,
@@ -84,6 +85,7 @@ import ScenarioComposerPage from './pages/studio/ScenarioComposerPage';
 import PipelineBuilderPage from './pages/studio/PipelineBuilderPage';
 import MyDashboardPage from './pages/studio/MyDashboardPage';
 import ClosedLoopLabPage from './pages/nextgen/ClosedLoopLabPage';
+import Studio2GovernancePage from './pages/studio2/Studio2GovernancePage';
 import RetroAnalyzerPage from './pages/retro/RetroAnalyzerPage';
 import LaunchReadinessPage from './pages/agentic/LaunchReadinessPage';
 import PageIntro from './components/help/PageIntro';
@@ -139,6 +141,7 @@ const SAFETY_NAV: NavItem[] = [
   { id: 'safety-discrepancy', label: 'Discrepancy Mining', icon: <GitCompareArrows size={18} /> },
   { id: 'safety-scenarios', label: 'Scenario DB', icon: <Library size={18} /> },
   { id: 'safety-search', label: 'Semantic Search', icon: <Sparkles size={18} /> },
+  { id: 'studio2', label: 'Studio 2.0 Governance', icon: <ClipboardCheck size={18} /> },
   { id: 'retro', label: 'Retrospective Analyzer', icon: <Undo2 size={18} /> },
   { id: 'launch-readiness', label: 'Launch Readiness', icon: <Scale size={18} /> },
 ];
@@ -184,6 +187,7 @@ const PAGE_TITLES: Record<PageId, string> = {
   retro: 'Retrospective Safety Analyzer',
   'closed-loop-lab': 'Closed-Loop Lab',
   'launch-readiness': 'Launch Readiness (Agentic Triage)',
+  studio2: 'Studio 2.0 Governance (Control Plane & Release)',
   legacy: 'Legacy Studio',
 };
 
@@ -437,6 +441,7 @@ export default function App() {
               {page === 'retro' ? <RetroAnalyzerPage /> : null}
               {page === 'launch-readiness' ? <LaunchReadinessPage /> : null}
               {page === 'closed-loop-lab' ? <ClosedLoopLabPage /> : null}
+              {page === 'studio2' ? <Studio2GovernancePage /> : null}
             </Box>
           )}
         </Box>

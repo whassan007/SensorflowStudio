@@ -239,6 +239,18 @@ export const PAGE_HELP: Record<PageId, PageHelpEntry> = {
     dataFlow:
       'Counterfactuals are transformations of bevfusion scenes; safety math reuses the SSAM extensions; sequential early stopping delegates to seqeval; distribution similarity delegates to the mega-eval statistics. Artifacts persist under runs/nextgen/. A run with incomplete lineage is marked INVALID for launch purposes.',
   },
+  studio2: {
+    subtitle:
+      'The Studio 2.0 control plane: versioned entities for the whole system, one deterministic release decision composed from the real engines (safety gates + seqeval + megaeval shift + agentic/nextgen when available), hardware-stratified gating, and the unified observability funnel.',
+    purpose:
+      'The engines exist; what was missing is the layer that composes them. This page answers "can this candidate ship?" with a GO / REVIEW / NO-GO decision backed by a full evidence tuple, keeps humans (not gates) as the deployment authority, and makes cross-package entities (models, datasets with roles, policies, runs) first-class and browsable.',
+    reading:
+      'Release Board: the decision banner shows status, confidence and evidence completeness; blocking conditions, named degraded inputs and unresolved questions below it; the evidence tuple lists exactly which subsystem artifacts the decision was computed from. A GO decision still shows "deployment not authorized" until the separate human approval is recorded. Control Plane: role badges (REGRESSION/LAUNCH/TEST are PROTECTED by the contamination guard) and REPRODUCIBLE / NON-REPRODUCIBLE badges (a run missing any tuple component is non-reproducible, with the missing parts listed). Hardware Gates: each row is a region × platform × sensor-generation combination; a failing CRITICAL row blocks even when the global aggregate passes; amber rows lack sufficient evidence and never count as passing. Funnel: stage bars are log-scaled; absent sources show UNAVAILABLE with the reason — numbers are never fabricated.',
+    actions:
+      'Evaluate a candidate from live sources, run the end-to-end closed-loop demo (bevfusion scenario → seqeval verdict → nextgen replay → safety gates → release decision → flywheel registration), browse and auto-ingest registry entities, transition dataset roles (guarded transitions demand an audited override), recompute the hardware matrix, and record human deployment approvals.',
+    dataFlow:
+      'Reads the persisted stores of megaeval, seqeval, safety, agentic, nextgen, bevfusion and vitis (best-effort, availability-flagged). Writes only under runs/studio2/: registry entities, release decisions, approvals and an append-only audit trail. Failures found by the demo feed back as protected REGRESSION-role dataset entries.',
+  },
   ssam: {
     subtitle:
       'Surrogate-safety analysis of real intersections: conflicts ranked by TTC / PET / severity on an interactive map — the safety context the label platform feeds.',

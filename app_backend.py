@@ -1509,6 +1509,12 @@ app.include_router(studio_ux_router)
 from sensorflow.nextgen.api import router as nextgen_router
 app.include_router(nextgen_router)
 
+# Studio 2.0 control plane: unified entity registry, deterministic release
+# gate composing safety/seqeval/megaeval (+ agentic/nextgen when available),
+# hardware-aware gate matrix, observability funnel, closed-loop demo.
+from sensorflow.studio2.api import router as studio2_router
+app.include_router(studio2_router)
+
 # Multimodal rare-event mining & perception QA (costumed-pedestrian miner).
 from sensorflow.raremine.api import router as raremine_router
 app.include_router(raremine_router)

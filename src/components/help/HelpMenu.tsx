@@ -203,6 +203,7 @@ const PAGE_ORDER: PageId[] = [
   'retro',
   'closed-loop-lab',
   'launch-readiness',
+  'studio2',
   'legacy',
 ];
 
@@ -242,6 +243,7 @@ const PAGE_NAMES: Record<PageId, string> = {
   retro: 'Retrospective Analyzer',
   'closed-loop-lab': 'Closed-Loop Lab',
   'launch-readiness': 'Launch Readiness',
+  studio2: 'Studio 2.0 Governance',
   legacy: 'Legacy Studio',
 };
 
