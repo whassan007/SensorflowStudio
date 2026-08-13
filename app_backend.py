@@ -1467,6 +1467,10 @@ app.include_router(labeleval_router)
 from sensorflow.megaeval.api import router as megaeval_router
 app.include_router(megaeval_router)
 
+# Sequential regression detection engine (anytime-valid, budgeted, paired).
+from sensorflow.seqeval.api import router as seqeval_router
+app.include_router(seqeval_router)
+
 # BEV-Fusion perception engine (camera+LiDAR fusion, masklet tracking, self-eval).
 from sensorflow.bevfusion.api import router as bevfusion_router
 app.include_router(bevfusion_router)
@@ -1475,10 +1479,6 @@ app.include_router(bevfusion_router)
 # discrepancy mining, scenario DB, semantic mining).
 from sensorflow.safety.api import router as safety_router
 app.include_router(safety_router)
-
-# Hill Climbing EM: adaptive EM development & interview-readiness platform.
-from sensorflow.hillclimb.api import router as hillclimb_router
-app.include_router(hillclimb_router)
 
 # Mount static folder
 static_dir = Path(__file__).parent / "static"
