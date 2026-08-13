@@ -1471,6 +1471,15 @@ app.include_router(megaeval_router)
 from sensorflow.bevfusion.api import router as bevfusion_router
 app.include_router(bevfusion_router)
 
+# Safety & compliance layer (ODD coverage, release gates, SSAM, calibration,
+# discrepancy mining, scenario DB, semantic mining).
+from sensorflow.safety.api import router as safety_router
+app.include_router(safety_router)
+
+# Hill Climbing EM: adaptive EM development & interview-readiness platform.
+from sensorflow.hillclimb.api import router as hillclimb_router
+app.include_router(hillclimb_router)
+
 # Mount static folder
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
