@@ -20,6 +20,7 @@ export type PageId =
   | 'raremine'
   | 'hillclimb'
   | 'retro'
+  | 'launch-readiness'
   | 'vitis'
   | 'ssam'
   | 'legacy';
@@ -43,6 +44,7 @@ export const ALL_PAGE_IDS: PageId[] = [
   'raremine',
   'hillclimb',
   'retro',
+  'launch-readiness',
   'vitis',
   'ssam',
   'legacy',

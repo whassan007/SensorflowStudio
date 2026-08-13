@@ -239,6 +239,18 @@ export const PAGE_HELP: Record<PageId, PageHelpEntry> = {
     dataFlow:
       'Fixtures live in sensorflow/retro/fixtures; analyses and audit trails persist under runs/retro/. Metric math reuses the SSAM safety extensions; distribution stats delegate to the mega-eval engine; the safety-case corpus is indexed at startup (chromadb or deterministic fallback).',
   },
+  'launch-readiness': {
+    subtitle:
+      'Agentic launch readiness & misclassification triage: a five-layer pipeline (detection → evidence → analysis → decision → flywheel) where AI agents only recommend and a deterministic, versioned policy engine plus recorded human review own every launch decision.',
+    purpose:
+      'A pedestrian misclassified as a construction cone at "~0.01%" is not actionable until the denominator, confidence interval, significance, safety criticality, concentration and novelty are established. This page runs that triage end-to-end and shows exactly which claims are OBSERVED measurements versus AI hypotheses versus missing evidence.',
+    reading:
+      'The failure queue lists detected patterns with severity (S0–S5) and policy-outcome chips. Inside an investigation: the Evidence Graph colors each node by status (OBSERVED / DERIVED / HYPOTHESIS / UNAVAILABLE); the statistical panel shows Wilson CIs, exact-binomial significance and the seqeval anytime-valid decision with small-sample flags; the safety chain marks links without replay evidence as UNCERTAIN; the concentration heatmap colors strata by relative risk. Every panel is badged AI ANALYSIS (ADVISORY) or DETERMINISTIC. The decision tab shows the four-way policy outcome, the matrix row that fired, and option cards where safety-infeasible options are excluded no matter how cheap.',
+    actions:
+      'Scan for failures, run the seeded pedestrian→cone worked example, step the five pipeline stages, record human-review decisions (the only path to validation), export the leadership scorecard as JSON, and evaluate candidates against the flywheel-generated suites.',
+    dataFlow:
+      'Detection scans a seeded synthetic campaign (bevfusion scenes + a paired rate population). Statistics delegate to seqeval; safety replays reuse the SSAM extensions; Option C checks use the ODD taxonomy. Validated failures feed evaluation suites (contamination-guarded) under runs/agentic/, and every action lands in a hash-chained append-only audit log.',
+  },
   ssam: {
     subtitle:
       'Surrogate-safety analysis of real intersections: conflicts ranked by TTC / PET / severity on an interactive map — the safety context the label platform feeds.',

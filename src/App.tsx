@@ -31,6 +31,7 @@ import {
   AppWindow,
   Mountain,
   Undo2,
+  Scale,
   CircuitBoard,
 } from 'lucide-react';
 import { LabelEvalContext, type PageId, ALL_PAGE_IDS } from './context/LabelEvalContext';
@@ -56,6 +57,7 @@ import RareMinePage from './pages/raremine/RareMinePage';
 import VitisPage from './pages/vitis/VitisPage';
 import HillClimbSection from './pages/hillclimb/HillClimbSection';
 import RetroAnalyzerPage from './pages/retro/RetroAnalyzerPage';
+import LaunchReadinessPage from './pages/agentic/LaunchReadinessPage';
 import PageIntro from './components/help/PageIntro';
 import HelpMenu from './components/help/HelpMenu';
 
@@ -86,6 +88,7 @@ const PLATFORM_NAV: NavItem[] = [
   { id: 'pipeline', label: 'Pipeline Architecture', icon: <Workflow size={18} /> },
   { id: 'hillclimb', label: 'Hill Climbing EM', icon: <Mountain size={18} /> },
   { id: 'retro', label: 'Retrospective Analyzer', icon: <Undo2 size={18} /> },
+  { id: 'launch-readiness', label: 'Launch Readiness', icon: <Scale size={18} /> },
   { id: 'vitis', label: 'Hardware Acceleration', icon: <CircuitBoard size={18} /> },
 ];
 
@@ -113,6 +116,7 @@ const PAGE_TITLES: Record<PageId, string> = {
   pipeline: 'Pipeline Architecture',
   hillclimb: 'Hill Climbing EM',
   retro: 'Retrospective Safety Analyzer',
+  'launch-readiness': 'Launch Readiness (Agentic Triage)',
   vitis: 'Hardware Acceleration (Vitis Vision)',
   ssam: 'SSAM Safety Dashboard',
   legacy: 'Legacy Studio',
@@ -322,6 +326,7 @@ export default function App() {
               {page === 'pipeline' ? <PipelineArchitecturePage /> : null}
               {page === 'hillclimb' ? <HillClimbSection initialView={entityId} /> : null}
               {page === 'retro' ? <RetroAnalyzerPage /> : null}
+              {page === 'launch-readiness' ? <LaunchReadinessPage /> : null}
               {page === 'vitis' ? <VitisPage /> : null}
             </Box>
           )}

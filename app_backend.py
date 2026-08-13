@@ -1493,6 +1493,11 @@ app.include_router(hillclimb_router)
 from sensorflow.retro.api import router as retro_router
 app.include_router(retro_router)
 
+# Agentic launch readiness & misclassification triage (five-layer pipeline,
+# deterministic policy engine, evidence graphs, evaluation flywheel).
+from sensorflow.agentic.api import router as agentic_router
+app.include_router(agentic_router)
+
 # Multimodal rare-event mining & perception QA (costumed-pedestrian miner).
 from sensorflow.raremine.api import router as raremine_router
 app.include_router(raremine_router)
