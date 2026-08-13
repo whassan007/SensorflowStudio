@@ -16,6 +16,7 @@ import {
   Database,
   Tag,
   Radar,
+  Pickaxe,
   ShieldCheck,
   TrendingDown,
   Microscope,
@@ -48,6 +49,7 @@ import SSAMSafetyDashboard from './pages/SSAMSafetyDashboard';
 import LegacyStudioPage from './pages/LegacyStudioPage';
 import CommandCenterPage from './pages/CommandCenterPage';
 import RootCauseLabPage from './pages/rca/RootCauseLabPage';
+import RareMinePage from './pages/raremine/RareMinePage';
 import PageIntro from './components/help/PageIntro';
 import HelpMenu from './components/help/HelpMenu';
 
@@ -65,6 +67,7 @@ const PLATFORM_NAV: NavItem[] = [
   { id: 'datasets', label: 'Datasets', icon: <Database size={18} /> },
   { id: 'label-generation', label: 'Label Generation', icon: <Tag size={18} /> },
   { id: 'rare-events', label: 'Rare Events', icon: <Radar size={18} /> },
+  { id: 'raremine', label: 'Rare-Event Miner', icon: <Pickaxe size={18} /> },
   { id: 'quality', label: 'Quality Engine', icon: <ShieldCheck size={18} /> },
   { id: 'regression', label: 'Regression', icon: <TrendingDown size={18} /> },
   { id: 'rca', label: 'Root Cause Lab', icon: <Microscope size={18} /> },
@@ -88,6 +91,7 @@ const PAGE_TITLES: Record<PageId, string> = {
   datasets: 'Datasets',
   'label-generation': 'Label Generation',
   'rare-events': 'Rare Event Detection',
+  raremine: 'Rare-Event Miner (Costumed Pedestrians)',
   quality: 'Quality Engine',
   regression: 'Regression Tracking',
   rca: 'Root Cause Lab',
@@ -293,6 +297,7 @@ export default function App() {
               {page === 'datasets' ? <DatasetsPage /> : null}
               {page === 'label-generation' ? <LabelGenerationPage /> : null}
               {page === 'rare-events' ? <RareEventDashboard /> : null}
+              {page === 'raremine' ? <RareMinePage /> : null}
               {page === 'quality' ? <QualityEnginePage /> : null}
               {page === 'regression' ? <RegressionPage /> : null}
               {page === 'rca' ? <RootCauseLabPage /> : null}

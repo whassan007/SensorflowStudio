@@ -1484,6 +1484,10 @@ app.include_router(safety_router)
 from sensorflow.rca.api import router as rca_router
 app.include_router(rca_router)
 
+# Multimodal rare-event mining & perception QA (costumed-pedestrian miner).
+from sensorflow.raremine.api import router as raremine_router
+app.include_router(raremine_router)
+
 # Mount static folder
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():

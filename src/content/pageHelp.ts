@@ -79,6 +79,18 @@ export const PAGE_HELP: Record<PageId, PageHelpEntry> = {
     dataFlow:
       'Feature vectors come from evaluated labels. Flagged candidates flow into Triage (ANOMALY reason) and the Human Review queue; confirmed rare events are prioritized into Training datasets — the flywheel\u2019s scarcest fuel.',
   },
+  raremine: {
+    subtitle:
+      'Multimodal miner for costumed pedestrians (mascots, inflatables, character suits…) whose distorted silhouettes expose perception weaknesses — proposals, never verdicts.',
+    purpose:
+      'Costumed pedestrians are the canonical hard rare event: a person whose silhouette no longer looks human. This page runs a deterministic rule-based proposer over a synthetic multimodal scene bank, consolidates multi-frame tracks, removes near-duplicates, and routes candidates through automated + human validation into governed dataset destinations. The separation is strict: the miner proposes, validation measures, humans confirm, statistics judge the miner, and training usage is a governed decision.',
+    reading:
+      'Each candidate card shows THREE separate confidences (human present / costume present / rare event) — never one collapsed score — plus modality-tagged evidence (the miner cannot cite sensors the scene lacks), alternative hypotheses it kept alive (statue? mannequin? decoration?), and observed model behavior kept strictly apart from the miner\u2019s predicted failure. The track view collapses a 20-frame walk into one event with representative frames. Coverage & curator quality measures the miner itself against the planted truth: precision, recall, calibration, yield and model-value.',
+    actions:
+      'Generate a scene bank (n, seed), run the miner, filter and review candidates (approve into a dataset destination or reject with a note), inspect lineage and training/eval eligibility, record a governance override to release a protected eval example for training, and re-mine with the improvement report\u2019s suggested config.',
+    dataFlow:
+      'Scene banks are synthetic and deterministic (planted rare events + confounders give exact ground truth). Approved candidates land in rare-event / hard-example / protected evaluation sets with full lineage; the leakage guard forces training_eligible=false for protected eval sets unless an explicit, audited override exists. Curator metrics feed the next mining run\u2019s configuration.',
+  },
   quality: {
     subtitle:
       'GT-free structural validation: geometry, sensor-consistency and plausibility checks that run on every label — no reference truth required.',

@@ -654,6 +654,27 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     short: 'Running a candidate model on live traffic without acting on its output.',
     detail: 'The candidate scores real production inputs in parallel with the incumbent; outcomes are compared post-hoc. Sensitive to sampling bias, serving-config differences and provisional labels — which is why the Root Cause Lab audits the shadow pipeline before trusting its number.',
   },
+
+  // ------------------------------------------------- rare-event mining (raremine)
+  costumed_pedestrian: {
+    term: 'Costumed pedestrian',
+    category: 'Anomaly & rarity',
+    short: 'A person whose costume distorts the human silhouette a detector relies on.',
+    detail: 'Mascot / inflatable / animal / character / robot-armor / oversized / large-prop costumes break silhouette, texture and proportion priors, causing misses or misclassification (vehicle, animal, background). The Rare-Event Miner keeps three SEPARATE confidences: a human is present, a costume is present, and the combination is a rare event.',
+    caveat: 'Confounders (mascot statues, inflatable decorations, printed figures, mannequins) look identical in one frame — only motion, 3D volume, or human validation separates them.',
+  },
+  leakage_guard: {
+    term: 'Leakage guard',
+    category: 'Operations',
+    short: 'Examples in protected evaluation sets can never silently become training data.',
+    detail: 'Anything routed to a REGRESSION or SAFETY_CRITICAL evaluation set gets training_eligible=false in its lineage. Promoting such an example to training requires an explicit governance override recording who and why, which is permanently audited.',
+  },
+  mining_calibration: {
+    term: 'Mining calibration',
+    category: 'Anomaly & rarity',
+    short: 'Whether the miner\u2019s stated confidence matches how often it is right.',
+    detail: 'Candidates are binned by stated rare-event confidence; within each bin, the observed rate of true (planted) rare events is measured. A calibrated miner\u2019s 80% bin is right about 80% of the time — over-confident bins mean stated confidence cannot be trusted for triage ordering.',
+  },
 };
 
 export type GlossaryKey = keyof typeof GLOSSARY;
