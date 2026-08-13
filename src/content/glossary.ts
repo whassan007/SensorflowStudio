@@ -30,7 +30,8 @@ export type GlossaryCategory =
   | 'Pipeline & statuses'
   | 'Failure reasons'
   | 'Ground truth'
-  | 'Operations';
+  | 'Operations'
+  | 'Hardware acceleration';
 
 export const GLOSSARY: Record<string, GlossaryEntry> = {
   // ------------------------------------------------------------ detection metrics
@@ -675,6 +676,65 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     short: 'Whether the miner\u2019s stated confidence matches how often it is right.',
     detail: 'Candidates are binned by stated rare-event confidence; within each bin, the observed rate of true (planted) rare events is measured. A calibrated miner\u2019s 80% bin is right about 80% of the time — over-confident bins mean stated confidence cannot be trusted for triage ordering.',
   },
+
+  // ------------------------------------------------------------ hardware acceleration (Vitis)
+  vitis_emulated_backend: {
+    term: 'Emulated Vitis backend',
+    category: 'Hardware acceleration',
+    short: 'CPU emulator of a Vitis Vision FPGA pipeline: same ops, faithful hardware constraints, no silicon.',
+    detail: 'Implements the same VisionBackend interface as the reference float32 backend, but applies ap_fixed<W,I> fixed-point quantization (truncation + saturation), XFCVDEPTH line-buffer limits and LUT divide/sqrt to every op, plus a deterministic per-op latency model (pixels/cycle × clock, PL vs AIE placement). A real Vitis/PYNQ/XRT backend slots in behind the identical interface later.',
+    caveat: 'No FPGA hardware is attached to this machine. Every latency, throughput and speedup figure this backend reports is analytically MODELED, never measured on silicon.',
+  },
+  ap_fixed_quantization: {
+    term: 'ap_fixed<W,I> quantization',
+    category: 'Hardware acceleration',
+    short: 'HLS fixed-point format: W total bits, I integer bits; values are truncated and saturated like on the FPGA.',
+    detail: 'Matches the HLS ap_fixed defaults: rounding is truncation toward negative infinity (AP_TRN) at 2^-(W-I) resolution, and overflow saturates (AP_SAT) to the representable range. Fewer fractional bits mean coarser detection confidences and positions — the root cause the HIL ablation isolates as "precision".',
+  },
+  xfcvdepth: {
+    term: 'XFCVDEPTH (line-buffer depth)',
+    category: 'Hardware acceleration',
+    short: 'Maximum image width a streaming Vitis Vision kernel can buffer rows for.',
+    detail: 'Streaming FPGA kernels hold a few rows in on-chip line buffers whose width is bounded at synthesis time. When the frame is wider than the configured depth, the emulator processes independent vertical strips with no halo exchange — producing localized seam artifacts at strip boundaries, exactly like an under-provisioned kernel.',
+  },
+  lut_approximation: {
+    term: 'LUT divide/sqrt',
+    category: 'Hardware acceleration',
+    short: 'HLS-style lookup-table approximation of divide and square root with bounded relative error.',
+    detail: 'Full dividers are expensive in fabric, so HLS designs use mantissa-indexed lookup tables. The emulator uses 2^lut_bits-entry tables (relative error ≈ 2^-lut_bits) for every reciprocal and square root — including the determinant inverse inside the optical-flow solver.',
+  },
+  quantization_gap_score: {
+    term: 'Quantization gap score',
+    category: 'Hardware acceleration',
+    short: 'Scalar severity of the float32-vs-fixed-point detection gap on identical frames.',
+    detail: 'Computed from paired per-object comparisons: 0.45·dropped-detection rate + 0.2·class-flip rate + 0.2·mean |confidence drift| + 0.15·(1 − mean pair IoU). The HIL ablation re-measures it with one hardware constraint enabled at a time to attribute the gap to precision, streaming depth, or LUT approximation.',
+  },
+  modeled_throughput: {
+    term: 'Modeled FPGA throughput',
+    category: 'Hardware acceleration',
+    short: 'Analytical latency estimate (pixels/cycle × clock MHz), clearly labeled — never a measurement.',
+    detail: 'Each op has a modeled pixels/cycle rate and PL-vs-AIE placement; end-to-end pipelined fps assumes HLS dataflow overlap (1 / max stage latency). Reported alongside the MEASURED CPU wall time of the reference pipeline for contrast.',
+    caveat: 'Ignores memory bandwidth, AXI backpressure and resource contention; it is an upper bound to be validated on silicon, and every report carries modeled_not_measured: true.',
+  },
+  flow_motion_baseline: {
+    term: 'Flow motion baseline',
+    category: 'Hardware acceleration',
+    short: 'Model-independent object motion predicted by dense pyramidal Lucas-Kanade optical flow.',
+    detail: 'Flow over consecutive BEV rasters predicts each ground-truth object\u2019s next position without consulting any detection engine. A track is "flow-continuous" at a frame when the flow-predicted displacement matches the true displacement within a residual gate — the license to blame the engine (not the scene) for a dropped detection.',
+  },
+  temporal_stability_score: {
+    term: 'Temporal stability score',
+    category: 'Hardware acceleration',
+    short: 'Per-engine 0–100 score penalizing flicker, jitter, fragmentation and unexcused ID switches against the flow baseline.',
+    detail: '100 × (0.35·(1 − 4·flicker rate) + 0.25·e^(−1.5·jitter) + 0.25·(1 − 0.6·fragmentation/track) + 0.15·(1 − unexcused ID-switch fraction)). Computed per cohort (day/night/rain/occluded) and per backend; the backend-agreement meta-check verifies fixed-point flow does not change the engine ranking.',
+    caveat: 'The weights are a documented product decision; check ranking sensitivity before gating releases on the absolute score.',
+  },
+  evaluation_only_variant: {
+    term: 'Evaluation-only variant',
+    category: 'Hardware acceleration',
+    short: 'Synthetic stress variant barred from training by default: full lineage, protected eval destination.',
+    detail: 'Every generated augmentation variant carries training_eligible: false, evaluation_only: true and destination REGRESSION_EVALUATION_SET, plus complete lineage (recipe with resolved parameters, seed, source frame, backend config). Mirrors the rare-event miner\u2019s protected-destination leakage guard: stress data that leaked into training would corrupt the very regression signal it exists to protect.',
+  },
 };
 
 export type GlossaryKey = keyof typeof GLOSSARY;
@@ -748,4 +808,5 @@ export const GLOSSARY_CATEGORIES: GlossaryCategory[] = [
   'Failure reasons',
   'Ground truth',
   'Operations',
+  'Hardware acceleration',
 ];

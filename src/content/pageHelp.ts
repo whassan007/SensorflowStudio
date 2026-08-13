@@ -203,6 +203,18 @@ export const PAGE_HELP: Record<PageId, PageHelpEntry> = {
     dataFlow:
       'Investigations generate a paired offline + shadow evaluation dataset (persisted under runs/rca/). Every diagnostic is computed from that data — nothing is invented — and every board score traces to a recorded finding. Reports feed promotion decisions and the recommended follow-up experiments.',
   },
+  vitis: {
+    subtitle:
+      'Optional AMD/Xilinx Vitis Vision acceleration layer: an emulated FPGA backend (honestly labeled — no hardware attached) powering HIL quantization-gap regression detection, accelerated ISP + synthetic edge-case generation, and temporal/stereo stability profiling.',
+    purpose:
+      'Perception pipelines destined for FPGA/ACAP silicon fail in hardware-specific ways: fixed-point quantization drops detections, line-buffer limits create seam artifacts, LUT approximations shift confidences. This page quantifies those gaps BEFORE hardware exists, using a constraint-faithful CPU emulator behind the same VisionBackend interface a real Vitis/XRT backend will implement.',
+    reading:
+      'The backends panel states honestly which backends exist; the amber EMULATED badge means every FPGA latency/speedup figure is analytically modeled (pixels/cycle × clock), never measured. HIL tab: verdict banner is a sequential (anytime-valid) three-outcome decision; the ablation bars attribute the observed gap to precision vs streaming vs LUT causes; the sweep chart shows gap vs bit-width with the minimal viable config called out. ISP tab: per-stage PSNR chips compare emulated output against the float32 reference; CPU fps is measured wall clock, FPGA fps is modeled. Temporal tab: engines are scored against a model-independent optical-flow motion baseline; the timeline strip highlights (red) frames where a detection dropped while flow proves the object stayed observable; the agreement banner is the meta-check that fixed-point flow does not change verdicts.',
+    actions:
+      'Configure precision (ap_fixed<W,I>), XFCVDEPTH line-buffer depth, LUT toggles and target device. Run paired HIL comparisons and bit-width sweeps. Run the ISP over both backends and generate evaluation-only augmentation batches with full lineage. Profile engine temporal stability across both backends and inspect per-cohort breakdowns. Read the three PRDs served from docs/prd/.',
+    dataFlow:
+      'Scenes and engines come read-only from the bevfusion package; sequential verdicts use seqeval\u2019s anytime-valid tests when importable (local paired-t fallback otherwise). Runs persist under runs/vitis/. Generated variants are evaluation-set supplements tagged evaluation-only (never training-eligible) and are offered to the raremine candidate flow when that package is available.',
+  },
   ssam: {
     subtitle:
       'Surrogate-safety analysis of real intersections: conflicts ranked by TTC / PET / severity on an interactive map — the safety context the label platform feeds.',

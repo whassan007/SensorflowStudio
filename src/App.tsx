@@ -29,6 +29,7 @@ import {
   Workflow,
   Map as MapIcon,
   AppWindow,
+  CircuitBoard,
 } from 'lucide-react';
 import { LabelEvalContext, type PageId, ALL_PAGE_IDS } from './context/LabelEvalContext';
 import { getOverview, useStream } from './services/labeleval';
@@ -50,6 +51,7 @@ import LegacyStudioPage from './pages/LegacyStudioPage';
 import CommandCenterPage from './pages/CommandCenterPage';
 import RootCauseLabPage from './pages/rca/RootCauseLabPage';
 import RareMinePage from './pages/raremine/RareMinePage';
+import VitisPage from './pages/vitis/VitisPage';
 import PageIntro from './components/help/PageIntro';
 import HelpMenu from './components/help/HelpMenu';
 
@@ -78,6 +80,7 @@ const PLATFORM_NAV: NavItem[] = [
   { id: 'evaluation', label: 'Evaluation', icon: <ListChecks size={18} /> },
   { id: 'audit', label: 'Audit', icon: <ScrollText size={18} /> },
   { id: 'pipeline', label: 'Pipeline Architecture', icon: <Workflow size={18} /> },
+  { id: 'vitis', label: 'Hardware Acceleration', icon: <CircuitBoard size={18} /> },
 ];
 
 const LEGACY_NAV: NavItem[] = [
@@ -102,6 +105,7 @@ const PAGE_TITLES: Record<PageId, string> = {
   evaluation: 'Evaluation Records',
   audit: 'Audit & Process Units',
   pipeline: 'Pipeline Architecture',
+  vitis: 'Hardware Acceleration (Vitis Vision)',
   ssam: 'SSAM Safety Dashboard',
   legacy: 'Legacy Studio',
 };
@@ -308,6 +312,7 @@ export default function App() {
               {page === 'evaluation' ? <EvaluationPage /> : null}
               {page === 'audit' ? <AuditPage /> : null}
               {page === 'pipeline' ? <PipelineArchitecturePage /> : null}
+              {page === 'vitis' ? <VitisPage /> : null}
             </Box>
           )}
         </Box>

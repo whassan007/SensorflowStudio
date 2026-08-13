@@ -184,6 +184,7 @@ const PAGE_ORDER: PageId[] = [
   'evaluation',
   'audit',
   'pipeline',
+  'vitis',
   'ssam',
   'legacy',
 ];
@@ -205,6 +206,7 @@ const PAGE_NAMES: Record<PageId, string> = {
   evaluation: 'Evaluation Records',
   audit: 'Audit',
   pipeline: 'Pipeline Architecture',
+  vitis: 'Hardware Acceleration',
   ssam: 'SSAM Safety',
   legacy: 'Legacy Studio',
 };

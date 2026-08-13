@@ -1488,6 +1488,11 @@ app.include_router(rca_router)
 from sensorflow.raremine.api import router as raremine_router
 app.include_router(raremine_router)
 
+# Vitis Vision acceleration layer (HIL quantization gap, accelerated ISP +
+# synthetic edge cases, temporal/stereo stability). Emulated backend; no FPGA.
+from sensorflow.vitis.api import router as vitis_router
+app.include_router(vitis_router)
+
 # Mount static folder
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
