@@ -65,9 +65,17 @@ export function GeneratePopulationButton({
 
   return (
     <>
-      <Button variant={variant} size={size} startIcon={<Database size={16} />} onClick={() => setOpen(true)}>
-        Generate population
-      </Button>
+      <Tooltip title="Create a synthetic annotated population for aggregate-first Command Center evaluation">
+        <Button
+          variant={variant}
+          size={size}
+          startIcon={<Database size={16} />}
+          onClick={() => setOpen(true)}
+          aria-label="Generate evaluation population"
+        >
+          Generate population
+        </Button>
+      </Tooltip>
       <Dialog open={open} onClose={() => (busy ? undefined : setOpen(false))} maxWidth="xs" fullWidth>
         <DialogTitle>Generate evaluation population</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '12px !important' }}>
@@ -148,7 +156,7 @@ export function NewRunButton({
 
   return (
     <>
-      <Tooltip title={populationId ? '' : 'Generate a population first'}>
+      <Tooltip title={populationId ? 'Launch an evaluation run that scores the population against a model version' : 'Generate a population first'}>
         <span>
           <Button
             variant={variant}
@@ -156,6 +164,7 @@ export function NewRunButton({
             startIcon={<FlaskConical size={16} />}
             disabled={!populationId}
             onClick={() => setOpen(true)}
+            aria-label="New evaluation run"
           >
             New evaluation run
           </Button>

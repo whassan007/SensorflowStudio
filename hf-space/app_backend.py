@@ -1534,6 +1534,10 @@ app.include_router(studio2_router)
 from sensorflow.rotr.api import router as rotr_router
 app.include_router(rotr_router)
 
+# In-app help chatbot (FAQ / page-guide matcher; optional Ollama enrichment).
+from sensorflow.help.api import router as help_router
+app.include_router(help_router)
+
 # Mount static folder
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():

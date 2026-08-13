@@ -1,23 +1,27 @@
 /**
- * Global help: the (?) button in the app bar. Opens a dialog with three tabs:
- *   How it works  — the pipeline story (input → engines → gate → triage → HITL → flywheel)
- *   Glossary      — searchable browser over every definition in src/content/glossary.ts
- *   Pages         — what each page does, deep-linking into the app
+ * Global help: the (?) button in the app bar. Opens a dialog with tabs:
+ *   How it works  — the pipeline story
+ *   Glossary      — searchable glossary
+ *   Pages         — what each page does (from pageGuides)
+ *   Tips          — keyboard / nav tips
+ *   Docs          — links into hf-space/docs/
  */
 import { useMemo, useState } from 'react';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
+import Link from '@mui/material/Link';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { ArrowRight, CircleHelp, Search, X } from 'lucide-react';
+import { ArrowRight, CircleHelp, MessageCircle, Search, X } from 'lucide-react';
 import { GLOSSARY, GLOSSARY_CATEGORIES, type GlossaryEntry } from '../../content/glossary';
-import { PAGE_HELP } from '../../content/pageHelp';
+import { PAGE_GUIDE_LIST } from '../../help/pageGuides';
 import { useLabelEval, type PageId } from '../../context/LabelEvalContext';
 
 // ---------------------------------------------------------------- how it works
@@ -63,7 +67,7 @@ function HowItWorks({ goTo }: { goTo: (p: PageId) => void }) {
         gate it against a versioned quality policy, route the uncertain minority to humans, and feed verified results
         back into training. Aggregates lead, individual annotations are drill-down.
       </Typography>
-      {PIPELINE_STAGES.map((s, i) => (
+      {PIPELINE_STAGES.map((s) => (
         <Box
           key={s.name}
           sx={{
@@ -85,10 +89,9 @@ function HowItWorks({ goTo }: { goTo: (p: PageId) => void }) {
               {s.text}
             </Typography>
           </Box>
-          <IconButton size="small" onClick={() => goTo(s.page)} title="Open related page" sx={{ color: '#5c6873' }}>
+          <IconButton size="small" onClick={() => goTo(s.page)} title="Open related page" aria-label={`Open ${s.page}`} sx={{ color: '#5c6873' }}>
             <ArrowRight size={16} />
           </IconButton>
-          {i < PIPELINE_STAGES.length ? null : null}
         </Box>
       ))}
     </Box>
@@ -167,97 +170,13 @@ function GlossaryBrowser() {
 
 // ---------------------------------------------------------------- page index
 
-const PAGE_ORDER: PageId[] = [
-  'command',
-  'overview',
-  'datasets',
-  'label-generation',
-  'rare-events',
-  'raremine',
-  'quality',
-  'regression',
-  'rca',
-  'triage',
-  'review',
-  'training',
-  'models',
-  'evaluation',
-  'audit',
-  'pipeline',
-  'hillclimb',
-  'vitis',
-  'ssam',
-  'my-dashboard',
-  'scenario-composer',
-  'pipeline-builder',
-  'seqeval',
-  'bevfusion',
-  'safety-odd',
-  'safety-gates',
-  'safety-evidence',
-  'safety-ssam',
-  'safety-calibration',
-  'safety-discrepancy',
-  'safety-scenarios',
-  'safety-search',
-  'retro',
-  'launch-readiness',
-  'closed-loop-lab',
-  'studio2',
-  'legacy',
-  'production-readiness',
-  'rotr',
-];
-
-const PAGE_NAMES: Record<PageId, string> = {
-  command: 'Command Center',
-  overview: 'Overview',
-  datasets: 'Datasets',
-  'label-generation': 'Label Generation',
-  'rare-events': 'Rare Events',
-  raremine: 'Rare-Event Miner',
-  quality: 'Quality Engine',
-  regression: 'Regression',
-  rca: 'Root Cause Lab',
-  triage: 'Triage',
-  review: 'Human Review',
-  training: 'Training',
-  models: 'Models',
-  evaluation: 'Evaluation Records',
-  audit: 'Audit',
-  pipeline: 'Pipeline Architecture',
-  hillclimb: 'Hill Climbing EM',
-  vitis: 'Hardware Acceleration',
-  ssam: 'SSAM Safety',
-  'safety-odd': 'ODD Coverage',
-  'safety-gates': 'Release Gates',
-  'safety-evidence': 'Evidence Package',
-  'safety-ssam': 'SSAM Conflicts',
-  'safety-calibration': 'Calibration',
-  'safety-discrepancy': 'Discrepancy Mining',
-  'safety-scenarios': 'Scenario DB',
-  'safety-search': 'Semantic Search',
-  seqeval: 'Sequential Regression',
-  bevfusion: 'Perception Engines',
-  'scenario-composer': 'Scenario Composer',
-  'pipeline-builder': 'Pipeline Builder',
-  'my-dashboard': 'My Dashboard',
-  retro: 'Retrospective Analyzer',
-  'closed-loop-lab': 'Closed-Loop Lab',
-  'launch-readiness': 'Launch Readiness',
-  studio2: 'Studio 2.0 Governance',
-  legacy: 'Legacy Studio',
-  'production-readiness': 'Production Readiness',
-  rotr: 'ROTR Control Center',
-};
-
 function PageIndex({ goTo }: { goTo: (p: PageId) => void }) {
   return (
     <Box>
-      {PAGE_ORDER.map((id) => (
+      {PAGE_GUIDE_LIST.map((g) => (
         <Box
-          key={id}
-          onClick={() => goTo(id)}
+          key={g.pageId}
+          onClick={() => goTo(g.pageId)}
           sx={{
             display: 'flex',
             gap: 1.5,
@@ -273,10 +192,10 @@ function PageIndex({ goTo }: { goTo: (p: PageId) => void }) {
         >
           <Box sx={{ flex: 1 }}>
             <Typography variant="body2" sx={{ fontWeight: 700, fontSize: 13 }}>
-              {PAGE_NAMES[id]}
+              {g.title}
             </Typography>
             <Typography variant="body2" sx={{ color: '#8a949e', fontSize: 12, lineHeight: 1.45 }}>
-              {PAGE_HELP[id].subtitle}
+              {g.summary}
             </Typography>
           </Box>
           <ArrowRight size={15} color="#5c6873" />
@@ -286,12 +205,104 @@ function PageIndex({ goTo }: { goTo: (p: PageId) => void }) {
   );
 }
 
+// ---------------------------------------------------------------- tips
+
+const NAV_TIPS = [
+  {
+    title: 'Hash URLs',
+    text: 'Every page is addressable as #/page or #/page/entityId. Browser back/forward and shareable deep links work.',
+  },
+  {
+    title: 'Left drawer',
+    text: 'Platform / Studio / Engines / Safety / Legacy sections list every major screen. Badges on Overview and Human Review show live alert and queue counts.',
+  },
+  {
+    title: 'About this page',
+    text: 'Under each page title, expand “About this page” for purpose, how to read the UI, actions, and data flow. Open state is remembered per page.',
+  },
+  {
+    title: 'Tooltips & glossary',
+    text: 'Hover dotted terms and (i) icons for definitions. The Glossary tab searches the full term bank.',
+  },
+  {
+    title: 'Help chatbot',
+    text: 'The floating chat bubble answers questions from the local FAQ + page-guide index (CPU-friendly). Ollama is optional enrichment when available.',
+  },
+  {
+    title: 'Active dataset chip',
+    text: 'The AppBar chip shows the dataset other pages follow. Change it on Datasets.',
+  },
+];
+
+function TipsPanel() {
+  return (
+    <Box>
+      {NAV_TIPS.map((t) => (
+        <Box key={t.title} sx={{ mb: 1.5, p: 1.5, bgcolor: '#141a20', border: '1px solid #232a31', borderRadius: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#4fc3f7', mb: 0.25 }}>
+            {t.title}
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#aab4be', fontSize: 12.5, lineHeight: 1.55 }}>
+            {t.text}
+          </Typography>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+// ---------------------------------------------------------------- docs
+
+const DOC_LINKS: Array<{ label: string; path: string; note: string }> = [
+  { label: 'Platform inventory', path: 'docs/PLATFORM_INVENTORY.md', note: 'What ships where in the Space.' },
+  { label: 'Population-scale roadmap', path: 'docs/POPULATION_SCALE_ROADMAP.md', note: 'Megaeval aggregate-first design.' },
+  { label: 'Hardening audit', path: 'docs/hardening/audit.md', note: 'Production-readiness findings.' },
+  { label: 'ROTR architecture', path: 'docs/architecture/rotr-architecture.md', note: 'Right-of-the-road control plane.' },
+  { label: 'Studio 2.0 review', path: 'docs/architecture/studio2-review.md', note: 'Governance / release gate.' },
+  { label: 'Next-gen ADR', path: 'docs/architecture/nextgen-adr.md', note: 'Closed-loop lab decisions.' },
+  { label: 'Vitis HIL PRD', path: 'docs/prd/vitis-hil-regression.md', note: 'Hardware acceleration demos.' },
+  { label: 'Retro final report', path: 'docs/retro/final-report.md', note: 'Retrospective analyzer.' },
+];
+
+function DocsPanel() {
+  return (
+    <Box>
+      <Typography variant="body2" sx={{ color: '#aab4be', mb: 2, lineHeight: 1.55 }}>
+        In-repo guides under <code>hf-space/docs/</code>. On Hugging Face Spaces these are packaged with the backend;
+        locally open them in the repo. The Production Readiness page also surfaces the hardening audit live.
+      </Typography>
+      {DOC_LINKS.map((d) => (
+        <Box key={d.path} sx={{ mb: 1, p: 1.25, bgcolor: '#141a20', border: '1px solid #232a31', borderRadius: 1 }}>
+          <Typography variant="body2" sx={{ fontWeight: 700, fontSize: 13 }}>
+            {d.label}
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#8a949e', fontSize: 12, mb: 0.5 }}>
+            {d.note}
+          </Typography>
+          <Typography variant="caption" sx={{ color: '#5c6873', fontFamily: 'monospace' }}>
+            {d.path}
+          </Typography>
+        </Box>
+      ))}
+      <Typography variant="body2" sx={{ color: '#8a949e', mt: 1, fontSize: 12 }}>
+        Also see{' '}
+        <Link href="#/production-readiness" underline="hover" sx={{ color: '#4fc3f7' }}>
+          Production Readiness
+        </Link>{' '}
+        for the live audit browser.
+      </Typography>
+    </Box>
+  );
+}
+
 // ---------------------------------------------------------------- dialog shell
 
-export default function HelpMenu() {
+type HelpTab = 'how' | 'glossary' | 'pages' | 'tips' | 'docs';
+
+export default function HelpMenu({ onOpenChat }: { onOpenChat?: () => void }) {
   const { navigate } = useLabelEval();
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<'how' | 'glossary' | 'pages'>('how');
+  const [tab, setTab] = useState<HelpTab>('how');
 
   const goTo = (p: PageId) => {
     setOpen(false);
@@ -300,7 +311,7 @@ export default function HelpMenu() {
 
   return (
     <>
-      <Tooltip title="Help: how Sensorflow Studio works, glossary, page guide">
+      <Tooltip title="Help: overview, glossary, page guides, tips, docs">
         <IconButton size="small" onClick={() => setOpen(true)} sx={{ ml: 1, color: '#8a949e' }} aria-label="Open help">
           <CircleHelp size={19} />
         </IconButton>
@@ -312,27 +323,48 @@ export default function HelpMenu() {
         fullWidth
         PaperProps={{ sx: { bgcolor: '#12171d', border: '1px solid #232a31', height: '82vh' } }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', px: 2, pt: 1.5, gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', px: 2, pt: 1.5, gap: 1 }}>
           <Typography variant="h6" sx={{ fontSize: 15, fontWeight: 700, flex: 1 }}>
             Sensorflow Studio Help
           </Typography>
+          {onOpenChat ? (
+            <Button
+              size="small"
+              startIcon={<MessageCircle size={14} />}
+              onClick={() => {
+                setOpen(false);
+                onOpenChat();
+              }}
+              sx={{ textTransform: 'none', color: '#4fc3f7' }}
+              title="Open the help chatbot"
+              aria-label="Open help chatbot"
+            >
+              Ask chatbot
+            </Button>
+          ) : null}
           <IconButton size="small" onClick={() => setOpen(false)} aria-label="Close help">
             <X size={16} />
           </IconButton>
         </Box>
         <Tabs
           value={tab}
-          onChange={(_, v: 'how' | 'glossary' | 'pages') => setTab(v)}
+          onChange={(_, v: HelpTab) => setTab(v)}
+          variant="scrollable"
+          scrollButtons="auto"
           sx={{ px: 2, minHeight: 36, '& .MuiTab-root': { minHeight: 36, fontSize: 12.5 } }}
         >
           <Tab value="how" label="How it works" />
           <Tab value="glossary" label="Glossary" />
           <Tab value="pages" label="Pages" />
+          <Tab value="tips" label="Tips" />
+          <Tab value="docs" label="Docs" />
         </Tabs>
         <DialogContent sx={{ pt: 2 }}>
           {tab === 'how' ? <HowItWorks goTo={goTo} /> : null}
           {tab === 'glossary' ? <GlossaryBrowser /> : null}
           {tab === 'pages' ? <PageIndex goTo={goTo} /> : null}
+          {tab === 'tips' ? <TipsPanel /> : null}
+          {tab === 'docs' ? <DocsPanel /> : null}
         </DialogContent>
       </Dialog>
     </>
