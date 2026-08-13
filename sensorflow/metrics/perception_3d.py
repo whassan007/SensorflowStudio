@@ -61,10 +61,10 @@ def _clip_polygon(subject: np.ndarray, clip: np.ndarray) -> np.ndarray:
 
 def bev_iou(box_a: List[float], box_b: List[float]) -> float:
     """BEV rotated rectangle IoU for bbox_3d [x,y,z,l,w,h,yaw]."""
-    xa, ya, la, wa, ya = box_a[0], box_a[1], box_a[3], box_a[4], box_a[6]
-    xb, yb, lb, wb, yb = box_b[0], box_b[1], box_b[3], box_b[4], box_b[6]
-    poly_a = _rotate_corners(xa, ya, la, wa, ya)
-    poly_b = _rotate_corners(xb, yb, lb, wb, yb)
+    xa, ya, la, wa, yaw_a = box_a[0], box_a[1], box_a[3], box_a[4], box_a[6]
+    xb, yb, lb, wb, yaw_b = box_b[0], box_b[1], box_b[3], box_b[4], box_b[6]
+    poly_a = _rotate_corners(xa, ya, la, wa, yaw_a)
+    poly_b = _rotate_corners(xb, yb, lb, wb, yaw_b)
     inter = _clip_polygon(poly_a, poly_b)
     if len(inter) < 3:
         return 0.0

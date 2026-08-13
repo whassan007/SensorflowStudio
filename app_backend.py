@@ -380,8 +380,24 @@ def export_weights(params: ExportParams):
     exported_file = base_path / f"best.{params.format}"
     return {"status": "ok", "exported_file": str(exported_file)}
 
+class CopilotContextRequest(BaseModel):
+    context_type: Optional[str] = None
+    annotation_id: Optional[str] = None
+    event_id: Optional[str] = None
+    model_version: Optional[str] = None
+    extra: dict = {}
+
 @app.post("/api/copilot/explain")
-def copilot_explain():
+def copilot_explain(req: Optional[CopilotContextRequest] = None):
+    # Evidence-based path: evaluation-platform contexts (FP/FN/anomaly/regression/
+    # disagreement) route to the labeleval copilot, which handles Ollama being
+    # unreachable with a deterministic offline analysis.
+    if req is not None and (req.context_type or req.annotation_id or req.event_id):
+        from sensorflow.evaluation import copilot as eval_copilot
+        from sensorflow.evaluation.records import get_store
+        return eval_copilot.explain(get_store(), req.model_dump())
+
+    # Legacy path: YOLO studio quality audit.
     # 1. Gather configuration details
     config = load_config()
     
@@ -456,10 +472,20 @@ Keep the response concise, professional, and directly addressable. Do not includ
             error_msg += f"[{ep['url']}]: {str(e)}; "
             
     if not response_text:
-        raise HTTPException(
-            status_code=503, 
-            detail=f"All Ollama endpoints failed or timed out. Details: {error_msg}"
-        )
+        # Graceful offline fallback instead of a hard failure.
+        return {
+            "status": "ok",
+            "provider": "offline_deterministic",
+            "analysis": (
+                "## Offline Pipeline Audit (Ollama unreachable)\n\n"
+                f"- Configured epochs: {training_summary['epochs_limit']}\n"
+                f"- Loss trend: {training_summary['losses_trend'] or 'no training recorded'}\n"
+                f"- Grader report: {'present' if grader_summary else 'not generated yet'}\n\n"
+                "Local LLM endpoints could not be reached "
+                f"({error_msg.strip()[:300]}). This deterministic summary was "
+                "generated from the actual run state instead."
+            ),
+        }
 
 MITL_FILE = Path("runs/mitl_annotations.json")
 
@@ -1432,6 +1458,14 @@ def get_mitl_queue(sequence_id: str = "seq_001"):
     copilot = MitlCopilot()
     return {"status": "ok", "queue": copilot.get_queue(sequence_id)}
 
+
+# L4 Perception Label Evaluation platform routes (must precede the static mount).
+from sensorflow.evaluation.api import router as labeleval_router
+app.include_router(labeleval_router)
+
+# Aggregate-first mega-scale evaluation layer (metric cube, async runs, query API).
+from sensorflow.megaeval.api import router as megaeval_router
+app.include_router(megaeval_router)
 
 # BEV-Fusion perception engine (camera+LiDAR fusion, masklet tracking, self-eval).
 from sensorflow.bevfusion.api import router as bevfusion_router
