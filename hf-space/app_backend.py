@@ -1467,9 +1467,9 @@ app.include_router(labeleval_router)
 from sensorflow.megaeval.api import router as megaeval_router
 app.include_router(megaeval_router)
 
-# Population-scale foundation (container quality, multi-model compare, multi-gate, evidence).
-from sensorflow.platform.api import router as platform_router
-app.include_router(platform_router)
+# BEV-Fusion perception engine (camera+LiDAR fusion, masklet tracking, self-eval).
+from sensorflow.bevfusion.api import router as bevfusion_router
+app.include_router(bevfusion_router)
 
 # Mount static folder
 static_dir = Path(__file__).parent / "static"
