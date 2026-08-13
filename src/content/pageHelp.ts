@@ -215,6 +215,18 @@ export const PAGE_HELP: Record<PageId, PageHelpEntry> = {
     dataFlow:
       'Scenes and engines come read-only from the bevfusion package; sequential verdicts use seqeval\u2019s anytime-valid tests when importable (local paired-t fallback otherwise). Runs persist under runs/vitis/. Generated variants are evaluation-set supplements tagged evaluation-only (never training-eligible) and are offered to the raremine candidate flow when that package is available.',
   },
+  hillclimb: {
+    subtitle:
+      'Adaptive Engineering-Manager development & interview-readiness platform: a 4-phase competency blueprint (ML depth → system design → execution & people → hill-climbing simulation) with evidence-based scoring, never self-reported progress.',
+    purpose:
+      'Interview readiness is a hill-climbing problem: find the competency whose weakness blocks the most downstream skills, fix it with deliberate practice, measure, repeat. This section runs that loop — Assess → Diagnose → Practice → Apply → Evaluate → Improve — over a prerequisite-linked competency graph reconstructed from the Hill Climbing EM blueprint spec.',
+    reading:
+      'Dashboard bars are per-dimension readiness (Knowledge / Technical Reasoning / Leadership / Execution — tracked separately, never collapsed). The bottleneck callout names the prerequisite blocking the most downstream competencies, not merely the lowest score. Every score in the matrix is explainable: click it to see the evidence artifacts (attempt quotes, STAR stories, design grades, simulation debriefs, interview transcripts) that produced it. Coaching panels quote your own statements as evidence — a score without evidence is never shown.',
+    actions:
+      'Run the adaptive diagnostic to seed your matrix. Practice generated exercises (structurally different on each retry) and get rubric-based coaching. Diagnose raw experience stories into STAR components with claim-vs-evidence flags. Build architectures in the Design Lab. Play the multi-objective hill-climbing simulation. Take an adaptive mock interview. Review your evidence library and competency matrix.',
+    dataFlow:
+      'All state persists under runs/hillclimb/. Exercise submissions, STAR stories, design grades, simulation debriefs and interview transcripts become Evidence artifacts that feed the readiness matrix; the matrix feeds bottleneck analysis and the Next Best Action. The Phase-1 "offline +5% / shadow −2%" exercise family cross-links to the Root Cause Lab as the live practice tool.',
+  },
   ssam: {
     subtitle:
       'Surrogate-safety analysis of real intersections: conflicts ranked by TTC / PET / severity on an interactive map — the safety context the label platform feeds.',

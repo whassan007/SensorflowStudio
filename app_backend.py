@@ -1484,6 +1484,10 @@ app.include_router(safety_router)
 from sensorflow.rca.api import router as rca_router
 app.include_router(rca_router)
 
+# Hill Climbing EM: adaptive EM development & interview-readiness platform.
+from sensorflow.hillclimb.api import router as hillclimb_router
+app.include_router(hillclimb_router)
+
 # Multimodal rare-event mining & perception QA (costumed-pedestrian miner).
 from sensorflow.raremine.api import router as raremine_router
 app.include_router(raremine_router)

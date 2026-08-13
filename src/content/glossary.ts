@@ -31,6 +31,7 @@ export type GlossaryCategory =
   | 'Failure reasons'
   | 'Ground truth'
   | 'Operations'
+  | 'EM readiness'
   | 'Hardware acceleration';
 
 export const GLOSSARY: Record<string, GlossaryEntry> = {
@@ -735,6 +736,58 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     short: 'Synthetic stress variant barred from training by default: full lineage, protected eval destination.',
     detail: 'Every generated augmentation variant carries training_eligible: false, evaluation_only: true and destination REGRESSION_EVALUATION_SET, plus complete lineage (recipe with resolved parameters, seed, source frame, backend config). Mirrors the rare-event miner\u2019s protected-destination leakage guard: stress data that leaked into training would corrupt the very regression signal it exists to protect.',
   },
+
+  // ------------------------------------------------------------ EM readiness (Hill Climbing EM)
+  hc_competency: {
+    term: 'Competency',
+    category: 'EM readiness',
+    short: 'A single skill node in the 4-phase blueprint graph, with prerequisites and a dimension tag.',
+    detail: 'Each competency belongs to a phase (ML depth / system design / execution & people / simulation), lists prerequisite competencies, and is tagged with one dimension (Knowledge, Technical Reasoning, Leadership, Execution). Scores are tracked per competency and per dimension — never collapsed into one number.',
+  },
+  hc_readiness_state: {
+    term: 'Readiness state',
+    category: 'EM readiness',
+    short: 'Per-competency progression: NOT_STARTED → LEARNING → PRACTICING → NEEDS_REVIEW → COMPETENT → STRONG → INTERVIEW_READY.',
+    detail: 'Derived from three separate scores: knowledge (diagnostic/interview answers), application (exercises, design lab, simulation) and evidence (STAR stories and other artifacts). NEEDS_REVIEW is entered when recent attempts contradict earlier strong scores.',
+    caveat: 'States are only as trustworthy as the evidence backing them; with the LLM offline, scoring is rule-based concept coverage, which is stricter but coarser.',
+  },
+  hc_evidence_artifact: {
+    term: 'Evidence artifact',
+    category: 'EM readiness',
+    short: 'A stored, quotable record (attempt, STAR story, design grade, simulation debrief, interview transcript) that justifies a score.',
+    detail: 'The scoring rule is "no score without evidence": every evaluation must quote specific user statements. Artifacts persist under runs/hillclimb/ and are browsable in the Evidence Library; clicking any matrix score shows the artifacts behind it.',
+  },
+  hc_bottleneck: {
+    term: 'Bottleneck competency',
+    category: 'EM readiness',
+    short: 'The weak prerequisite blocking the most downstream competencies — not merely the lowest score.',
+    detail: 'Computed from the prerequisite graph: for each weak competency, count the downstream competencies transitively gated on it; the highest-leverage weakness wins. Fixing the bottleneck unblocks more of the graph than fixing the globally lowest score.',
+  },
+  hc_next_best_action: {
+    term: 'Next best action',
+    category: 'EM readiness',
+    short: 'Exactly one concept to study, one exercise to attempt and one assessment to take, aimed at the current bottleneck.',
+    detail: 'Regenerated whenever the readiness matrix changes. Deliberately singular: a ranked to-do list invites cherry-picking easy items; one action per category forces work on the highest-leverage weakness.',
+  },
+  hc_claim_vs_evidence: {
+    term: 'Claim vs evidence',
+    category: 'EM readiness',
+    short: 'STAR Story Box flag: an unquantified claim ("improved performance") vs measurable evidence (numbers, before/after, named mechanism).',
+    detail: 'Claim sentences are detected by improvement verbs without attached quantities. Each flag asks for the missing strengthening: the metric, the baseline, the delta, or the mechanism that caused it. Interviewers apply the same test — so the diagnoser applies it first.',
+  },
+  hc_anti_gaming: {
+    term: 'Anti-gaming rule',
+    category: 'EM readiness',
+    short: 'Verbosity alone must not raise scores: concept coverage, tradeoffs and quantified results are scored, not length.',
+    detail: 'The evaluator scores rubric-concept coverage, tradeoff discussion and quantified statements. Length is not a feature, and low information density is penalized — a long waffle scores below a short precise answer (enforced by test).',
+  },
+  hc_hill_climbing: {
+    term: 'Hill climbing (simulation)',
+    category: 'EM readiness',
+    short: 'Iterative optimization loop: hypothesis → intervention → measure → keep/reject → repeat, under competing objectives.',
+    detail: 'The Phase-4 simulation tracks ten competing state metrics (performance, safety, reliability, cost, velocity, maintainability, morale, customer impact, risk, schedule) with hard floors — dropping safety below its floor triggers an incident. The balanced multi-objective score rewards keeping all objectives healthy, not maximizing one.',
+    caveat: 'Deterministic given the scenario seed: identical intervention sequences replay identically, which is what makes debriefs auditable.',
+  },
 };
 
 export type GlossaryKey = keyof typeof GLOSSARY;
@@ -808,5 +861,6 @@ export const GLOSSARY_CATEGORIES: GlossaryCategory[] = [
   'Failure reasons',
   'Ground truth',
   'Operations',
+  'EM readiness',
   'Hardware acceleration',
 ];
