@@ -71,7 +71,10 @@ export default function RelabelingPanel({
   const revalidationPassed = result?.revalidation.validation.passed ?? null;
 
   return (
-    <SectionCard title="Relabeling Actions">
+    <SectionCard
+      title="Relabeling Actions"
+      help="Reviewer verdicts for the selected task: Verify (label correct as-is), Correct (fix geometry/class — becomes new ground truth), Reject (label wrong, discard), plus track surgery (merge/split) and occlusion marking. Every action re-runs the quality gates before anything is accepted; verified/corrected labels flow to training data."
+    >
       <Typography variant="caption" sx={{ color: '#ffcc80', display: 'block', mb: 1.5 }}>
         Corrected labels are never verified without re-running the quality gates — every action below triggers
         re-validation.

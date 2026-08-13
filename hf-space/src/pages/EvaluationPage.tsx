@@ -21,6 +21,8 @@ import { useLabelEval } from '../context/LabelEvalContext';
 import EvidencePanel from '../components/labeleval/EvidencePanel';
 import CopilotDrawer from '../components/labeleval/CopilotDrawer';
 import { SectionCard, StatusChip, LoadingBox, ErrorNote, fmtNum, fmtPct } from '../components/labeleval/shared';
+import { ExplainTip, HeadCell } from '../components/help/InfoTip';
+import { glossaryKeyForStatus } from '../content/glossary';
 
 const PAGE_SIZE = 15;
 
@@ -90,7 +92,10 @@ export default function EvaluationPage() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <SectionCard title="Evaluation Record Explorer">
+      <SectionCard
+        title="Evaluation Record Explorer"
+        help="One row per annotation: the evidence every engine recorded (geometry, anomaly, consensus) and the triage verdict. Click a row to open the full evidence panel with gate lines and per-engine details; Copilot can narrate the WHY. For population-scale analysis use the Command Center instead — this explorer is for individual records."
+      >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
           <Typography variant="body2" sx={{ color: '#8a949e' }}>
             Dataset:
@@ -133,10 +138,22 @@ export default function EvaluationPage() {
                   <TableCell>Annotation</TableCell>
                   <TableCell>Class</TableCell>
                   <TableCell>Model</TableCell>
-                  <TableCell align="right">3D IoU</TableCell>
-                  <TableCell align="right">Anomaly</TableCell>
-                  <TableCell align="right">Consensus</TableCell>
-                  <TableCell>Status</TableCell>
+                  <TableCell align="right">
+                    <HeadCell label="3D IoU" term="iou_3d" />
+                  </TableCell>
+                  <TableCell align="right">
+                    <HeadCell label="Anomaly" term="anomaly_score" />
+                  </TableCell>
+                  <TableCell align="right">
+                    <HeadCell label="Consensus" term="grader_consensus" />
+                  </TableCell>
+                  <TableCell>
+                    <HeadCell
+                      label="Status"
+                      title="Triage status"
+                      detail="The routing decision the quality gate produced for this label. Hover the chip for what each status means; click the row for the gate-by-gate breakdown."
+                    />
+                  </TableCell>
                   <TableCell>Primary failure</TableCell>
                 </TableRow>
               </TableHead>
@@ -165,7 +182,15 @@ export default function EvaluationPage() {
                     </TableCell>
                     <TableCell>{r.decision ? <StatusChip status={r.decision.status} /> : '—'}</TableCell>
                     <TableCell sx={{ fontSize: 12, color: '#ef9a9a' }}>
-                      {r.decision?.primary_failure_reason?.replace(/_/g, ' ') ?? '—'}
+                      {r.decision?.primary_failure_reason ? (
+                        <ExplainTip term={glossaryKeyForStatus(r.decision.primary_failure_reason) ?? undefined}>
+                          <Box component="span" sx={{ borderBottom: '1px dotted #5c6873', cursor: 'help' }}>
+                            {r.decision.primary_failure_reason.replace(/_/g, ' ')}
+                          </Box>
+                        </ExplainTip>
+                      ) : (
+                        '—'
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

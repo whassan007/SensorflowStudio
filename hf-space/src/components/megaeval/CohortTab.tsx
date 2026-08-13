@@ -24,6 +24,7 @@ import { DIM_NAMES } from '../../types/megaeval';
 import { fmtCompact, queryEvaluations, whyAnalysis } from '../../services/megaeval';
 import { usePoll } from '../../services/labeleval';
 import { ErrorNote, HBar, LoadingBox, SectionCard, fmtNum, fmtPct } from '../labeleval/shared';
+import { HeadCell } from '../help/InfoTip';
 import { PctBarCell, QueryBadge, rowNum, rowStr } from './shared';
 
 interface Crumb {
@@ -150,6 +151,7 @@ export default function CohortTab({ runId, refreshKey }: { runId: string; refres
     <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
       <SectionCard
         title="Cohort explorer"
+        helpTerm="cohort"
         action={
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <QueryBadge meta={query.data?.meta} />
@@ -211,11 +213,21 @@ export default function CohortTab({ runId, refreshKey }: { runId: string; refres
             <TableHead>
               <TableRow>
                 <TableCell>{dim.replace(/_/g, ' ')}</TableCell>
-                <TableCell align="right">n</TableCell>
-                <TableCell>Recall</TableCell>
-                <TableCell>Precision</TableCell>
-                <TableCell align="right">Mean IoU</TableCell>
-                <TableCell align="right">Anomaly rate</TableCell>
+                <TableCell align="right">
+                  <HeadCell label="n" title="n" detail="Objects in this cohort under the current filters (exact cube count)." />
+                </TableCell>
+                <TableCell>
+                  <HeadCell label="Recall" term="recall" />
+                </TableCell>
+                <TableCell>
+                  <HeadCell label="Precision" term="precision" />
+                </TableCell>
+                <TableCell align="right">
+                  <HeadCell label="Mean IoU" term="iou_3d" />
+                </TableCell>
+                <TableCell align="right">
+                  <HeadCell label="Anomaly rate" term="anomaly_rate" />
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>

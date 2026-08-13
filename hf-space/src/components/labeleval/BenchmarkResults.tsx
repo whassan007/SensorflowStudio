@@ -15,21 +15,22 @@ import { FlaskConical } from 'lucide-react';
 import type { BenchmarkResponse, BenchmarkRow } from '../../types/labeleval';
 import { runBenchmark } from '../../services/labeleval';
 import { SectionCard, fmtNum, fmtPct } from './shared';
+import { InfoDot } from '../help/InfoTip';
 
 type NumericKey = Exclude<keyof BenchmarkRow, 'technique'>;
 type SortKey = keyof BenchmarkRow;
 
-const COLUMNS: Array<{ key: SortKey; label: string; pct?: boolean }> = [
-  { key: 'technique', label: 'Technique' },
-  { key: 'precision', label: 'Precision', pct: true },
-  { key: 'recall', label: 'Recall', pct: true },
-  { key: 'rare_recall', label: 'Rare Recall', pct: true },
-  { key: 'f1', label: 'F1', pct: true },
-  { key: 'box_error_3d', label: '3D Box Error' },
-  { key: 'id_swap_rate', label: 'ID Swap', pct: true },
-  { key: 'consensus', label: 'Consensus', pct: true },
-  { key: 'fp_rate', label: 'FP Rate', pct: true },
-  { key: 'process_units', label: 'Process Units' },
+const COLUMNS: Array<{ key: SortKey; label: string; pct?: boolean; term?: string; info?: string }> = [
+  { key: 'technique', label: 'Technique', info: 'The detection/labeling technique being benchmarked.' },
+  { key: 'precision', label: 'Precision', pct: true, term: 'precision' },
+  { key: 'recall', label: 'Recall', pct: true, term: 'recall' },
+  { key: 'rare_recall', label: 'Rare Recall', pct: true, term: 'rare_recall' },
+  { key: 'f1', label: 'F1', pct: true, term: 'f1' },
+  { key: 'box_error_3d', label: '3D Box Error', info: 'Mean 3D localization error (meters) of matched boxes — lower is better.' },
+  { key: 'id_swap_rate', label: 'ID Swap', pct: true, term: 'id_switch' },
+  { key: 'consensus', label: 'Consensus', pct: true, term: 'grader_consensus' },
+  { key: 'fp_rate', label: 'FP Rate', pct: true, term: 'error_fp' },
+  { key: 'process_units', label: 'Process Units', term: 'process_units' },
 ];
 
 const HIGHLIGHTS: Array<{ key: keyof BenchmarkResponse['highlights']; label: string; color: string }> = [
@@ -91,6 +92,7 @@ export default function BenchmarkResults({
   return (
     <SectionCard
       title="Technique Benchmark — no single winner, each excels on a different axis"
+      help="Head-to-head comparison of detection techniques on labeled evaluation data. Sort any column; the highlight chips call out the per-axis winners. There is deliberately no composite score: pick the technique whose strength matches your goal (rare recall vs FP rate vs compute cost)."
       action={
         <Button
           size="small"
@@ -136,6 +138,7 @@ export default function BenchmarkResults({
                     >
                       {col.label}
                     </TableSortLabel>
+                    {col.term || col.info ? <InfoDot term={col.term} title={col.info ? col.label : undefined} detail={col.info} /> : null}
                   </TableCell>
                 ))}
               </TableRow>

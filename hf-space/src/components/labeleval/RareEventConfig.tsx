@@ -124,6 +124,7 @@ export default function RareEventConfig({
   return (
     <SectionCard
       title="Rare Event Detection Configuration"
+      help="The anomaly ensemble, configured in four stages: (1) class-imbalance handling before detection, (2) classical detectors (KNN, LOF, Isolation Forest, OC-SVM, DBSCAN), (3) deep reconstruction detectors (autoencoder/VAE/GAN), (4) fusion — how individual scores combine into one anomaly score and the decision threshold. Save persists the config; Re-run applies it to the active dataset."
       action={
         <Box sx={{ display: 'flex', gap: 1 }}>
           <Button

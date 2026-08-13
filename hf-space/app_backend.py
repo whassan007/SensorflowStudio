@@ -1467,9 +1467,72 @@ app.include_router(labeleval_router)
 from sensorflow.megaeval.api import router as megaeval_router
 app.include_router(megaeval_router)
 
+# Sequential regression detection engine (anytime-valid, budgeted, paired).
+from sensorflow.seqeval.api import router as seqeval_router
+app.include_router(seqeval_router)
+
 # BEV-Fusion perception engine (camera+LiDAR fusion, masklet tracking, self-eval).
 from sensorflow.bevfusion.api import router as bevfusion_router
 app.include_router(bevfusion_router)
+
+# Safety & compliance layer (ODD coverage, release gates, SSAM, calibration,
+# discrepancy mining, scenario DB, semantic mining).
+from sensorflow.safety.api import router as safety_router
+app.include_router(safety_router)
+
+# Regression Root Cause Analysis workbench (staged offline-vs-shadow forensics).
+from sensorflow.rca.api import router as rca_router
+app.include_router(rca_router)
+
+# Hill Climbing EM: adaptive EM development & interview-readiness platform.
+from sensorflow.hillclimb.api import router as hillclimb_router
+app.include_router(hillclimb_router)
+
+# Multimodal rare-event mining & perception QA (costumed-pedestrian miner).
+from sensorflow.raremine.api import router as raremine_router
+app.include_router(raremine_router)
+
+# Vitis Vision acceleration layer (HIL quantization gap, accelerated ISP +
+# synthetic edge cases, temporal/stereo stability). Emulated backend; no FPGA.
+from sensorflow.vitis.api import router as vitis_router
+app.include_router(vitis_router)
+
+# Agentic launch readiness & misclassification triage (five-layer pipeline,
+# deterministic policy engine, evidence graphs, evaluation flywheel).
+from sensorflow.agentic.api import router as agentic_router
+app.include_router(agentic_router)
+
+# Next-gen AV perception evaluation: counterfactual simulation + validity
+# gating, closed-loop behavioral evaluation, safety-informed metrics,
+# compute dedup + launch-eval gauntlet scheduling.
+from sensorflow.nextgen.api import router as nextgen_router
+app.include_router(nextgen_router)
+
+# Agentic Retrospective Safety Analyzer (evidence-tiered failure retrospectives,
+# safety-case RAG, deterministic severity + launch policy gate).
+from sensorflow.retro.api import router as retro_router
+app.include_router(retro_router)
+
+# Studio UX support (dashboard layout persistence + BEV frame replay for the
+# interactive canvas). Read-only over other packages' data.
+from sensorflow.studio_ux.api import router as studio_ux_router
+app.include_router(studio_ux_router)
+
+# Production hardening layer (audit browser, readiness scorecard, funnel,
+# sampling/quality/HITL demos on seeded synthetic fixtures).
+from sensorflow.hardening.api import router as hardening_router
+app.include_router(hardening_router)
+
+# Studio 2.0 control plane: unified entity registry, deterministic release
+# gate composing safety/seqeval/megaeval (+ agentic/nextgen when available),
+# hardware-aware gate matrix, observability funnel, closed-loop demo.
+from sensorflow.studio2.api import router as studio2_router
+app.include_router(studio2_router)
+
+# ROTR: right-of-the-road violation detection, causal-layer attribution,
+# counterfactual consequence, taxonomy mining, governed flywheel + stop-ship.
+from sensorflow.rotr.api import router as rotr_router
+app.include_router(rotr_router)
 
 # Mount static folder
 static_dir = Path(__file__).parent / "static"

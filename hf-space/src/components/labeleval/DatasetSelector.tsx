@@ -24,6 +24,8 @@ import {
   type PrecheckResponse,
 } from '../../services/labeleval';
 import { SectionCard, StatusChip, GateLineList, fmtInt, fmtPct, EmptyState } from './shared';
+import { ExplainTip, HeadCell } from '../help/InfoTip';
+import { glossaryKeyForStatus } from '../../content/glossary';
 
 function lineageChips(d: DatasetSummary) {
   const chips: string[] = [];
@@ -107,6 +109,7 @@ export default function DatasetSelector({
   return (
     <SectionCard
       title="Datasets"
+      help="All ingested datasets. Click a row to make it the active dataset (every other page follows it). Precheck validates readiness (GT labeling, sensor completeness) before Run Evaluation pushes it through the pipeline. The ground-truth chip color warns when the reference is pseudo-GT."
       action={
         <Button
           size="small"
@@ -147,9 +150,15 @@ export default function DatasetSelector({
               <TableCell>Version</TableCell>
               <TableCell align="right">Frames</TableCell>
               <TableCell align="right">Annotations</TableCell>
-              <TableCell>Ground truth</TableCell>
-              <TableCell align="right">Verification</TableCell>
-              <TableCell>Lineage</TableCell>
+              <TableCell>
+                <HeadCell label="Ground truth" term="gt_coverage" />
+              </TableCell>
+              <TableCell align="right">
+                <HeadCell label="Verification" term="verification_rate" />
+              </TableCell>
+              <TableCell>
+                <HeadCell label="Lineage" term="lineage" />
+              </TableCell>
               <TableCell>Status</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
@@ -171,17 +180,25 @@ export default function DatasetSelector({
                   <TableCell align="right">{fmtInt(d.num_annotations)}</TableCell>
                   <TableCell>
                     {d.gt_availability.has_reference && d.gt_availability.gt_type ? (
-                      <Chip
-                        size="small"
-                        label={`${d.gt_availability.gt_type.replace(/_/g, ' ')} · ${fmtPct(d.gt_availability.coverage)}`}
-                        sx={{
-                          bgcolor: d.gt_availability.gt_type === 'PSEUDO_GROUND_TRUTH' ? '#4a2c00' : '#1b3a24',
-                          color: d.gt_availability.gt_type === 'PSEUDO_GROUND_TRUTH' ? '#ffcc80' : '#a5d6a7',
-                          fontSize: 10,
-                        }}
-                      />
+                      <ExplainTip term={glossaryKeyForStatus(d.gt_availability.gt_type) ?? 'gt_coverage'}>
+                        <Chip
+                          size="small"
+                          label={`${d.gt_availability.gt_type.replace(/_/g, ' ')} · ${fmtPct(d.gt_availability.coverage)}`}
+                          sx={{
+                            bgcolor: d.gt_availability.gt_type === 'PSEUDO_GROUND_TRUTH' ? '#4a2c00' : '#1b3a24',
+                            color: d.gt_availability.gt_type === 'PSEUDO_GROUND_TRUTH' ? '#ffcc80' : '#a5d6a7',
+                            fontSize: 10,
+                            cursor: 'help',
+                          }}
+                        />
+                      </ExplainTip>
                     ) : (
-                      <Chip size="small" label="no reference" sx={{ bgcolor: '#232a31', fontSize: 10 }} />
+                      <ExplainTip
+                        title="No reference ground truth"
+                        detail="This dataset has no reference labels at all: only GT-free checks apply (geometric plausibility, sensor consistency, anomaly, consensus). Precision/recall cannot be computed against it."
+                      >
+                        <Chip size="small" label="no reference" sx={{ bgcolor: '#232a31', fontSize: 10, cursor: 'help' }} />
+                      </ExplainTip>
                     )}
                   </TableCell>
                   <TableCell align="right" sx={{ fontFamily: 'monospace' }}>

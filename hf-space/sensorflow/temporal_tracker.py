@@ -117,7 +117,16 @@ class TemporalTracker:
                     (track.state[0] - prop.bbox_3d[0]) ** 2 +
                     (track.state[1] - prop.bbox_3d[1]) ** 2
                 )
-                yaw_diff = abs(track.state[2] if len(track.state) > 2 else 0 - prop.bbox_3d[6])
+                # Yaw penalty: compare against the track's last *observed* yaw
+                # (the Kalman state is [x, y, vx, vy] and carries no yaw).
+                # The difference is wrapped to [-pi, pi] so 359 deg vs 1 deg
+                # is a 2-degree disagreement, not a 358-degree one.
+                if track.history:
+                    last_yaw = track.history[-1]["bbox_3d"][6]
+                    raw = last_yaw - prop.bbox_3d[6]
+                    yaw_diff = abs(math.atan2(math.sin(raw), math.cos(raw)))
+                else:
+                    yaw_diff = 0.0
                 vel_penalty = self.velocity_penalty * yaw_diff
                 cost[ti, pi] = dist + vel_penalty
 

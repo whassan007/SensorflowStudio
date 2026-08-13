@@ -62,7 +62,10 @@ export default function HaystackVisualizer({
   }, [points]);
 
   return (
-    <SectionCard title="Haystack — finding the needles">
+    <SectionCard
+      title="Haystack — finding the needles"
+      help="2D feature-space projection of every evaluated label. Gray points are the nominal mass; colored points are the interesting minority (anomalies, rare events, FP/FN, verified). Clusters of colored points suggest a systematic blind spot rather than one-off noise. Click any point to open its evidence."
+    >
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
         <Box sx={{ position: 'relative' }}>
           <svg

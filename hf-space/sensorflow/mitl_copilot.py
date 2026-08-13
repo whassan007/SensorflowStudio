@@ -3,15 +3,32 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import httpx
 
-OLLAMA_ENDPOINTS = [
-    {"url": "http://dgx-spark.tail16d8d9.ts.net:11434/api/chat", "model": "gemma4:26b"},
-    {"url": "http://localhost:11434/api/chat", "model": "gemma4:latest"},
-]
+
+def _llm_endpoints() -> List[Dict[str, str]]:
+    """LLM endpoints in fallback order, configurable via environment.
+
+    SENSORFLOW_LLM_URL / SENSORFLOW_LLM_MODEL prepend a primary endpoint
+    (e.g. a remote GPU box); local Ollama is always the last fallback.
+    Deployment-specific hostnames must never be hard-coded in source.
+    """
+    endpoints: List[Dict[str, str]] = []
+    url = os.environ.get("SENSORFLOW_LLM_URL")
+    if url:
+        endpoints.append({
+            "url": url,
+            "model": os.environ.get("SENSORFLOW_LLM_MODEL", "gemma4:latest"),
+        })
+    endpoints.append({"url": "http://localhost:11434/api/chat", "model": "gemma4:latest"})
+    return endpoints
+
+
+OLLAMA_ENDPOINTS = _llm_endpoints()
 
 MITL_QUEUE_PATH = Path("runs/pipeline/mitl_queue.json")
 

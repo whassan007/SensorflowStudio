@@ -23,7 +23,10 @@ export default function InputStage({ dataset }: { dataset: DatasetSummary | null
   ];
 
   return (
-    <SectionCard title="Input Stage — Sensor Modalities">
+    <SectionCard
+      title="Input Stage — Sensor Modalities"
+      help="What the pipeline ingests per frame: LiDAR sweep, camera image, HD map tile, ego pose, telemetry and synchronized timestamps. Auto-labeling and every downstream check (point support, camera–LiDAR consistency, kinematics) consume these modalities."
+    >
       <Typography variant="body2" sx={{ color: '#8a949e', mb: 1.5 }}>
         Hierarchy: <strong>Dataset</strong> ({dataset ? dataset.name : 'none selected'}) → <strong>Scene</strong> (
         {fmtInt(scenes)}) → <strong>Sequence</strong> ({fmtInt(sequences)}) → <strong>Frame</strong> ({fmtInt(frames)}

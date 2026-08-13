@@ -11,6 +11,7 @@ import { X } from 'lucide-react';
 import { annotateStreet } from '../../services/api';
 import { useFilters } from '../../context/FilterContext';
 import { SEVERITY_COLORS } from '../../types';
+import { Term } from '../help/InfoTip';
 
 export default function SeverityDrawer() {
   const { selected, setSelected } = useFilters();
@@ -64,7 +65,7 @@ export default function SeverityDrawer() {
 
           <div className="severity-block">
             <Typography variant="overline" color="text.secondary">
-              Severity index
+              <Term k="severity_index">Severity index</Term>
             </Typography>
             <div className="severity-value" style={{ color: severityColor }}>
               {selected.severity_index.toFixed(2)}
@@ -92,11 +93,15 @@ export default function SeverityDrawer() {
               <dd>{selected.conflict_type}</dd>
             </div>
             <div>
-              <dt>Min time-to-collision</dt>
+              <dt>
+                <Term k="ttc">Min time-to-collision</Term>
+              </dt>
               <dd>{selected.min_ttc.toFixed(1)} s</dd>
             </div>
             <div>
-              <dt>Min post-encroachment time</dt>
+              <dt>
+                <Term k="pet">Min post-encroachment time</Term>
+              </dt>
               <dd>{selected.min_pet.toFixed(1)} s</dd>
             </div>
             <div>

@@ -15,6 +15,7 @@ import Typography from '@mui/material/Typography';
 import { compareRuns, fmtCompact } from '../../services/megaeval';
 import { usePoll } from '../../services/labeleval';
 import { ErrorNote, LoadingBox, SectionCard, fmtPct } from '../labeleval/shared';
+import { ExplainTip, InfoDot } from '../help/InfoTip';
 import { DeltaText } from './shared';
 
 /** Metrics where a positive delta is a regression rather than an improvement. */
@@ -60,10 +61,21 @@ export default function CompareTab({
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Alert severity={promote ? 'success' : 'error'} variant="filled" sx={{ fontWeight: 700 }}>
-        <AlertTitle sx={{ fontWeight: 800 }}>
-          {promote ? 'PROMOTE' : 'DO NOT PROMOTE'} — {data.candidate.model_version} vs baseline{' '}
-          {data.baseline.model_version}
+        <AlertTitle sx={{ fontWeight: 800, display: 'flex', alignItems: 'center' }}>
+          <ExplainTip term="do_not_promote">
+            <Box component="span" sx={{ borderBottom: '1px dotted rgba(255,255,255,0.6)', cursor: 'help' }}>
+              {promote ? 'PROMOTE' : 'DO NOT PROMOTE'}
+            </Box>
+          </ExplainTip>
+          <Box component="span" sx={{ ml: 0.75 }}>
+            — {data.candidate.model_version} vs baseline {data.baseline.model_version}
+          </Box>
         </AlertTitle>
+        <Typography variant="caption" sx={{ display: 'block', mb: 0.5, opacity: 0.85 }}>
+          {promote
+            ? 'Every policy rule passed: no headline or safety metric dropped beyond tolerance and no cohort regressed materially.'
+            : 'Each line below is a violated promotion-policy rule, with the measured drop and the maximum the policy allows.'}
+        </Typography>
         {data.blockers.length ? (
           <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
             {data.blockers.map((b, i) => (
@@ -78,7 +90,11 @@ export default function CompareTab({
       </Alert>
 
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-        <SectionCard title="Headline deltas" sx={{ flex: '1 1 380px' }}>
+        <SectionCard
+          title="Headline deltas"
+          help="Population-level metric comparison: baseline value, candidate value, and the delta (green = better, red = worse; direction-aware, e.g. lower anomaly rate is good). Hover metric names for definitions."
+          sx={{ flex: '1 1 380px' }}
+        >
           <Table size="small">
             <TableHead>
               <TableRow>
@@ -111,7 +127,11 @@ export default function CompareTab({
           </Table>
         </SectionCard>
 
-        <SectionCard title="Per-class deltas" sx={{ flex: '1 1 480px' }}>
+        <SectionCard
+          title="Per-class deltas"
+          help="The same comparison broken out per object class — a stable global average can hide a collapsed class. Vulnerable-road-user classes (pedestrian, cyclist, motorcycle) deserve the closest look."
+          sx={{ flex: '1 1 480px' }}
+        >
           <Table size="small">
             <TableHead>
               <TableRow>
@@ -149,7 +169,14 @@ export default function CompareTab({
         </SectionCard>
       </Box>
 
-      <SectionCard title={`Top regressions (${data.regressions.length})`}>
+      <SectionCard
+        title={
+          <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center' }}>
+            {`Top regressions (${data.regressions.length})`}
+            <InfoDot term="regression_detected" size={13} />
+          </Box>
+        }
+      >
         {data.regressions.length === 0 ? (
           <Typography variant="body2" sx={{ color: '#8a949e' }}>
             No cohort regressions detected against the baseline.
@@ -170,9 +197,11 @@ export default function CompareTab({
                   flexWrap: 'wrap',
                 }}
               >
-                <Typography variant="body2" sx={{ fontWeight: 700, color: '#ef9a9a' }}>
-                  🚨 REGRESSION:
-                </Typography>
+                <ExplainTip term="regression_detected">
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#ef9a9a', cursor: 'help' }}>
+                    🚨 REGRESSION:
+                  </Typography>
+                </ExplainTip>
                 <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
                   {r.cohort} recall {fmtPct(r.recall_baseline)} → {fmtPct(r.recall_candidate)} (Δ{' '}
                   <DeltaText delta={r.recall_delta} />)
@@ -187,7 +216,10 @@ export default function CompareTab({
       </SectionCard>
 
       {data.worst_cohorts.length ? (
-        <SectionCard title="Worst cohorts (candidate)">
+        <SectionCard
+          title="Worst cohorts (candidate)"
+          help="The candidate's lowest-recall cohorts with enough objects to matter, regardless of whether they regressed — chronic weak spots as opposed to new ones."
+        >
           <Table size="small">
             <TableHead>
               <TableRow>

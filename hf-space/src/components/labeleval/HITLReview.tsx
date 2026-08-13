@@ -5,6 +5,8 @@ import ListItemButton from '@mui/material/ListItemButton';
 import Typography from '@mui/material/Typography';
 import type { Annotation, FrameSummary, ReviewTask } from '../../types/labeleval';
 import { SectionCard, StatusChip, GateLineList, LoadingBox, MetricCard, fmtNum, fmtPct } from './shared';
+import { ExplainTip } from '../help/InfoTip';
+import { glossaryKeyForStatus } from '../../content/glossary';
 
 // ---------------------------------------------------------------- geometry helpers
 
@@ -300,10 +302,15 @@ export default function HITLReview({
   return (
     <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', flexWrap: 'wrap' }}>
       {/* Left: task list */}
-      <SectionCard title={`Review Tasks (${tasks.length})`} sx={{ flex: '0 1 300px', minWidth: 270 }}>
+      <SectionCard
+        title={`Review Tasks (${tasks.length})`}
+        help="The human review queue, ordered by severity and safety criticality. Each task shows the failure reasons that flagged it (hover them for definitions); the primary reason is highlighted red. Select a task to load its full sensor evidence."
+        sx={{ flex: '0 1 300px', minWidth: 270 }}
+      >
         {tasks.length === 0 ? (
           <Typography variant="body2" sx={{ color: '#8a949e' }}>
-            No review tasks — flagged labels will appear here.
+            No review tasks — the queue fills as Triage flags labels that fail quality gates. Run the evaluation
+            pipeline (Datasets → Run Evaluation) to generate work.
           </Typography>
         ) : (
           <List dense sx={{ maxHeight: 620, overflowY: 'auto', p: 0 }}>
@@ -322,17 +329,19 @@ export default function HITLReview({
                 </Box>
                 <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
                   {t.failure_reasons.map((r) => (
-                    <Chip
-                      key={r}
-                      size="small"
-                      label={r.replace(/_/g, ' ')}
-                      sx={{
-                        bgcolor: r === t.primary_failure_reason ? '#4a1f1f' : '#232a31',
-                        color: r === t.primary_failure_reason ? '#ef9a9a' : '#aab4be',
-                        fontSize: 10,
-                        height: 18,
-                      }}
-                    />
+                    <ExplainTip key={r} term={glossaryKeyForStatus(r) ?? undefined}>
+                      <Chip
+                        size="small"
+                        label={r.replace(/_/g, ' ')}
+                        sx={{
+                          bgcolor: r === t.primary_failure_reason ? '#4a1f1f' : '#232a31',
+                          color: r === t.primary_failure_reason ? '#ef9a9a' : '#aab4be',
+                          fontSize: 10,
+                          height: 18,
+                          cursor: 'help',
+                        }}
+                      />
+                    </ExplainTip>
                   ))}
                 </Box>
               </ListItemButton>
@@ -362,6 +371,7 @@ export default function HITLReview({
         ) : (
           <SectionCard
             title={`Sensor Views — ${frame.frame_id} · seq ${frame.sequence_id} · ${frame.num_lidar_points.toLocaleString()} lidar pts`}
+            help="Four synchronized views of the flagged annotation (red): camera with projected 2D boxes, LiDAR bird's-eye points with 3D boxes (reference GT dashed green), BEV positions with track trails, and prev/current/next temporal strips to judge track continuity. Verify agreement across all views before verdicting."
           >
             <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
               <ViewFrame title="CAMERA VIEW (synthetic image, 2D boxes)">
@@ -385,20 +395,24 @@ export default function HITLReview({
         )}
 
         {selectedTask ? (
-          <SectionCard title="Evidence">
+          <SectionCard
+            title="Evidence"
+            help="The exact measurements the evaluation engines recorded for this label, plus the gate lines Triage judged them against. This is the WHY behind the flag — the reviewer verdicts against this evidence."
+          >
             {evidence ? (
               <>
                 <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
-                  <MetricCard label="3D IoU" value={fmtNum(evidence.geometry.iou_3d)} />
-                  <MetricCard label="Position err (m)" value={fmtNum(evidence.geometry.position_error)} />
-                  <MetricCard label="Orientation err (°)" value={fmtNum(evidence.geometry.orientation_error_deg, 1)} />
+                  <MetricCard label="3D IoU" value={fmtNum(evidence.geometry.iou_3d)} term="iou_3d" />
+                  <MetricCard label="Position err (m)" value={fmtNum(evidence.geometry.position_error)} term="position_error" />
+                  <MetricCard label="Orientation err (°)" value={fmtNum(evidence.geometry.orientation_error_deg, 1)} term="orientation_error" />
                   <MetricCard
                     label="Anomaly score"
                     value={fmtNum(evidence.anomaly.score)}
                     accent={evidence.anomaly.is_anomaly ? '#ffa726' : undefined}
+                    term="anomaly_score"
                   />
-                  <MetricCard label="Consensus" value={fmtPct(evidence.grading.consensus)} />
-                  <MetricCard label="Track quality" value={fmtNum(evidence.tracking.track_quality)} />
+                  <MetricCard label="Consensus" value={fmtPct(evidence.grading.consensus)} term="grader_consensus" />
+                  <MetricCard label="Track quality" value={fmtNum(evidence.tracking.track_quality)} term="track_quality" />
                 </Box>
                 <GateLineList
                   checks={evidence.decision ? evidence.decision.gate_lines : evidence.validation.checks}

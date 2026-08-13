@@ -23,6 +23,7 @@ import type { DimName, ErrorSearchResponse, ErrorType } from '../../types/megaev
 import { fmtCompact, getDimensions, searchErrors } from '../../services/megaeval';
 import { usePoll } from '../../services/labeleval';
 import { ErrorNote, MetricCard, SectionCard, fmtNum } from '../labeleval/shared';
+import { HeadCell } from '../help/InfoTip';
 import { DimChips, ERROR_TYPE_COLORS, OutcomeChip } from './shared';
 
 const ALL_ERROR_TYPES: ErrorType[] = ['FN', 'FP', 'LOCALIZATION', 'ANOMALY', 'LOW_CONF'];
@@ -114,7 +115,7 @@ export default function InvestigationTab({
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <SectionCard title="Error search">
+      <SectionCard title="Error search" helpTerm="error_index">
         <Box sx={{ display: 'flex', gap: 1.25, flexWrap: 'wrap', alignItems: 'center' }}>
           <MultiSelect label="Error types" options={ALL_ERROR_TYPES} value={errorTypes} onChange={setErrorTypes} />
           <MultiSelect label="Class" options={dimOptions('class')} value={classes} onChange={setClasses} />
@@ -158,7 +159,12 @@ export default function InvestigationTab({
       {result ? (
         <>
           <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
-            <MetricCard label="Matched errors" value={fmtCompact(result.matched_errors)} accent="#ef5350" />
+            <MetricCard
+              label="Matched errors"
+              info="Number of indexed error entries matching every active criterion — an exact count from the inverted error index, not an estimate."
+              value={fmtCompact(result.matched_errors)}
+              accent="#ef5350"
+            />
             <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', alignItems: 'center' }}>
               {ALL_ERROR_TYPES.filter((t) => (result.by_type[t] ?? 0) > 0).map((t) => (
                 <Chip
@@ -177,16 +183,38 @@ export default function InvestigationTab({
           </Box>
 
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-            <SectionCard title={`Worst containers (${result.worst_containers.length})`} sx={{ flex: '1 1 480px' }}>
+            <SectionCard
+              title={`Worst containers (${result.worst_containers.length})`}
+              help="Containers ranked by how many matching errors they concentrate, weighted by risk and severity. Fixing the top of this list yields the most quality per review hour."
+              sx={{ flex: '1 1 480px' }}
+            >
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Container</TableCell>
+                    <TableCell>
+                      <HeadCell label="Container" term="container" />
+                    </TableCell>
                     <TableCell>Context</TableCell>
-                    <TableCell align="right">Errors</TableCell>
-                    <TableCell align="right">Mean risk</TableCell>
-                    <TableCell align="right">Max severity</TableCell>
-                    <TableCell align="right">Safety hits</TableCell>
+                    <TableCell align="right">
+                      <HeadCell label="Errors" title="Errors" detail="Matching error-index entries inside this container." />
+                    </TableCell>
+                    <TableCell align="right">
+                      <HeadCell label="Mean risk" term="risk_score" />
+                    </TableCell>
+                    <TableCell align="right">
+                      <HeadCell
+                        label="Max severity"
+                        title="Max severity"
+                        detail="Highest per-error severity in this container (0–1): blends error type weight, safety criticality and geometric magnitude."
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      <HeadCell
+                        label="Safety hits"
+                        title="Safety hits"
+                        detail="Matching errors on safety-critical objects (vulnerable road users, near-path, low TTC)."
+                      />
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -222,7 +250,11 @@ export default function InvestigationTab({
               </Typography>
             </SectionCard>
 
-            <SectionCard title={`Top examples (${result.examples.length})`} sx={{ flex: '1 1 420px' }}>
+            <SectionCard
+              title={`Top examples (${result.examples.length})`}
+              help="Highest-severity individual errors matching the search — exemplars kept per cohort by reservoir sampling. Click one to open its container's forensic table."
+              sx={{ flex: '1 1 420px' }}
+            >
               <Box sx={{ maxHeight: 420, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 0.75 }}>
                 {result.examples.map((ex) => (
                   <Box

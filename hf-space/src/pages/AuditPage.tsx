@@ -25,26 +25,29 @@ export default function AuditPage() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <SectionCard title="Process Units — compute accounting">
+      <SectionCard title="Process Units — compute accounting" helpTerm="process_units">
         {units.error && !units.data ? <ErrorNote error={units.error} /> : null}
         {units.data ? (
           <>
             <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
-              <MetricCard label="Total consumed" value={fmtInt(units.data.total)} />
+              <MetricCard label="Total consumed" value={fmtInt(units.data.total)} term="process_units" />
               <MetricCard
                 label="Per verified event"
                 value={fmtNum(units.data.unit_economics.per_verified_event, 1)}
                 sub="unit economics"
+                info="Total process units divided by the number of verified labels — the compute cost of producing one trustworthy label. The number to drive down as automation improves."
               />
               <MetricCard
                 label="Per million frames"
                 value={fmtNum(units.data.unit_economics.per_million_frames, 1)}
                 sub="unit economics"
+                info="Process units normalized per million input frames — makes runs of different sizes comparable."
               />
               <MetricCard
                 label="Per training dataset"
                 value={fmtNum(units.data.unit_economics.per_training_dataset, 1)}
                 sub="unit economics"
+                info="Average process units consumed to produce one exported training dataset, end to end."
               />
             </Box>
             {stages.length > 0 ? (
@@ -69,7 +72,10 @@ export default function AuditPage() {
         ) : null}
       </SectionCard>
 
-      <SectionCard title={`Audit Trail (${audit.data?.events.length ?? 0} events)`}>
+      <SectionCard
+        title={`Audit Trail (${audit.data?.events.length ?? 0} events)`}
+        help="Append-only record of every state-changing action in the platform: who (actor — human reviewer or system component) did what (action) to which entity, when, and with what detail. This is the provenance layer that lineage and compliance queries rely on."
+      >
         {audit.error && !audit.data ? <ErrorNote error={audit.error} /> : null}
         {audit.data && audit.data.events.length > 0 ? (
           <Table size="small">

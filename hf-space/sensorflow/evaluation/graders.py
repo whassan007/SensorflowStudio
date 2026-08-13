@@ -202,6 +202,16 @@ def grade_annotation(
 
     consensus = float(np.clip(0.5 * class_agreement + 0.35 * spatial + 0.15 * temporal, 0, 1))
 
+    # --- additive consensus evidence (canonical consensus above is unchanged)
+    csv = consensus_score_vector(votes, spatial_detail, float(temporal), weights)
+    candidates = _grader_box_candidates(ann, gt, votes, rng)
+    mbr = mbr_consensus_select(candidates)
+    extra_stats: Dict[str, float] = {f"csv_{k}": v for k, v in csv.items()}
+    for c in mbr["candidates"]:
+        extra_stats[f"mbr_risk_{c['source']}"] = c["expected_risk"]
+    extra_stats["mbr_selected_idx"] = float(mbr["selected_index"])
+    extra_stats["mbr_selected_risk"] = mbr["selected"]["expected_risk"]
+
     cmp = GraderComparison(
         annotation_id=ann.annotation_id,
         grader_count=len(votes),
@@ -212,7 +222,9 @@ def grade_annotation(
         temporal_agreement=round(float(temporal), 4),
         consensus=round(consensus, 4),
         disagreement_types=disagreements,
-        kappa_stats={**kappa_stats, **{f"spatial_{k}": v for k, v in spatial_detail.items()}},
+        kappa_stats={**kappa_stats,
+                     **{f"spatial_{k}": v for k, v in spatial_detail.items()},
+                     **extra_stats},
     )
     store.put("grader_comparisons", cmp)
     return cmp
@@ -248,9 +260,132 @@ def dataset_grader_statistics(store: EvalStore, dataset_id: str) -> Dict[str, fl
             raters[GRADER_SOURCES.index("vendor_gt")][j] = None
     kripp = krippendorff_alpha(raters)
 
-    return {
+    stats = {
         "cohen_kappa": round(cohen, 4),
         "fleiss_kappa": round(fleiss, 4),
         "krippendorff_alpha": round(kripp, 4),
         "mean_consensus": round(float(np.mean([c.consensus for c in comparisons if c.consensus is not None])), 4),
     }
+
+    # Additive: Kendall's tau between the model-confidence ranking of items and
+    # the grader-consensus ranking (do graders order item quality like the
+    # model's own confidence does?). Needs >= 2 items.
+    paired = [(ann_by_id[c.annotation_id].confidence, c.consensus or 0.0)
+              for c in comparisons if c.annotation_id in ann_by_id]
+    conf = [p[0] for p in paired]
+    cons = [p[1] for p in paired]
+    if len(conf) >= 2:
+        tau, p = kendalls_tau(conf, cons)
+        stats["kendall_tau_confidence_vs_consensus"] = tau
+        stats["kendall_tau_p_value"] = p
+    return stats
+
+
+# ------------------------------------------------------------------ additive consensus extensions
+#
+# The canonical scalar consensus above stays authoritative. The functions
+# below add richer evidence (spec: consensus score vector, Kendall's tau
+# ranking agreement, Minimum Bayes Risk selection) surfaced through
+# GraderComparison.kappa_stats with csv_* / mbr_* prefixes.
+
+
+def consensus_score_vector(votes: Dict[str, str], spatial_detail: Dict[str, float],
+                           temporal: float,
+                           weights: Optional[Dict[str, float]] = None) -> Dict[str, float]:
+    """Per-element consensus scores instead of one scalar.
+
+    Elements: majority class share, reliability-weighted class agreement,
+    spatial sub-scores (IoU, center, dimensions, orientation) and temporal
+    consistency — each individually in [0, 1].
+    """
+    n = max(len(votes), 1)
+    counts = Counter(votes.values())
+    majority_share = max(counts.values()) / n if counts else 0.0
+    weights = weights or {}
+    weight_by_class: Dict[str, float] = {}
+    for source, cls in votes.items():
+        weight_by_class[cls] = weight_by_class.get(cls, 0.0) + weights.get(source, 1.0)
+    total_w = sum(weights.get(s, 1.0) for s in votes) or 1.0
+    weighted = max(weight_by_class.values()) / total_w if weight_by_class else 0.0
+
+    center = spatial_detail.get("center_distance")
+    dims = spatial_detail.get("dimension_diff")
+    orient = spatial_detail.get("orientation_diff_deg")
+    return {
+        "class_majority_share": round(majority_share, 4),
+        "class_weighted_agreement": round(weighted, 4),
+        "spatial_iou": round(float(spatial_detail.get("iou", 0.0)), 4),
+        "spatial_center": round(max(0.0, 1 - (center or 2.0) / 2.0), 4),
+        "spatial_dims": round(max(0.0, 1 - (dims if dims is not None else 1.0)), 4),
+        "spatial_orientation": round(max(0.0, 1 - (orient if orient is not None else 180.0) / 180.0), 4),
+        "temporal": round(float(temporal), 4),
+    }
+
+
+def kendalls_tau(scores_a: Sequence[float], scores_b: Sequence[float]) -> Tuple[float, float]:
+    """Kendall's tau-b ranking agreement between two score lists over the same
+    items (scipy.stats.kendalltau). Returns (tau, p_value)."""
+    from scipy.stats import kendalltau
+    tau, p = kendalltau(list(scores_a), list(scores_b))
+    if math.isnan(tau):
+        return 0.0, 1.0
+    return round(float(tau), 4), round(float(p), 6)
+
+
+def mbr_utility(cand_a: Dict, cand_b: Dict, iou_weight: float = 0.5) -> float:
+    """Pairwise utility for MBR: class match + BEV IoU (each in [0, 1])."""
+    class_match = 1.0 if cand_a.get("class_name") == cand_b.get("class_name") else 0.0
+    box_a, box_b = cand_a.get("bbox_3d"), cand_b.get("bbox_3d")
+    iou = bev_iou(box_a, box_b) if box_a and box_b else 0.0
+    return (1 - iou_weight) * class_match + iou_weight * iou
+
+
+def mbr_consensus_select(candidates: List[Dict], iou_weight: float = 0.5) -> Dict:
+    """Minimum Bayes Risk consensus selection.
+
+    Among candidate labels (each {source, class_name, bbox_3d}), select the one
+    minimizing expected disagreement risk against the others treated as
+    pseudo-references: risk(c) = 1 - mean_utility(c, others).
+    """
+    if not candidates:
+        raise ValueError("mbr_consensus_select requires at least one candidate")
+    scored = []
+    for i, cand in enumerate(candidates):
+        others = [c for j, c in enumerate(candidates) if j != i]
+        util = (float(np.mean([mbr_utility(cand, o, iou_weight) for o in others]))
+                if others else 1.0)
+        scored.append({"source": cand.get("source", f"candidate_{i}"),
+                       "class_name": cand.get("class_name"),
+                       "expected_utility": round(util, 4),
+                       "expected_risk": round(1 - util, 4)})
+    best = min(range(len(scored)),
+               key=lambda i: (scored[i]["expected_risk"], i))
+    return {"selected_index": best, "selected": scored[best], "candidates": scored,
+            "utility": f"{1 - iou_weight:.2f}*class_match + {iou_weight:.2f}*bev_iou"}
+
+
+def _grader_box_candidates(ann: Annotation, gt, votes: Dict[str, str],
+                           rng: np.random.Generator) -> List[Dict]:
+    """Candidate labels for MBR selection. auto_label and vendor_gt use their
+    real boxes; the remaining graders' boxes are SIMULATED as deterministic
+    small perturbations of their vote's base box (consistent with the simulated
+    grader panel above)."""
+    base_box = list(gt.bbox_3d) if gt is not None else (list(ann.bbox_3d) if ann.bbox_3d else None)
+    out: List[Dict] = []
+    for source in GRADER_SOURCES:
+        if source not in votes:
+            continue
+        if source == "auto_label":
+            box = list(ann.bbox_3d) if ann.bbox_3d else None
+        elif source == "vendor_gt":
+            box = list(gt.bbox_3d) if gt is not None else (list(ann.bbox_3d) if ann.bbox_3d else None)
+        elif base_box is not None:
+            jitter = rng.normal(0.0, 0.12, size=3)
+            box = list(base_box)
+            box[0] += float(jitter[0])
+            box[1] += float(jitter[1])
+            box[6] += float(jitter[2] * 0.2)
+        else:
+            box = None
+        out.append({"source": source, "class_name": votes[source], "bbox_3d": box})
+    return out

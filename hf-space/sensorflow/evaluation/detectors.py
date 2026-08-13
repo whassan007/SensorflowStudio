@@ -315,6 +315,9 @@ class AnomalyEnsemble:
         self.seed = seed
         self.detectors = self._build()
         self.scaler = StandardScaler()
+        # detector name -> error string for detectors that failed in the last
+        # run() and were excluded from the ensemble (never silently zeroed).
+        self.last_failures: Dict[str, str] = {}
 
     def _cfg(self, *path, default=None):
         node = self.config
@@ -376,12 +379,17 @@ class AnomalyEnsemble:
         Xs = self.scaler.fit_transform(X)
         raw: Dict[str, np.ndarray] = {}
         norm: Dict[str, np.ndarray] = {}
+        self.last_failures: Dict[str, str] = {}
         for det in self.detectors:
             try:
                 det.fit(Xs)
                 s = det.score(Xs)
-            except Exception:
-                s = np.zeros(len(Xs))
+            except Exception as exc:
+                # A failed detector is recorded and EXCLUDED from the ensemble.
+                # Substituting zeros (the previous behavior) silently diluted
+                # every other detector's signal and masked anomalies.
+                self.last_failures[det.name] = f"{type(exc).__name__}: {exc}"
+                continue
             raw[det.name] = s
             norm[det.name] = normalize_scores(s)
 

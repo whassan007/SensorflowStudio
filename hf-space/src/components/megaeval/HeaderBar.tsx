@@ -24,6 +24,8 @@ import { Database, FlaskConical } from 'lucide-react';
 import type { CacheStats, EvaluationRunInfo, PopulationMeta } from '../../types/megaeval';
 import { createRun, fmtCompact, generatePopulation } from '../../services/megaeval';
 import { fmtPct } from '../labeleval/shared';
+import { GLOSSARY } from '../../content/glossary';
+import { GlossaryContent } from '../help/InfoTip';
 import { RunStatusChip } from './shared';
 
 // ---------------------------------------------------------------- action buttons
@@ -259,71 +261,89 @@ export default function HeaderBar({
         borderRadius: 1,
       }}
     >
-      <TextField
-        select
-        size="small"
-        label="Population"
-        value={populationId ?? ''}
-        onChange={(e) => onPopulationChange(e.target.value)}
-        sx={{ minWidth: 220 }}
-        disabled={populations.length === 0}
-      >
-        {populations.map((p) => (
-          <MenuItem key={p.population_id} value={p.population_id}>
-            {p.name} · {fmtCompact(p.num_objects)} objects
-          </MenuItem>
-        ))}
-      </TextField>
+      <Tooltip title={<GlossaryContent entry={GLOSSARY.population} />} enterDelay={500}>
+        <TextField
+          select
+          size="small"
+          label="Population"
+          value={populationId ?? ''}
+          onChange={(e) => onPopulationChange(e.target.value)}
+          sx={{ minWidth: 220 }}
+          disabled={populations.length === 0}
+        >
+          {populations.map((p) => (
+            <MenuItem key={p.population_id} value={p.population_id}>
+              {p.name} · {fmtCompact(p.num_objects)} objects
+            </MenuItem>
+          ))}
+        </TextField>
+      </Tooltip>
 
-      <TextField
-        select
-        size="small"
-        label="Evaluation run"
-        value={runId && sortedRuns.some((r) => r.run_id === runId) ? runId : ''}
-        onChange={(e) => onRunChange(e.target.value)}
-        sx={{ minWidth: 240 }}
-        disabled={sortedRuns.length === 0}
-      >
-        {sortedRuns.map((r) => (
-          <MenuItem key={r.run_id} value={r.run_id}>
-            {runLabel(r)}
-          </MenuItem>
-        ))}
-      </TextField>
-
-      <TextField
-        select
-        size="small"
-        label="Baseline (compare)"
-        value={
-          baselineRunId && publishedRuns.some((r) => r.run_id === baselineRunId) ? baselineRunId : ''
-        }
-        onChange={(e) => onBaselineChange(e.target.value === '' ? null : e.target.value)}
-        sx={{ minWidth: 220 }}
-        disabled={publishedRuns.length === 0}
-      >
-        <MenuItem value="">
-          <em>None</em>
-        </MenuItem>
-        {publishedRuns
-          .filter((r) => r.run_id !== runId)
-          .map((r) => (
+      <Tooltip title={<GlossaryContent entry={GLOSSARY.evaluation_run} />} enterDelay={500}>
+        <TextField
+          select
+          size="small"
+          label="Evaluation run"
+          value={runId && sortedRuns.some((r) => r.run_id === runId) ? runId : ''}
+          onChange={(e) => onRunChange(e.target.value)}
+          sx={{ minWidth: 240 }}
+          disabled={sortedRuns.length === 0}
+        >
+          {sortedRuns.map((r) => (
             <MenuItem key={r.run_id} value={r.run_id}>
               {runLabel(r)}
             </MenuItem>
           ))}
-      </TextField>
+        </TextField>
+      </Tooltip>
+
+      <Tooltip
+        title="The published run the Compare tab measures the current candidate against. Promotion verdicts and regression scans use this as the reference."
+        enterDelay={500}
+      >
+        <TextField
+          select
+          size="small"
+          label="Baseline (compare)"
+          value={
+            baselineRunId && publishedRuns.some((r) => r.run_id === baselineRunId) ? baselineRunId : ''
+          }
+          onChange={(e) => onBaselineChange(e.target.value === '' ? null : e.target.value)}
+          sx={{ minWidth: 220 }}
+          disabled={publishedRuns.length === 0}
+        >
+          <MenuItem value="">
+            <em>None</em>
+          </MenuItem>
+          {publishedRuns
+            .filter((r) => r.run_id !== runId)
+            .map((r) => (
+              <MenuItem key={r.run_id} value={r.run_id}>
+                {runLabel(r)}
+              </MenuItem>
+            ))}
+        </TextField>
+      </Tooltip>
 
       {selectedRun ? <RunStatusChip status={selectedRun.status} /> : null}
 
       <Box sx={{ flex: 1 }} />
 
       {cache ? (
-        <Tooltip title={`Aggregate cache: ${cache.hits} hits / ${cache.misses} misses`}>
+        <Tooltip
+          title={
+            <Box>
+              <GlossaryContent entry={GLOSSARY.query_cache} />
+              <Typography variant="caption" sx={{ color: '#8a949e', display: 'block', mt: 0.5, fontFamily: 'monospace' }}>
+                {`now: ${cache.entries} entries · ${cache.hits} hits / ${cache.misses} misses`}
+              </Typography>
+            </Box>
+          }
+        >
           <Chip
             size="small"
             label={`cache ${cache.entries} · hit ${cache.hit_rate === null ? '—' : fmtPct(cache.hit_rate)}`}
-            sx={{ height: 20, fontSize: 10.5, fontFamily: 'monospace', bgcolor: '#232a31', color: '#aab4be' }}
+            sx={{ height: 20, fontSize: 10.5, fontFamily: 'monospace', bgcolor: '#232a31', color: '#aab4be', cursor: 'help' }}
           />
         </Tooltip>
       ) : null}

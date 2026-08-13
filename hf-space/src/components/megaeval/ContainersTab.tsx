@@ -26,6 +26,7 @@ import {
 } from '../../services/megaeval';
 import { usePoll } from '../../services/labeleval';
 import { ErrorNote, LoadingBox, SectionCard, fmtNum, fmtPct } from '../labeleval/shared';
+import { HeadCell } from '../help/InfoTip';
 import { ContainerStatusIcon, DimChips, OutcomeChip } from './shared';
 
 const SORT_PRESETS: Array<{ value: ContainerSortPreset; label: string }> = [
@@ -89,6 +90,7 @@ function ForensicView({
             Find similar containers
           </Button>
         }
+        help="Every annotation in this one container with its evaluation outcome. This is the deepest level of the app — per-object data is loaded on demand only here, never scanned in aggregate views. The shield icon marks safety-critical objects."
         sx={{ flex: '2 1 620px' }}
       >
         <Typography variant="caption" sx={{ color: '#8a949e', display: 'block', mb: 1 }}>
@@ -101,12 +103,30 @@ function ForensicView({
             <Table size="small" stickyHeader>
               <TableHead>
                 <TableRow>
-                  <TableCell>Outcome</TableCell>
+                  <TableCell>
+                    <HeadCell
+                      label="Outcome"
+                      title="Outcome"
+                      detail="Evaluation verdict for this annotation: TP (correct), FN (missed object), FP (phantom), LOCALIZATION (matched but geometry off), LOW_CONF. Hover each chip for its definition."
+                    />
+                  </TableCell>
                   <TableCell>Class</TableCell>
-                  <TableCell align="right">IoU</TableCell>
-                  <TableCell align="right">Conf</TableCell>
-                  <TableCell align="center">Anomaly</TableCell>
-                  <TableCell>Dims</TableCell>
+                  <TableCell align="right">
+                    <HeadCell label="IoU" term="iou_3d" />
+                  </TableCell>
+                  <TableCell align="right">
+                    <HeadCell label="Conf" term="confidence" />
+                  </TableCell>
+                  <TableCell align="center">
+                    <HeadCell label="Anomaly" term="anomaly_score" />
+                  </TableCell>
+                  <TableCell>
+                    <HeadCell
+                      label="Dims"
+                      title="Dimensions"
+                      detail="The cohort dimensions this object belongs to (weather, lighting, scenario, sensor, distance band, occlusion) plus evidence flags like sensor-disagree."
+                    />
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -165,6 +185,7 @@ function ForensicView({
       {similar ? (
         <SectionCard
           title={`Similar containers${similar.retrieval ? ` · ${similar.retrieval}` : ''}`}
+          helpTerm="embedding_similarity"
           sx={{ flex: '1 1 380px' }}
         >
           <Table size="small">
@@ -233,6 +254,7 @@ export default function ContainersTab({
   return (
     <SectionCard
       title="Quality by container"
+      helpTerm="container"
       action={
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           {containers.data ? (
@@ -265,15 +287,29 @@ export default function ContainersTab({
             <TableHead>
               <TableRow>
                 <TableCell />
-                <TableCell>Container</TableCell>
+                <TableCell>
+                  <HeadCell label="Container" term="container" />
+                </TableCell>
                 <TableCell>Context</TableCell>
                 <TableCell align="right">Objects</TableCell>
-                <TableCell align="right">Verified</TableCell>
-                <TableCell align="right">Precision</TableCell>
-                <TableCell align="right">Recall</TableCell>
-                <TableCell align="right">Mean IoU</TableCell>
-                <TableCell align="right">Anomalies</TableCell>
-                <TableCell align="right">Risk</TableCell>
+                <TableCell align="right">
+                  <HeadCell label="Verified" term="status_verified" />
+                </TableCell>
+                <TableCell align="right">
+                  <HeadCell label="Precision" term="precision" />
+                </TableCell>
+                <TableCell align="right">
+                  <HeadCell label="Recall" term="recall" />
+                </TableCell>
+                <TableCell align="right">
+                  <HeadCell label="Mean IoU" term="iou_3d" />
+                </TableCell>
+                <TableCell align="right">
+                  <HeadCell label="Anomalies" term="anomaly_score" />
+                </TableCell>
+                <TableCell align="right">
+                  <HeadCell label="Risk" term="risk_score" />
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>

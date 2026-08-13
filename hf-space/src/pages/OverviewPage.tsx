@@ -104,40 +104,45 @@ export default function OverviewPage() {
 
       {counters ? (
         <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-          <MetricCard label="Frames processed" value={fmtInt(counters.frames_processed)} />
-          <MetricCard label="Auto-labeled" value={fmtInt(counters.auto_labeled)} />
-          <MetricCard label="Auto-graded" value={fmtInt(counters.auto_graded)} accent="#66bb6a" />
-          <MetricCard label="Flagged" value={fmtInt(counters.flagged)} accent="#ffa726" />
-          <MetricCard label="Verified" value={fmtInt(counters.verified)} accent="#66bb6a" />
-          <MetricCard label="HITL" value={fmtInt(counters.in_hitl)} accent="#42a5f5" />
-          <MetricCard label="Rejected" value={fmtInt(counters.rejected)} accent="#ef5350" />
-          <MetricCard label="Rare events" value={fmtInt(counters.rare_events)} accent="#ef5350" />
+          <MetricCard label="Frames processed" value={fmtInt(counters.frames_processed)} info="Sensor frames the pipeline has ingested and pushed through auto-labeling." />
+          <MetricCard label="Auto-labeled" value={fmtInt(counters.auto_labeled)} info="Candidate labels produced by the auto-labeler, before any quality gating." />
+          <MetricCard label="Auto-graded" value={fmtInt(counters.auto_graded)} accent="#66bb6a" term="status_auto_graded" />
+          <MetricCard label="Flagged" value={fmtInt(counters.flagged)} accent="#ffa726" term="status_flagged" />
+          <MetricCard label="Verified" value={fmtInt(counters.verified)} accent="#66bb6a" term="status_verified" />
+          <MetricCard label="HITL" value={fmtInt(counters.in_hitl)} accent="#42a5f5" info="Labels currently sitting in the human review queue." />
+          <MetricCard label="Rejected" value={fmtInt(counters.rejected)} accent="#ef5350" term="status_rejected" />
+          <MetricCard label="Rare events" value={fmtInt(counters.rare_events)} accent="#ef5350" info="Samples flagged as rare/anomalous by the ensemble detectors — candidates for targeted training data." />
         </Box>
       ) : null}
 
       {data ? (
         <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-          <MetricCard label="Precision" value={fmtPct(data.metrics.precision)} />
-          <MetricCard label="Recall" value={fmtPct(data.metrics.recall)} />
-          <MetricCard label="Safety recall" value={fmtPct(data.metrics.safety_critical_recall)} accent="#ffa726" />
-          <MetricCard label="mAP (3D)" value={fmtPct(data.metrics.map_3d)} />
-          <MetricCard label="3D IoU" value={fmtNum(data.metrics.mean_iou_3d)} />
-          <MetricCard label="IDF1" value={fmtPct(data.metrics.idf1)} />
-          <MetricCard label="Anomaly rate" value={fmtPct(data.metrics.anomaly_rate)} />
-          <MetricCard label="Grader consensus" value={fmtPct(data.metrics.grader_consensus)} />
-          <MetricCard label="Verification rate" value={fmtPct(data.verification_rate)} accent="#66bb6a" />
-          <MetricCard label="Automation rate" value={fmtPct(data.automation_rate)} />
-          <MetricCard label="Process units" value={fmtInt(data.process_units_total)} sub="total consumed" />
+          <MetricCard label="Precision" value={fmtPct(data.metrics.precision)} term="precision" />
+          <MetricCard label="Recall" value={fmtPct(data.metrics.recall)} term="recall" />
+          <MetricCard label="Safety recall" value={fmtPct(data.metrics.safety_critical_recall)} accent="#ffa726" term="safety_recall" />
+          <MetricCard label="mAP (3D)" value={fmtPct(data.metrics.map_3d)} term="map_3d" />
+          <MetricCard label="3D IoU" value={fmtNum(data.metrics.mean_iou_3d)} term="iou_3d" />
+          <MetricCard label="IDF1" value={fmtPct(data.metrics.idf1)} term="idf1" />
+          <MetricCard label="Anomaly rate" value={fmtPct(data.metrics.anomaly_rate)} term="anomaly_rate" />
+          <MetricCard label="Grader consensus" value={fmtPct(data.metrics.grader_consensus)} term="grader_consensus" />
+          <MetricCard label="Verification rate" value={fmtPct(data.verification_rate)} accent="#66bb6a" term="verification_rate" />
+          <MetricCard label="Automation rate" value={fmtPct(data.automation_rate)} term="automation_rate" />
+          <MetricCard label="Process units" value={fmtInt(data.process_units_total)} sub="total consumed" term="process_units" />
         </Box>
       ) : null}
 
       <VerificationFunnel funnel={funnel.data} />
 
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-        <SectionCard title={`Alerts (${alerts.data?.alerts.length ?? 0})`} sx={{ flex: '1 1 420px' }}>
+        <SectionCard
+          title={`Alerts (${alerts.data?.alerts.length ?? 0})`}
+          help="Active alerts from anomaly detection, regression tracking and distribution-shift checks. Hover a severity chip for what it means; Evidence deep-links to the page that raised the alert with the offending entity selected."
+          sx={{ flex: '1 1 420px' }}
+        >
           {!alerts.data || alerts.data.alerts.length === 0 ? (
             <Typography variant="body2" sx={{ color: '#8a949e' }}>
-              No active alerts.
+              No active alerts — anomaly, regression and shift monitors are all quiet. Alerts will appear here as the
+              pipeline processes data.
             </Typography>
           ) : (
             <Table size="small">

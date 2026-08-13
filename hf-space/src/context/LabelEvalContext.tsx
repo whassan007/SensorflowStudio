@@ -16,8 +16,31 @@ export type PageId =
   | 'evaluation'
   | 'audit'
   | 'pipeline'
+  | 'rca'
+  | 'raremine'
+  | 'hillclimb'
+  | 'vitis'
   | 'ssam'
-  | 'legacy';
+  | 'safety-odd'
+  | 'safety-gates'
+  | 'safety-evidence'
+  | 'safety-ssam'
+  | 'safety-calibration'
+  | 'safety-discrepancy'
+  | 'safety-scenarios'
+  | 'safety-search'
+  | 'seqeval'
+  | 'bevfusion'
+  | 'scenario-composer'
+  | 'pipeline-builder'
+  | 'my-dashboard'
+  | 'retro'
+  | 'closed-loop-lab'
+  | 'launch-readiness'
+  | 'studio2'
+  | 'legacy'
+  | 'production-readiness'
+  | 'rotr';
 
 export const ALL_PAGE_IDS: PageId[] = [
   'command',
@@ -34,8 +57,31 @@ export const ALL_PAGE_IDS: PageId[] = [
   'evaluation',
   'audit',
   'pipeline',
+  'rca',
+  'raremine',
+  'hillclimb',
+  'vitis',
   'ssam',
+  'safety-odd',
+  'safety-gates',
+  'safety-evidence',
+  'safety-ssam',
+  'safety-calibration',
+  'safety-discrepancy',
+  'safety-scenarios',
+  'safety-search',
+  'seqeval',
+  'bevfusion',
+  'scenario-composer',
+  'pipeline-builder',
+  'my-dashboard',
+  'retro',
+  'closed-loop-lab',
+  'launch-readiness',
+  'studio2',
   'legacy',
+  'production-readiness',
+  'rotr',
 ];
 
 /** Maps backend evidence_link.page strings (unknown vocabulary) onto our page ids. */

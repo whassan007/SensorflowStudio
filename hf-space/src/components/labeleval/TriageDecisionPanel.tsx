@@ -9,6 +9,8 @@ import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import type { TriageDecision } from '../../types/labeleval';
 import { SectionCard, StatusChip, GateLineList, HBar, fmtNum } from './shared';
+import { ExplainTip } from '../help/InfoTip';
+import { glossaryKeyForStatus } from '../../content/glossary';
 
 export default function TriageDecisionPanel({ decisions }: { decisions: TriageDecision[] }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -25,10 +27,15 @@ export default function TriageDecisionPanel({ decisions }: { decisions: TriageDe
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <SectionCard title="Active Quality Policy">
+      <SectionCard title="Active Quality Policy" helpTerm="quality_policy">
         {policy ? (
           <>
-            <Chip label={policy.policy_id} sx={{ bgcolor: '#12314a', color: '#90caf9', fontWeight: 700, mb: 1.5 }} />
+            <ExplainTip
+              title={`Policy ${policy.policy_id}`}
+              detail="Every decision below records this policy ID — the exact, versioned threshold set that produced it. Same evidence + same policy always yields the same decision."
+            >
+              <Chip label={policy.policy_id} sx={{ bgcolor: '#12314a', color: '#90caf9', fontWeight: 700, mb: 1.5, cursor: 'help' }} />
+            </ExplainTip>
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
               {Object.entries(policy.policy_values).map(([k, v]) => (
                 <Chip
@@ -48,10 +55,15 @@ export default function TriageDecisionPanel({ decisions }: { decisions: TriageDe
       </SectionCard>
 
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-        <SectionCard title="Recent Triage Decisions" sx={{ flex: '2 1 460px' }}>
+        <SectionCard
+          title="Recent Triage Decisions"
+          help="Latest routing decisions. Hover a status chip for its meaning; click a row to open the full gate-line breakdown (measured value vs threshold vs verdict) in the Gate Explainability panel."
+          sx={{ flex: '2 1 460px' }}
+        >
           {decisions.length === 0 ? (
             <Typography variant="body2" sx={{ color: '#8a949e' }}>
-              No decisions to show.
+              No decisions yet — triage decisions appear as soon as the evaluation pipeline processes labels (Datasets →
+              Run Evaluation).
             </Typography>
           ) : (
             <Table size="small">
@@ -77,7 +89,15 @@ export default function TriageDecisionPanel({ decisions }: { decisions: TriageDe
                       <StatusChip status={d.status} />
                     </TableCell>
                     <TableCell sx={{ fontSize: 12, color: d.primary_failure_reason ? '#ef9a9a' : '#8a949e' }}>
-                      {d.primary_failure_reason ? d.primary_failure_reason.replace(/_/g, ' ') : '—'}
+                      {d.primary_failure_reason ? (
+                        <ExplainTip term={glossaryKeyForStatus(d.primary_failure_reason) ?? undefined}>
+                          <Box component="span" sx={{ borderBottom: '1px dotted #5c6873', cursor: 'help' }}>
+                            {d.primary_failure_reason.replace(/_/g, ' ')}
+                          </Box>
+                        </ExplainTip>
+                      ) : (
+                        '—'
+                      )}
                     </TableCell>
                     <TableCell sx={{ fontSize: 12 }}>{new Date(d.decided_at).toLocaleTimeString()}</TableCell>
                   </TableRow>
@@ -88,7 +108,7 @@ export default function TriageDecisionPanel({ decisions }: { decisions: TriageDe
         </SectionCard>
 
         <Box sx={{ flex: '1 1 340px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <SectionCard title="Gate Explainability">
+          <SectionCard title="Gate Explainability" helpTerm="quality_gate">
             {selected ? (
               <>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
@@ -115,7 +135,10 @@ export default function TriageDecisionPanel({ decisions }: { decisions: TriageDe
             )}
           </SectionCard>
 
-          <SectionCard title="Failure Reason Distribution">
+          <SectionCard
+            title="Failure Reason Distribution"
+            help="How often each failure reason occurred across the recent decisions. Hover a reason for its definition — the shape of this distribution tells you which evaluation engine is doing the flagging."
+          >
             {reasonRows.length === 0 ? (
               <Typography variant="body2" sx={{ color: '#8a949e' }}>
                 No failures recorded.
@@ -125,6 +148,7 @@ export default function TriageDecisionPanel({ decisions }: { decisions: TriageDe
                 <HBar
                   key={reason}
                   label={reason.replace(/_/g, ' ')}
+                  term={glossaryKeyForStatus(reason) ?? undefined}
                   value={count}
                   max={maxReason}
                   color="#ef5350"

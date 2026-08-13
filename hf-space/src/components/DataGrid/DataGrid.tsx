@@ -9,15 +9,16 @@ import TableSortLabel from '@mui/material/TableSortLabel';
 import Typography from '@mui/material/Typography';
 import { useFilters } from '../../context/FilterContext';
 import { SEVERITY_COLORS } from '../../types';
+import { InfoDot } from '../help/InfoTip';
 
-const COLUMNS: { id: string; label: string; numeric?: boolean; sortable?: boolean }[] = [
+const COLUMNS: { id: string; label: string; numeric?: boolean; sortable?: boolean; term?: string; info?: string }[] = [
   { id: 'street_name', label: 'Intersection', sortable: true },
   { id: 'county', label: 'County', sortable: true },
-  { id: 'conflict_type', label: 'Conflict' },
-  { id: 'min_ttc', label: 'TTC (s)', numeric: true, sortable: true },
-  { id: 'min_pet', label: 'PET (s)', numeric: true, sortable: true },
-  { id: 'max_speed', label: 'Speed (m/s)', numeric: true, sortable: true },
-  { id: 'severity_index', label: 'Severity', numeric: true, sortable: true },
+  { id: 'conflict_type', label: 'Conflict', info: 'The interaction geometry of the near-miss: crossing (paths intersect), rear-end (same lane, following), or lane-change (merging paths). Different conflict types have different severity profiles at the same TTC.' },
+  { id: 'min_ttc', label: 'TTC (s)', numeric: true, sortable: true, term: 'ttc' },
+  { id: 'min_pet', label: 'PET (s)', numeric: true, sortable: true, term: 'pet' },
+  { id: 'max_speed', label: 'Speed (m/s)', numeric: true, sortable: true, info: 'Maximum approach speed of either road user during the conflict. Higher speed at the same TTC/PET means higher injury potential — it feeds the severity index.' },
+  { id: 'severity_index', label: 'Severity', numeric: true, sortable: true, term: 'severity_index' },
 ];
 
 export default function DataGrid() {
@@ -47,9 +48,13 @@ export default function DataGrid() {
                       onClick={() => setSort(col.id)}
                     >
                       {col.label}
+                      {col.term || col.info ? <InfoDot term={col.term} title={col.label} detail={col.info} /> : null}
                     </TableSortLabel>
                   ) : (
-                    col.label
+                    <>
+                      {col.label}
+                      {col.term || col.info ? <InfoDot term={col.term} title={col.label} detail={col.info} /> : null}
+                    </>
                   )}
                 </TableCell>
               ))}

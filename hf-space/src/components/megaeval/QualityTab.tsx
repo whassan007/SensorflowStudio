@@ -21,6 +21,7 @@ import {
 } from '../../services/megaeval';
 import { usePoll } from '../../services/labeleval';
 import { ErrorNote, HBar, LoadingBox, SectionCard, fmtNum, fmtPct } from '../labeleval/shared';
+import { HeadCell } from '../help/InfoTip';
 import {
   ERROR_TYPE_COLORS,
   ExactnessTag,
@@ -45,7 +46,12 @@ function QualityByClass({ runId, refreshKey }: { runId: string; refreshKey: numb
     [runId, refreshKey]
   );
   return (
-    <SectionCard title="Quality by class" action={<QueryBadge meta={q.data?.meta} />} sx={{ flex: '1 1 460px' }}>
+    <SectionCard
+      title="Quality by class"
+      help="Headline metrics broken down per object class, aggregated from the metric cube. Classes with markedly lower recall than the population are where the model under-detects — start drilling there."
+      action={<QueryBadge meta={q.data?.meta} />}
+      sx={{ flex: '1 1 460px' }}
+    >
       {q.error ? <ErrorNote error={q.error} /> : null}
       {q.loading && !q.data ? <LoadingBox /> : null}
       {q.data ? (
@@ -53,11 +59,21 @@ function QualityByClass({ runId, refreshKey }: { runId: string; refreshKey: numb
           <TableHead>
             <TableRow>
               <TableCell>Class</TableCell>
-              <TableCell align="right">n</TableCell>
-              <TableCell>Recall</TableCell>
-              <TableCell>Precision</TableCell>
-              <TableCell align="right">F1</TableCell>
-              <TableCell align="right">Mean IoU</TableCell>
+              <TableCell align="right">
+                <HeadCell label="n" title="n" detail="Number of evaluated objects of this class in the population (exact cube count)." />
+              </TableCell>
+              <TableCell>
+                <HeadCell label="Recall" term="recall" />
+              </TableCell>
+              <TableCell>
+                <HeadCell label="Precision" term="precision" />
+              </TableCell>
+              <TableCell align="right">
+                <HeadCell label="F1" term="f1" />
+              </TableCell>
+              <TableCell align="right">
+                <HeadCell label="Mean IoU" term="iou_3d" />
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -99,8 +115,19 @@ function ErrorDistribution({ runId, refreshKey }: { runId: string; refreshKey: n
   const byType = res.data?.by_type ?? {};
   const total = ERROR_TYPE_ORDER.reduce((acc, t) => acc + (byType[t] ?? 0), 0);
   const max = Math.max(1, ...ERROR_TYPE_ORDER.map((t) => byType[t] ?? 0));
+  const ERROR_TERM_KEYS: Record<ErrorType, string> = {
+    FN: 'error_fn',
+    FP: 'error_fp',
+    LOCALIZATION: 'error_localization',
+    ANOMALY: 'reason_anomaly',
+    LOW_CONF: 'error_low_conf',
+  };
   return (
-    <SectionCard title="Error distribution" sx={{ flex: '1 1 320px' }}>
+    <SectionCard
+      title="Error distribution"
+      helpTerm="error_index"
+      sx={{ flex: '1 1 320px' }}
+    >
       {res.error ? <ErrorNote error={res.error} /> : null}
       {res.loading && !res.data ? <LoadingBox /> : null}
       {res.data ? (
@@ -114,6 +141,7 @@ function ErrorDistribution({ runId, refreshKey }: { runId: string; refreshKey: n
               <HBar
                 key={t}
                 label={t}
+                term={ERROR_TERM_KEYS[t]}
                 value={count}
                 max={max}
                 color={ERROR_TYPE_COLORS[t]}
@@ -135,7 +163,11 @@ function QualityFunnel({ runId, refreshKey }: { runId: string; refreshKey: numbe
   const max = stages.length ? Math.max(...stages.map((s) => s.count)) : 1;
   const est = funnel.data?.estimated_precision ?? null;
   return (
-    <SectionCard title="Quality funnel" sx={{ flex: '1 1 420px' }}>
+    <SectionCard
+      title="Quality funnel"
+      help="How the population narrows toward human verification: Objects Evaluated → Containers → Potential Errors (error index) → High-Confidence Errors → Review Sample → Human Verified. Each stage shows its count and share of the population; the precision estimate at the bottom carries a Wilson 95% CI from the review sample."
+      sx={{ flex: '1 1 420px' }}
+    >
       {funnel.error ? <ErrorNote error={funnel.error} /> : null}
       {funnel.loading && !funnel.data ? <LoadingBox /> : null}
       {funnel.data ? (
@@ -199,7 +231,11 @@ function QualityTrend({ runs }: { runs: EvaluationRunInfo[] }) {
   const yFor = (v: number) => padT + (1 - (v - lo) / Math.max(1e-9, hi - lo)) * (height - padT - padB);
 
   return (
-    <SectionCard title="Quality trend across published runs" sx={{ flex: '1 1 460px' }}>
+    <SectionCard
+      title="Quality trend across published runs"
+      help="Headline precision / recall / safety recall for every published evaluation run on this population, ordered by creation time. A dip in the newest point is exactly what the Compare tab's promotion policy guards against."
+      sx={{ flex: '1 1 460px' }}
+    >
       {published.length < 2 ? (
         <Typography variant="body2" sx={{ color: '#8a949e' }}>
           {published.length === 0
@@ -277,9 +313,10 @@ function DistributionsCard({ runId, refreshKey }: { runId: string; refreshKey: n
       title={
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <span>Distributions</span>
-          <ExactnessTag approx />
+          <ExactnessTag approx method="quantile_sketch" />
         </Box>
       }
+      help="Population-scale distributions from mergeable sketches: confidence and IoU histograms come from fixed-bin quantile sketches (p10/p50/p90 markers), container cardinality from a HyperLogLog. Approximate by design — exact counts shown alongside where available."
       sx={{ flex: '1 1 320px' }}
     >
       {dist.error ? <ErrorNote error={dist.error} /> : null}
@@ -308,7 +345,7 @@ function DistributionsCard({ runId, refreshKey }: { runId: string; refreshKey: n
                 <Typography variant="caption" sx={{ color: '#8a949e' }}>
                   Containers (HLL)
                 </Typography>
-                <ExactnessTag approx />
+                <ExactnessTag approx method="hll" />
               </Box>
               <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 700 }}>
                 {d.containers_hll_estimate === null ? '—' : fmtCompact(d.containers_hll_estimate)}

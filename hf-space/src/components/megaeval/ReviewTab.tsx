@@ -17,19 +17,24 @@ import { ClipboardList, UserCheck } from 'lucide-react';
 import type { MetricEstimate, ReviewState, SamplingFunnel, StratumPlan } from '../../types/megaeval';
 import { executeReview, fmtCompact, planReview } from '../../services/megaeval';
 import { ErrorNote, HBar, SectionCard, fmtPct } from '../labeleval/shared';
+import { HeadCell } from '../help/InfoTip';
 
-const FUNNEL_STAGES: Array<{ key: keyof SamplingFunnel; label: string }> = [
-  { key: 'population_objects', label: 'Population objects' },
-  { key: 'containers', label: 'Containers' },
-  { key: 'suspicious_containers', label: 'Suspicious containers' },
-  { key: 'candidate_pool', label: 'Candidate pool' },
-  { key: 'statistically_selected', label: 'Statistically selected' },
-  { key: 'reviewed', label: 'Reviewed' },
+const FUNNEL_STAGES: Array<{ key: keyof SamplingFunnel; label: string; info: string }> = [
+  { key: 'population_objects', label: 'Population objects', info: 'Every evaluated object in this run — the frame the estimates generalize to.' },
+  { key: 'containers', label: 'Containers', info: 'Physical scene groupings containing those objects.' },
+  { key: 'suspicious_containers', label: 'Suspicious containers', info: 'Containers with elevated risk score — dense errors, anomalies or safety-critical failures.' },
+  { key: 'candidate_pool', label: 'Candidate pool', info: 'All review-eligible labels: error-index hits, low-confidence, anomalies, safety-critical.' },
+  { key: 'statistically_selected', label: 'Statistically selected', info: 'The stratified risk-weighted sample actually drawn from the candidate pool.' },
+  { key: 'reviewed', label: 'Reviewed', info: 'Sampled labels a human has actually reviewed so far.' },
 ];
 
 function EstimateCard({ label, est }: { label: string; est: MetricEstimate }) {
   return (
-    <SectionCard title={`${label} estimate`} sx={{ flex: '1 1 420px' }}>
+    <SectionCard
+      title={`${label} estimate`}
+      help={`Human-calibrated ${label.toLowerCase()} for the whole run: per-stratum review proportions (with Wilson 95% CIs) are combined into one population estimate weighted by stratum size. N = stratum population, n = reviews done, p = observed proportion.`}
+      sx={{ flex: '1 1 420px' }}
+    >
       <Typography variant="h5" sx={{ fontWeight: 800, color: '#a5d6a7' }}>
         {fmtPct(est.estimate)}
         <Typography component="span" variant="body2" sx={{ color: '#8a949e', ml: 1 }}>
@@ -43,11 +48,21 @@ function EstimateCard({ label, est }: { label: string; est: MetricEstimate }) {
       <Table size="small">
         <TableHead>
           <TableRow>
-            <TableCell>Stratum</TableCell>
-            <TableCell align="right">N</TableCell>
-            <TableCell align="right">n</TableCell>
-            <TableCell align="right">p</TableCell>
-            <TableCell align="right">Wilson 95% CI</TableCell>
+            <TableCell>
+              <HeadCell label="Stratum" term="stratified_sampling" />
+            </TableCell>
+            <TableCell align="right">
+              <HeadCell label="N" title="N" detail="Total population objects in this stratum." />
+            </TableCell>
+            <TableCell align="right">
+              <HeadCell label="n" title="n" detail="Number of human reviews drawn from this stratum." />
+            </TableCell>
+            <TableCell align="right">
+              <HeadCell label="p" title="p" detail="Observed proportion in the reviewed sample (e.g. fraction of reviewed labels confirmed correct)." />
+            </TableCell>
+            <TableCell align="right">
+              <HeadCell label="Wilson 95% CI" term="wilson_ci" />
+            </TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -77,13 +92,23 @@ function EstimateCard({ label, est }: { label: string; est: MetricEstimate }) {
 function PlanTable({ title, strata }: { title: string; strata: Record<string, StratumPlan> }) {
   const entries = Object.entries(strata);
   return (
-    <SectionCard title={title} sx={{ flex: '1 1 340px' }}>
+    <SectionCard
+      title={title}
+      help="Review budget allocation per stratum: bigger and riskier strata receive more reviews (size × risk weighting). Execute the plan to turn allocations into verdicts and confidence intervals."
+      sx={{ flex: '1 1 340px' }}
+    >
       <Table size="small">
         <TableHead>
           <TableRow>
-            <TableCell>Stratum</TableCell>
-            <TableCell align="right">N</TableCell>
-            <TableCell align="right">Allocated</TableCell>
+            <TableCell>
+              <HeadCell label="Stratum" term="stratified_sampling" />
+            </TableCell>
+            <TableCell align="right">
+              <HeadCell label="N" title="N" detail="Total population objects in this stratum." />
+            </TableCell>
+            <TableCell align="right">
+              <HeadCell label="Allocated" title="Allocated" detail="Human reviews budgeted for this stratum by the risk-weighted allocation." />
+            </TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -135,6 +160,7 @@ export default function ReviewTab({
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <SectionCard
         title="Statistical review sampling"
+        helpTerm="stratified_sampling"
         action={
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Button
@@ -176,6 +202,7 @@ export default function ReviewTab({
                   <HBar
                     key={s.key}
                     label={s.label}
+                    info={s.info}
                     value={funnel[s.key]}
                     max={max}
                     color={s.key === 'reviewed' ? '#66bb6a' : '#4fc3f7'}

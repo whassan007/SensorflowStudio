@@ -18,24 +18,25 @@ interface NodeDef {
   x: number;
   y: number;
   aliases: string[];
+  desc: string;
 }
 
 const NODE_W = 116;
 const NODE_H = 52;
 
 const NODES: NodeDef[] = [
-  { id: 'input', label: 'Input', x: 70, y: 235, aliases: ['input', 'ingest', 'sensor'] },
-  { id: 'autolabels', label: 'Auto Labels', x: 215, y: 235, aliases: ['auto_label', 'auto-label', 'autolabel', 'labeling', 'labeler'] },
-  { id: 'queue', label: 'Queue', x: 360, y: 235, aliases: ['queue', 'broker'] },
-  { id: 'anomaly', label: 'Anomaly Detection', x: 505, y: 100, aliases: ['anomaly'] },
-  { id: 'regression', label: 'Regression', x: 505, y: 235, aliases: ['regression'] },
-  { id: 'grader', label: 'Grader', x: 505, y: 370, aliases: ['grader', 'grading', 'consensus'] },
-  { id: 'validation', label: 'Quality Validation', x: 655, y: 235, aliases: ['validation', 'quality', 'gate'] },
-  { id: 'rare', label: 'Rare Events', x: 805, y: 100, aliases: ['rare'] },
-  { id: 'autograded', label: 'Auto-Graded', x: 805, y: 235, aliases: ['auto_grad', 'auto-grad', 'autograd', 'triage'] },
-  { id: 'review', label: 'Review (HITL)', x: 805, y: 370, aliases: ['review', 'hitl'] },
-  { id: 'relabel', label: 'Re-Label', x: 950, y: 370, aliases: ['relabel', 're-label', 're_label'] },
-  { id: 'training', label: 'Training', x: 1095, y: 235, aliases: ['train'] },
+  { id: 'input', label: 'Input', x: 70, y: 235, aliases: ['input', 'ingest', 'sensor'], desc: 'Ingests raw sensor data: camera frames, LiDAR sweeps, radar and ego-pose. Everything downstream evaluates labels produced on these frames.' },
+  { id: 'autolabels', label: 'Auto Labels', x: 215, y: 235, aliases: ['auto_label', 'auto-label', 'autolabel', 'labeling', 'labeler'], desc: 'The current model auto-labels each frame with 3D boxes, classes, confidences and track IDs. These labels are candidates, not truth — the rest of the pipeline exists to grade them.' },
+  { id: 'queue', label: 'Queue', x: 360, y: 235, aliases: ['queue', 'broker'], desc: 'Message queue distributing labeled frames to the three evaluation engines. Depth per stage is visible in the Queue Status card below.' },
+  { id: 'anomaly', label: 'Anomaly Detection', x: 505, y: 100, aliases: ['anomaly'], desc: 'Ensemble anomaly scoring: geometric plausibility, point-cloud statistics, temporal consistency. High scores flag physically implausible or novel labels.' },
+  { id: 'regression', label: 'Regression', x: 505, y: 235, aliases: ['regression'], desc: 'Compares the labeling model against its registered baseline. Detected regressions block auto-verification for affected labels.' },
+  { id: 'grader', label: 'Grader', x: 505, y: 370, aliases: ['grader', 'grading', 'consensus'], desc: 'Multiple independent grader models score each label; their agreement (consensus) is a confidence signal. Low consensus routes to human review.' },
+  { id: 'validation', label: 'Quality Validation', x: 655, y: 235, aliases: ['validation', 'quality', 'gate'], desc: 'The quality gate: combines all engine evidence and applies the versioned quality policy thresholds, gate by gate, to produce a triage decision.' },
+  { id: 'rare', label: 'Rare Events', x: 805, y: 100, aliases: ['rare'], desc: 'Mines the long tail: high-rarity, high-severity events are surfaced for review and prioritized for training data (they are worth the most).' },
+  { id: 'autograded', label: 'Auto-Graded', x: 805, y: 235, aliases: ['auto_grad', 'auto-grad', 'autograd', 'triage'], desc: 'Labels that passed every gate with margin — verified automatically without human involvement. The automation-rate numerator.' },
+  { id: 'review', label: 'Review (HITL)', x: 805, y: 370, aliases: ['review', 'hitl'], desc: 'Human-in-the-loop queue: flagged labels wait here for a reviewer verdict, ordered by severity. The badge shows the current queue depth.' },
+  { id: 'relabel', label: 'Re-Label', x: 950, y: 370, aliases: ['relabel', 're-label', 're_label'], desc: 'Reviewer corrections are applied here, then fed back into Quality Validation — corrected labels are never trusted without re-passing the gates.' },
+  { id: 'training', label: 'Training', x: 1095, y: 235, aliases: ['train'], desc: 'Verified labels become training data for the next model version, closing the flywheel. Only verified data ever reaches this node.' },
 ];
 
 const EDGES: Array<{ from: string; to: string; label?: 'verified' }> = [
@@ -97,6 +98,7 @@ export default function PipelineArchitecturePage() {
 
       <SectionCard
         title="Pipeline Architecture"
+        help="Live map of every service in the label-quality pipeline, left to right: sensor input → auto-labeling → fan-out to three parallel evaluation engines (anomaly, regression, grader) → quality gate → routing (auto-graded / human review / rare events) → re-label loop → training. Node border color is service health; the counter under each node is processed/total; click a node for its role, live status and process-unit consumption."
         action={
           pipeline ? (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -226,6 +228,11 @@ export default function PipelineArchitecturePage() {
               <X size={18} />
             </IconButton>
           </Box>
+          {selectedNode ? (
+            <Typography variant="body2" sx={{ color: '#aab4be', mb: 1.5 }}>
+              {selectedNode.desc}
+            </Typography>
+          ) : null}
           {selectedService ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               <StatusChip status={selectedService.state} />

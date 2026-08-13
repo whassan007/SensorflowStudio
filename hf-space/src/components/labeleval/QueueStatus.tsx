@@ -18,6 +18,7 @@ export default function QueueStatus({ queue: queueProp }: { queue?: QueueStatusT
   return (
     <SectionCard
       title="Queue Status"
+      help="Live state of the message queue feeding the pipeline stages. Pending = waiting for a worker, Processing = in flight, Failed = errored messages that will be retried or dead-lettered. Depth-by-topic shows which stage is the current bottleneck."
       action={queue ? <Chip size="small" label={`backend: ${queue.backend}`} sx={{ bgcolor: '#232a31' }} /> : null}
     >
       {!queue && error ? <ErrorNote error={error} /> : null}

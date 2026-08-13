@@ -13,6 +13,8 @@ import { CheckCircle2, AlertTriangle, OctagonAlert } from 'lucide-react';
 import type { ErrorType, HistogramSketch, QueryMeta, QueryRow } from '../../types/megaeval';
 import { fmtCompact } from '../../services/megaeval';
 import { fmtPct } from '../labeleval/shared';
+import { GLOSSARY, glossaryKeyForStatus } from '../../content/glossary';
+import { ExplainTip, GlossaryContent, InfoDot } from '../help/InfoTip';
 
 // ---------------------------------------------------------------- query provenance
 
@@ -33,11 +35,20 @@ export function QueryBadge({ meta }: { meta: QueryMeta | null | undefined }) {
   if (!meta) return null;
   const colors = SOURCE_COLORS[meta.source] ?? SOURCE_COLORS.cube;
   const label = `${meta.source} · ${fmtLatency(meta.latency_ms)}`;
+  const entry = GLOSSARY.query_source;
   return (
     <Tooltip
-      title={`source=${meta.source} · cache_hit=${meta.cache_hit ? 'yes' : 'no'} · cells=${meta.cells_touched}${
-        meta.exact ? ' · exact' : ` · approx (${meta.approximate_fields.join(', ') || 'sketch'})`
-      }`}
+      title={
+        <Box sx={{ maxWidth: 340 }}>
+          <GlossaryContent entry={entry} />
+          <Typography variant="caption" sx={{ color: '#8a949e', display: 'block', mt: 0.5, fontFamily: 'monospace' }}>
+            {`this query: source=${meta.source} · cache_hit=${meta.cache_hit ? 'yes' : 'no'} · cells=${meta.cells_touched}${
+              meta.exact ? ' · exact' : ` · approx (${meta.approximate_fields.join(', ') || 'sketch'})`
+            }`}
+          </Typography>
+        </Box>
+      }
+      slotProps={{ tooltip: { sx: { bgcolor: '#1d242c', border: '1px solid #2f3944', p: 1.25 } } }}
     >
       <Chip
         size="small"
@@ -55,21 +66,33 @@ export function QueryBadge({ meta }: { meta: QueryMeta | null | undefined }) {
   );
 }
 
-/** Exact vs sketch-derived honesty tag. */
-export function ExactnessTag({ approx, sx }: { approx: boolean; sx?: object }) {
+/** Exact vs sketch-derived honesty tag. Hover explains how the estimate was made. */
+export function ExactnessTag({
+  approx,
+  sx,
+  method,
+}: {
+  approx: boolean;
+  sx?: object;
+  /** Optional glossary key of the estimator (hll, quantile_sketch, wilson_ci…). */
+  method?: string;
+}) {
   return (
-    <Chip
-      size="small"
-      label={approx ? 'approx' : 'exact'}
-      sx={{
-        height: 16,
-        fontSize: 9.5,
-        fontFamily: 'monospace',
-        bgcolor: approx ? '#4a3b12' : '#12303f',
-        color: approx ? '#ffd54f' : '#81d4fa',
-        ...sx,
-      }}
-    />
+    <ExplainTip term={approx ? method ?? 'approx_vs_exact' : 'approx_vs_exact'}>
+      <Chip
+        size="small"
+        label={approx ? 'approx' : 'exact'}
+        sx={{
+          height: 16,
+          fontSize: 9.5,
+          fontFamily: 'monospace',
+          cursor: 'help',
+          bgcolor: approx ? '#4a3b12' : '#12303f',
+          color: approx ? '#ffd54f' : '#81d4fa',
+          ...sx,
+        }}
+      />
+    </ExplainTip>
   );
 }
 
@@ -133,13 +156,23 @@ export const OUTCOME_COLORS: Record<string, { bg: string; fg: string }> = {
 
 export function OutcomeChip({ outcome }: { outcome: string }) {
   const colors = OUTCOME_COLORS[outcome] ?? { bg: '#37474f', fg: '#cfd8dc' };
-  return (
+  const chip = (
     <Chip
       size="small"
       label={outcome}
-      sx={{ height: 18, fontSize: 10, fontWeight: 700, fontFamily: 'monospace', bgcolor: colors.bg, color: colors.fg }}
+      sx={{
+        height: 18,
+        fontSize: 10,
+        fontWeight: 700,
+        fontFamily: 'monospace',
+        cursor: 'help',
+        bgcolor: colors.bg,
+        color: colors.fg,
+      }}
     />
   );
+  const key = glossaryKeyForStatus(outcome);
+  return key ? <ExplainTip term={key}>{chip}</ExplainTip> : chip;
 }
 
 export const ERROR_TYPE_COLORS: Record<ErrorType, string> = {
@@ -162,23 +195,64 @@ const RUN_STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
   failed: { bg: '#b71c1c', fg: '#ffcdd2' },
 };
 
+const RUN_STATUS_EXPLANATIONS: Record<string, string> = {
+  created: 'Run record exists but has not been queued yet.',
+  queued: 'Waiting for evaluation workers to pick it up.',
+  running: 'Workers are scoring population partitions and emitting partial statistics.',
+  reducing: 'Merging per-partition partial statistics into global aggregates.',
+  materializing: 'Writing the metric cube, error index and sketches to storage.',
+  published: 'Artifacts are live: this run is queryable across the Command Center.',
+  failed: 'The run aborted; inspect the run record for the failing stage.',
+};
+
 export function RunStatusChip({ status }: { status: string }) {
   const colors = RUN_STATUS_COLORS[status] ?? { bg: '#37474f', fg: '#cfd8dc' };
   return (
-    <Chip
-      size="small"
-      label={status.toUpperCase()}
-      sx={{ height: 20, fontSize: 10, fontWeight: 700, letterSpacing: 0.5, bgcolor: colors.bg, color: colors.fg }}
-    />
+    <ExplainTip
+      title={`Run status: ${status.toUpperCase()}`}
+      detail={`${RUN_STATUS_EXPLANATIONS[status] ?? ''} Lifecycle: created → queued → running → reducing → materializing → published.`}
+    >
+      <Chip
+        size="small"
+        label={status.toUpperCase()}
+        sx={{
+          height: 20,
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: 0.5,
+          cursor: 'help',
+          bgcolor: colors.bg,
+          color: colors.fg,
+        }}
+      />
+    </ExplainTip>
   );
 }
 
 // ---------------------------------------------------------------- container status
 
+const CONTAINER_STATUS_EXPLANATIONS: Record<string, string> = {
+  ok: 'No elevated error signal: error counts and risk score within normal range for this run.',
+  warn: 'Elevated risk: notable error density or anomaly presence — worth a look.',
+  critical: 'High risk: dense errors and/or safety-critical failures concentrated in this container.',
+};
+
 export function ContainerStatusIcon({ status }: { status: 'ok' | 'warn' | 'critical' }) {
-  if (status === 'critical') return <OctagonAlert size={15} color="#ef5350" />;
-  if (status === 'warn') return <AlertTriangle size={15} color="#ffa726" />;
-  return <CheckCircle2 size={15} color="#66bb6a" />;
+  const icon =
+    status === 'critical' ? (
+      <OctagonAlert size={15} color="#ef5350" />
+    ) : status === 'warn' ? (
+      <AlertTriangle size={15} color="#ffa726" />
+    ) : (
+      <CheckCircle2 size={15} color="#66bb6a" />
+    );
+  return (
+    <ExplainTip title={`Container status: ${status}`} detail={CONTAINER_STATUS_EXPLANATIONS[status]}>
+      <Box component="span" sx={{ display: 'inline-flex', cursor: 'help' }}>
+        {icon}
+      </Box>
+    </ExplainTip>
+  );
 }
 
 // ---------------------------------------------------------------- deltas
@@ -285,11 +359,12 @@ export function HistogramSparkline({
 
 // ---------------------------------------------------------------- misc
 
-export function CompactStat({ label, value }: { label: string; value: ReactNode }) {
+export function CompactStat({ label, value, term, info }: { label: string; value: ReactNode; term?: string; info?: string }) {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minWidth: 90 }}>
       <Typography variant="caption" sx={{ color: '#8a949e', textTransform: 'uppercase', fontSize: 9.5 }}>
         {label}
+        {term || info ? <InfoDot term={term} title={info ? label : undefined} detail={info} size={10} /> : null}
       </Typography>
       <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 700 }}>
         {value}

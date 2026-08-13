@@ -29,6 +29,7 @@ export default function RunProgressCard({ progress }: { progress: RunProgress })
           <RunStatusChip status={progress.status} />
         </Box>
       }
+      helpTerm="sse"
     >
       <LinearProgress
         variant="determinate"
@@ -36,18 +37,20 @@ export default function RunProgressCard({ progress }: { progress: RunProgress })
         sx={{ height: 10, borderRadius: 1, mb: 1.5, bgcolor: '#232a31' }}
       />
       <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-        <CompactStat label="Progress" value={`${pct.toFixed(1)}%`} />
+        <CompactStat label="Progress" value={`${pct.toFixed(1)}%`} info="Share of population partitions fully evaluated." />
         <CompactStat
           label="Objects"
           value={`${fmtCompact(progress.objects_processed)} / ${fmtCompact(progress.objects_total)}`}
+          info="Objects scored so far vs total in the population."
         />
         <CompactStat
           label="Partitions"
           value={`${progress.partitions_done} / ${progress.partitions_total}`}
+          term="partition"
         />
-        <CompactStat label="Workers" value={progress.workers} />
-        <CompactStat label="Throughput" value={`${fmtCompact(progress.throughput_objs_per_s)} objs/s`} />
-        <CompactStat label="ETA" value={fmtEta(progress.eta_s)} />
+        <CompactStat label="Workers" value={progress.workers} info="Parallel evaluation workers consuming the partition queue." />
+        <CompactStat label="Throughput" value={`${fmtCompact(progress.throughput_objs_per_s)} objs/s`} term="throughput" />
+        <CompactStat label="ETA" value={fmtEta(progress.eta_s)} info="Remaining objects divided by current throughput." />
       </Box>
       {progress.error ? (
         <Typography variant="body2" sx={{ color: '#ef5350', mt: 1.5, fontFamily: 'monospace' }}>

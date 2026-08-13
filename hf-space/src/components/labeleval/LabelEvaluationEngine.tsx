@@ -58,7 +58,10 @@ function EngineCard({
 
 export default function LabelEvaluationEngine({ pipeline }: { pipeline: PipelineStateResponse | null }) {
   return (
-    <SectionCard title="Label Evaluation Engine — three independent evidence sources">
+    <SectionCard
+      title="Label Evaluation Engine — three independent evidence sources"
+      help="Live status of the three evaluation services. Each emits independent evidence per label (anomaly score, regression verdict, grader consensus) that Triage gates separately — evidence is never blended into one score. Process units track each engine's compute cost."
+    >
       <Typography variant="body2" sx={{ color: '#8a949e', mb: 1.5 }}>
         Each engine produces <strong>independent evidence</strong> that feeds the Quality Gate. There is never a single
         blended score: a label is only verified when every applicable gate passes on its own evidence.

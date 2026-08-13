@@ -121,7 +121,7 @@ export default function TrainingPage() {
         </Box>
 
         <Box sx={{ flex: '1 1 380px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <SectionCard title="Dataset Lineage">
+          <SectionCard title="Dataset Lineage" helpTerm="lineage">
             {lineage ? (
               <>
                 <Typography variant="body2" sx={{ mb: 1 }}>
@@ -150,7 +150,10 @@ export default function TrainingPage() {
             )}
           </SectionCard>
 
-          <SectionCard title="Train a New Model">
+          <SectionCard
+            title="Train a New Model"
+            help="Launches a training job on the selected dataset. Only verified labels are used — unverified data would teach the model its own mistakes. The resulting model version registers in Models and gets evaluated back through the platform."
+          >
             {submitError ? (
               <Alert severity="error" variant="outlined" onClose={() => setSubmitError(null)} sx={{ mb: 1 }}>
                 {submitError}
@@ -225,10 +228,14 @@ export default function TrainingPage() {
               sx={{ height: 8, borderRadius: 1, mb: 2 }}
             />
             <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
-              <MetricCard label="Loss" value={fmtNum(activeJob.loss, 4)} />
-              <MetricCard label="Rare recall" value={fmtPct(activeJob.rare_recall)} accent="#ef5350" />
-              <MetricCard label="Safety recall" value={fmtPct(activeJob.safety_recall)} accent="#ffa726" />
-              <MetricCard label="Process units" value={fmtInt(activeJob.process_units)} />
+              <MetricCard
+                label="Loss"
+                value={fmtNum(activeJob.loss, 4)}
+                info="Training objective value — should trend down as the model fits the data. Plateaus or spikes suggest learning-rate or data problems."
+              />
+              <MetricCard label="Rare recall" value={fmtPct(activeJob.rare_recall)} accent="#ef5350" term="rare_recall" />
+              <MetricCard label="Safety recall" value={fmtPct(activeJob.safety_recall)} accent="#ffa726" term="safety_recall" />
+              <MetricCard label="Process units" value={fmtInt(activeJob.process_units)} term="process_units" />
             </Box>
             <TrainingLogViewer logs={activeJob.logs} />
           </>

@@ -12,6 +12,7 @@ import Typography from '@mui/material/Typography';
 import { AlertTriangle, ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
 import type { CopilotExplainRequest, RegressionEntry, RegressionResponse } from '../../types/labeleval';
 import { SectionCard, fmtNum } from './shared';
+import { ExplainTip, HeadCell } from '../help/InfoTip';
 
 function DeltaTable({ entry }: { entry: RegressionEntry }) {
   return (
@@ -21,8 +22,12 @@ function DeltaTable({ entry }: { entry: RegressionEntry }) {
           <TableCell>Metric</TableCell>
           <TableCell align="right">Baseline</TableCell>
           <TableCell align="right">Current</TableCell>
-          <TableCell align="right">Delta</TableCell>
-          <TableCell align="right">Tolerance</TableCell>
+          <TableCell align="right">
+            <HeadCell label="Delta" title="Delta" detail="Current minus baseline. Red rows breached the tolerance in the harmful direction." />
+          </TableCell>
+          <TableCell align="right">
+            <HeadCell label="Tolerance" title="Tolerance" detail="Maximum allowed degradation for this metric before it counts as a regression (from the comparison policy)." />
+          </TableCell>
         </TableRow>
       </TableHead>
       <TableBody>
@@ -78,9 +83,11 @@ export default function RegressionTracking({
         >
           <AlertTriangle size={28} />
           <Box>
-            <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: 1 }}>
-              REGRESSION DETECTED
-            </Typography>
+            <ExplainTip term="regression_detected">
+              <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: 1, cursor: 'help', display: 'inline-block' }}>
+                REGRESSION DETECTED
+              </Typography>
+            </ExplainTip>
             <Typography variant="body2">
               The current model performs worse than its baseline beyond configured tolerances. Affected labels are
               blocked from auto-verification until resolved.
@@ -89,10 +96,14 @@ export default function RegressionTracking({
         </Box>
       ) : null}
 
-      <SectionCard title="Regression Tracking — model vs. baseline">
+      <SectionCard
+        title="Regression Tracking — model vs. baseline"
+        help="Each row is one model-version comparison against its baseline on one dataset. Expand a row for the per-metric deltas and the tolerance each was allowed. Rows marked REGRESSED breached at least one tolerance; hover the chip for what that implies. Copilot can narrate the likely cause."
+      >
         {!regression || regression.entries.length === 0 ? (
           <Typography variant="body2" sx={{ color: '#8a949e' }}>
-            No regression comparisons yet — they appear after evaluating a model that has a baseline.
+            No regression comparisons yet — they appear automatically after the pipeline evaluates a model version that
+            has a registered baseline to compare against.
           </Typography>
         ) : (
           <Table size="small">
@@ -136,15 +147,25 @@ export default function RegressionTracking({
                       <TableCell sx={{ fontSize: 12 }}>{e.affected_classes.join(', ') || '—'}</TableCell>
                       <TableCell sx={{ fontSize: 12 }}>{e.affected_scenarios.join(', ') || '—'}</TableCell>
                       <TableCell>
-                        <Chip
-                          size="small"
-                          label={e.regression_detected ? 'REGRESSED' : 'OK'}
-                          sx={{
-                            bgcolor: e.regression_detected ? '#b71c1c' : '#1b5e20',
-                            color: e.regression_detected ? '#ffcdd2' : '#a5d6a7',
-                            fontWeight: 700,
-                          }}
-                        />
+                        <ExplainTip
+                          title={e.regression_detected ? 'REGRESSED' : 'OK'}
+                          detail={
+                            e.regression_detected
+                              ? 'At least one metric dropped beyond its tolerance vs the baseline. Expand the row for the exact deltas; affected labels are blocked from auto-verification while this stands.'
+                              : 'All compared metrics stayed within their configured tolerances against the baseline.'
+                          }
+                        >
+                          <Chip
+                            size="small"
+                            label={e.regression_detected ? 'REGRESSED' : 'OK'}
+                            sx={{
+                              bgcolor: e.regression_detected ? '#b71c1c' : '#1b5e20',
+                              color: e.regression_detected ? '#ffcdd2' : '#a5d6a7',
+                              fontWeight: 700,
+                              cursor: 'help',
+                            }}
+                          />
+                        </ExplainTip>
                       </TableCell>
                       <TableCell onClick={(ev) => ev.stopPropagation()}>
                         {e.regression_detected ? (

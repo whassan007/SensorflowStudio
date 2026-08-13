@@ -14,6 +14,7 @@ import Typography from '@mui/material/Typography';
 import type { ModelSummary } from '../types/labeleval';
 import { getModels, usePoll } from '../services/labeleval';
 import { SectionCard, StatusChip, LoadingBox, ErrorNote, MetricCard, fmtPct } from '../components/labeleval/shared';
+import { HeadCell } from '../components/help/InfoTip';
 
 export default function ModelsPage() {
   const models = usePoll(getModels, 10000);
@@ -24,10 +25,14 @@ export default function ModelsPage() {
       {models.loading && !models.data ? <LoadingBox label="Loading models…" /> : null}
       {models.error && !models.data ? <ErrorNote error={models.error} /> : null}
 
-      <SectionCard title={`Models (${models.data?.models.length ?? 0})`}>
+      <SectionCard
+        title={`Models (${models.data?.models.length ?? 0})`}
+        help="Every registered model version with its headline evaluation metrics and regression verdict against its baseline. Hover column headers for metric definitions and status chips for what each verdict means. Click a row for the full metric card."
+      >
         {!models.data || models.data.models.length === 0 ? (
           <Typography variant="body2" sx={{ color: '#8a949e' }}>
-            No models registered yet — train one from the Training page.
+            No models registered yet — train one from the Training page (Training → Train a New Model). Each completed
+            job registers a model version here with its evaluation metrics.
           </Typography>
         ) : (
           <Table size="small">
@@ -36,12 +41,28 @@ export default function ModelsPage() {
                 <TableCell>Version</TableCell>
                 <TableCell>Name</TableCell>
                 <TableCell>Trained on</TableCell>
-                <TableCell align="right">Precision</TableCell>
-                <TableCell align="right">Recall</TableCell>
-                <TableCell align="right">mAP 3D</TableCell>
-                <TableCell align="right">Safety recall</TableCell>
-                <TableCell align="right">Rare recall</TableCell>
-                <TableCell>Regression</TableCell>
+                <TableCell align="right">
+                  <HeadCell label="Precision" term="precision" />
+                </TableCell>
+                <TableCell align="right">
+                  <HeadCell label="Recall" term="recall" />
+                </TableCell>
+                <TableCell align="right">
+                  <HeadCell label="mAP 3D" term="map_3d" />
+                </TableCell>
+                <TableCell align="right">
+                  <HeadCell label="Safety recall" term="safety_recall" />
+                </TableCell>
+                <TableCell align="right">
+                  <HeadCell label="Rare recall" term="rare_recall" />
+                </TableCell>
+                <TableCell>
+                  <HeadCell
+                    label="Regression"
+                    title="Regression status"
+                    detail="Verdict from comparing this model against its baseline: REGRESSED if any metric dropped beyond its tolerance, OK otherwise. See the Regression page for the per-metric deltas."
+                  />
+                </TableCell>
                 <TableCell>Status</TableCell>
               </TableRow>
             </TableHead>
@@ -93,12 +114,12 @@ export default function ModelsPage() {
                 {new Date(selected.created_at).toLocaleString()} · status {selected.status}
               </Typography>
               <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
-                <MetricCard label="Precision" value={fmtPct(selected.metrics.precision)} />
-                <MetricCard label="Recall" value={fmtPct(selected.metrics.recall)} />
-                <MetricCard label="F1" value={fmtPct(selected.metrics.f1)} />
-                <MetricCard label="mAP 3D" value={fmtPct(selected.metrics.map_3d)} />
-                <MetricCard label="Safety recall" value={fmtPct(selected.metrics.safety_critical_recall)} accent="#ffa726" />
-                <MetricCard label="Rare recall" value={fmtPct(selected.metrics.rare_recall)} accent="#ef5350" />
+                <MetricCard label="Precision" value={fmtPct(selected.metrics.precision)} term="precision" />
+                <MetricCard label="Recall" value={fmtPct(selected.metrics.recall)} term="recall" />
+                <MetricCard label="F1" value={fmtPct(selected.metrics.f1)} term="f1" />
+                <MetricCard label="mAP 3D" value={fmtPct(selected.metrics.map_3d)} term="map_3d" />
+                <MetricCard label="Safety recall" value={fmtPct(selected.metrics.safety_critical_recall)} accent="#ffa726" term="safety_recall" />
+                <MetricCard label="Rare recall" value={fmtPct(selected.metrics.rare_recall)} accent="#ef5350" term="rare_recall" />
               </Box>
               <StatusChip status={selected.regression_status} />
             </>

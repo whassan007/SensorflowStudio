@@ -1,0 +1,27 @@
+# Retro (Agentic Retrospective Safety Analyzer) dependencies.
+#
+# Hard requirements — already part of the platform environment:
+pydantic>=2.6
+httpx>=0.27
+numpy>=1.26
+fastapi>=0.110
+
+# Optional — the package degrades gracefully when these are absent:
+#   chromadb        vector store + embedder for the safety-case RAG.
+#                   Fallback: deterministic hashed TF-IDF embedder + numpy
+#                   cosine store with the same interface (rag/embedder.py,
+#                   rag/store.py).
+# chromadb>=0.5
+#
+#   pydantic-ai     agent orchestration. Fallback: internal typed tool loop
+#                   (agent/orchestrator.py) with the same contracts.
+# pydantic-ai-slim>=0.0.30
+#
+#   mcp             exposes the tool registry as a real MCP server (bonus).
+#                   Fallback: the audited registry itself is the MCP-style
+#                   boundary (tools/registry.py).
+# mcp>=1.0
+
+# GPU-host only (NOT installable/runnable on this macOS dev machine):
+#   vllm>=0.6       # CUDA/ROCm Linux hosts; see inference/vllm_server/
+#   torch           # install the wheel matching your GPU stack

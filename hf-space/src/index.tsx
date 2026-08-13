@@ -1,20 +1,15 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import CssBaseline from '@mui/material/CssBaseline';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { ThemeProvider } from '@mui/material/styles';
 import App from './App';
 import './styles/globals.css';
+// Shared design tokens + theme factory (src/theme.ts): same palette values as
+// before, plus semantic tokens, motion durations, skeleton defaults and
+// keyboard-focus visibility.
+import { buildTheme } from './theme';
 
-const theme = createTheme({
-  palette: {
-    mode: 'dark',
-    background: { default: '#101418', paper: '#161b21' },
-    primary: { main: '#4fc3f7' },
-  },
-  typography: {
-    fontFamily: "'Inter', 'Helvetica Neue', Arial, sans-serif",
-  },
-});
+const theme = buildTheme();
 
 const container = document.getElementById('root');
 if (!container) throw new Error('Root element missing');

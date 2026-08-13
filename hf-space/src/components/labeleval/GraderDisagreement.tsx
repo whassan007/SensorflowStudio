@@ -3,6 +3,7 @@ import Chip from '@mui/material/Chip';
 import Typography from '@mui/material/Typography';
 import type { QualityMetrics } from '../../types/labeleval';
 import { SectionCard, HBar, fmtPct, pctFraction } from './shared';
+import { Term } from '../help/InfoTip';
 
 function ConsensusGauge({ value }: { value: number | null }) {
   const frac = pctFraction(value);
@@ -52,7 +53,10 @@ export default function GraderDisagreement({
   const consensus = metrics?.global.grader_consensus ?? null;
   const frac = pctFraction(consensus);
   return (
-    <SectionCard title={`Grader Disagreement — ${graderCount} graders`}>
+    <SectionCard
+      title={`Grader Disagreement — ${graderCount} graders`}
+      helpTerm="grader_consensus"
+    >
       <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <ConsensusGauge value={consensus} />
         <Box sx={{ flex: '1 1 280px', minWidth: 260 }}>
@@ -78,9 +82,10 @@ export default function GraderDisagreement({
         </Box>
       </Box>
       <Typography variant="caption" sx={{ color: '#8a949e', display: 'block', mt: 1.5 }}>
-        Agreement statistic: Cohen&apos;s κ for 2 graders, Fleiss&apos; κ for a fixed panel of 3+, Krippendorff&apos;s α
-        when graders have missing ratings. Low consensus is evidence for the Quality Gate — it never directly rejects a
-        label.
+        Agreement statistic: <Term k="cohens_kappa">Cohen&apos;s κ</Term> for 2 graders,{' '}
+        <Term k="fleiss_kappa">Fleiss&apos; κ</Term> for a fixed panel of 3+,{' '}
+        <Term k="krippendorff_alpha">Krippendorff&apos;s α</Term> when graders have missing ratings. Low consensus is
+        evidence for the Quality Gate — it never directly rejects a label.
       </Typography>
     </SectionCard>
   );

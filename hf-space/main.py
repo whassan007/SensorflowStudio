@@ -5,6 +5,7 @@ For demonstration purposes, providing core functionality only.
 
 import io
 import logging
+import time
 from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -218,6 +219,7 @@ async def analyze_accident_data(file: UploadFile = File(...)):
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV datasets are accepted.")
     
+    t0 = time.perf_counter()
     try:
         # Validate file size (limit to 50MB)
         content = await file.read()
@@ -249,23 +251,30 @@ async def analyze_accident_data(file: UploadFile = File(...)):
         insights = MockAccidentInsights(metrics)
         profile = insights.get_risk_profile()
         
+        elapsed = round(time.perf_counter() - t0, 4)
+
         # Cache for sub-resource queries with TTL (1 hour)
         await engine_cache.set("latest", {
             "metrics": metrics,
             "insights": profile,
-            "processing_time": len(clean_df)  # for reference
+            "processing_time": elapsed,
         }, ttl=3600)
         
         # Broadcast trigger over WebSockets
         broadcast_message = f"New dataset processed. Total records: {len(clean_df)}. Risk index: {profile.get('risk_index', 'N/A')}"
         await manager.broadcast(broadcast_message)
         
+        # `simulated`/`analysis_provenance` mark that validation, analysis and
+        # insights come from mock engines with constant outputs — the payload
+        # must never present them as real analysis results.
         return {
             "status": "success",
+            "simulated": True,
+            "analysis_provenance": "MOCK_ENGINE",
             "records_processed": len(clean_df),
             "quality_score": report.quality_score,
             "insights": profile,
-            "processing_time_seconds": len(clean_df)  # Add processing info
+            "processing_time_seconds": elapsed,
         }
 
     except pd.errors.EmptyDataError:
@@ -294,6 +303,8 @@ async def get_hotspots():
         
         return {
             "status": "success",
+            "simulated": True,
+            "analysis_provenance": "MOCK_ENGINE",
             "hotspots": hotspots,
             "count": len(hotspots)
         }
@@ -317,6 +328,8 @@ async def get_insights():
         insights = cached_data["insights"]
         return {
             "status": "success",
+            "simulated": True,
+            "analysis_provenance": "MOCK_ENGINE",
             "insights": insights
         }
     except Exception as e:

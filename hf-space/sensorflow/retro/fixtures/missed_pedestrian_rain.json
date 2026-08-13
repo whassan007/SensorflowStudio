@@ -1,0 +1,99 @@
+{
+  "evaluation_id": "EVAL-2026-0802-MP01",
+  "artifact_kind": "perception_failure_eval_log",
+  "scenario": {
+    "scenario_id": "SCN-URB-042-R",
+    "description": "Urban arterial, moderate rain at night. Pedestrian in dark clothing crosses mid-block. Detection is 1.9 s late; the pedestrian is inside ego stopping distance when finally tracked; planner executes a delayed hard brake; near-miss with safety-driver disengagement.",
+    "road_type": "urban_arterial",
+    "weather": "rain",
+    "rain_rate_mmh": 18.0,
+    "time_of_day": "night",
+    "odd_status": "inside",
+    "posted_speed_mps": 15.6
+  },
+  "models": {
+    "baseline": "percept-bev-v41.2",
+    "candidate": "percept-bev-v42.0"
+  },
+  "sensor_metadata": {
+    "camera": {"status": "degraded_contrast", "exposure": "night_mode", "fps": 30,
+               "note": "wet-road glare and low pedestrian contrast"},
+    "lidar": {"status": "attenuated", "returns_density": "reduced_by_spray", "fps": 10},
+    "radar": {"status": "nominal", "note": "weak return, pedestrian RCS at range"}
+  },
+  "ego": {
+    "speed_mps": 13.4,
+    "heading_deg": 0.0,
+    "grade": -0.02,
+    "road_friction_estimate": 0.5,
+    "lane": 1
+  },
+  "ground_truth": {
+    "object_id": "gt-7742",
+    "class": "pedestrian",
+    "distance_m": 26.0,
+    "lateral_offset_m": 1.1,
+    "relative_velocity_mps": 13.9,
+    "dimensions_m": [0.6, 0.6, 1.7],
+    "crossing": true,
+    "source": "human-verified replay label"
+  },
+  "prediction": {
+    "object_id": "det-91027",
+    "class": "pedestrian",
+    "confidence": 0.34,
+    "distance_m": 14.8,
+    "relative_velocity_mps": 13.1,
+    "track_id": "trk-551",
+    "class_history": ["unknown", "unknown", "pedestrian"],
+    "detection_delay_s": 1.9,
+    "note": "fusion confidence below tracking threshold for 6 consecutive frames before track confirmation"
+  },
+  "tracks": [
+    {"track_id": "trk-551", "frames": 4, "class_flicker": true,
+     "velocity_variance": "moderate", "id_switches": 0,
+     "confirmation_delay_frames": 6}
+  ],
+  "timing": {
+    "detection_latency_ms": 180,
+    "planner_latency_ms": 100
+  },
+  "planner_response": {
+    "action": "emergency_brake",
+    "decel_mps2": 8.0,
+    "response_time_s": 2.4,
+    "lateral_action": "partial_swerve_left"
+  },
+  "counterfactual_planner_response": {
+    "action": "controlled_brake",
+    "decel_mps2": 3.5,
+    "response_time_s": 0.5,
+    "source": "resim replay with on-time pedestrian detection"
+  },
+  "traffic_context": {
+    "following_vehicle": {"present": false, "time_gap_s": null, "speed_mps": null}
+  },
+  "disengagement": {
+    "occurred": true,
+    "probability_model": 0.87,
+    "note": "safety driver braked simultaneously with the late system response"
+  },
+  "collision": {"occurred": false, "near_miss": true, "min_gap_m": 1.6},
+  "evaluation_context": {
+    "critical_object_count": 1240,
+    "baseline_missed_critical": 3,
+    "candidate_missed_critical": 6,
+    "metric_delta": {"recall_pedestrian_rain": -0.021, "recall_pedestrian_overall": -0.006},
+    "significance": {
+      "method": "seqeval.PairedSequentialTest",
+      "significant": true,
+      "detail": "pedestrian-rain recall regression CS excludes 0 at alpha=0.05 (from run artifact)"
+    },
+    "distribution_shift": {
+      "slice": "pedestrian_rain_night",
+      "candidate_fn_rate": 0.048,
+      "baseline_fn_rate": 0.021,
+      "relative_change": 1.29
+    }
+  }
+}

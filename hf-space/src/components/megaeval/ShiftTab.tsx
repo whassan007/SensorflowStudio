@@ -13,6 +13,7 @@ import Typography from '@mui/material/Typography';
 import { fmtCompact, getRunShift } from '../../services/megaeval';
 import { usePoll } from '../../services/labeleval';
 import { ErrorNote, LoadingBox, SectionCard, fmtPct } from '../labeleval/shared';
+import { HeadCell } from '../help/InfoTip';
 
 function gapColor(gap: number | null): string | undefined {
   if (gap === null) return undefined;
@@ -27,7 +28,7 @@ export default function ShiftTab({ runId, refreshKey }: { runId: string; refresh
   const data = shift.data;
 
   return (
-    <SectionCard title="Distribution shift (train mix vs evaluation population)">
+    <SectionCard title="Distribution shift (train mix vs evaluation population)" helpTerm="distribution_shift">
       {shift.error ? <ErrorNote error={shift.error} /> : null}
       {shift.loading && !data ? <LoadingBox /> : null}
       {data ? (
@@ -44,12 +45,38 @@ export default function ShiftTab({ runId, refreshKey }: { runId: string; refresh
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>Cohort</TableCell>
-                  <TableCell align="right">Train → eval share</TableCell>
-                  <TableCell align="right">Relative change</TableCell>
+                  <TableCell>
+                    <HeadCell label="Cohort" term="cohort" />
+                  </TableCell>
+                  <TableCell align="right">
+                    <HeadCell
+                      label="Train → eval share"
+                      title="Train → eval share"
+                      detail="This cohort's share of the training corpus vs its share of the evaluation population. A jump means the model is being asked about conditions it rarely saw during training."
+                    />
+                  </TableCell>
+                  <TableCell align="right">
+                    <HeadCell
+                      label="Relative change"
+                      title="Relative change"
+                      detail="(eval share − train share) / train share. Only cohorts above the relative-change threshold with enough eval objects are listed."
+                    />
+                  </TableCell>
                   <TableCell align="right">Eval count</TableCell>
-                  <TableCell align="right">Cohort recall vs overall</TableCell>
-                  <TableCell align="right">Recall gap</TableCell>
+                  <TableCell align="right">
+                    <HeadCell
+                      label="Cohort recall vs overall"
+                      title="Cohort recall vs overall"
+                      detail="Recall inside this cohort compared to the run's overall recall — shows whether the shift actually hurts quality."
+                    />
+                  </TableCell>
+                  <TableCell align="right">
+                    <HeadCell
+                      label="Recall gap"
+                      title="Recall gap"
+                      detail="Cohort recall minus overall recall, in points. Strongly negative + over-represented = highest-priority data collection target (highlighted rows)."
+                    />
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>

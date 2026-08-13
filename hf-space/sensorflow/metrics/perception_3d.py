@@ -106,7 +106,16 @@ def compute_map_mar(
     all_gts: List[List[float]],
     iou_thresholds: List[float] = None,
 ) -> Dict[str, float]:
-    """Compute mean AP and mean AR across IoU thresholds."""
+    """Set-level precision/recall at fixed IoU thresholds (NOT literature mAP).
+
+    Despite the key names ("map_3d"/"mar_3d", kept for API compatibility),
+    this computes greedy-matched precision and recall averaged over the given
+    IoU thresholds. It does NOT rank detections by confidence or integrate a
+    precision-recall curve, so it is not comparable to COCO/nuScenes mAP.
+    Matching is performed over the box sets as given: callers are responsible
+    for scoping the inputs to a single frame (see compute_map_mar_by_frame),
+    otherwise boxes from different timestamps can match each other.
+    """
     iou_thresholds = iou_thresholds or [0.5, 0.7]
     aps, ars = [], []
     for thresh in iou_thresholds:
@@ -122,6 +131,45 @@ def compute_map_mar(
         "map_3d": float(np.mean(aps)) if aps else 0.0,
         "mar_3d": float(np.mean(ars)) if ars else 0.0,
         "mean_iou_3d": float(np.mean([p[2] for p in _match_boxes(all_preds, all_gts, 0.5)[0]])) if all_preds and all_gts and _match_boxes(all_preds, all_gts, 0.5)[0] else 0.0,
+    }
+
+
+def compute_map_mar_by_frame(
+    preds_by_frame: Dict[str, List[List[float]]],
+    gts_by_frame: Dict[str, List[List[float]]],
+    iou_thresholds: List[float] = None,
+) -> Dict[str, float]:
+    """Frame-scoped precision/recall at fixed IoU thresholds (micro-averaged).
+
+    Matching runs independently within each frame, so a prediction can only
+    match ground truth from the same timestamp. TP/FP/FN counts are summed
+    across frames before ratios are taken. Same naming caveat as
+    compute_map_mar: "map_3d"/"mar_3d" are precision/recall at fixed IoU
+    thresholds, not ranked average precision.
+    """
+    iou_thresholds = iou_thresholds or [0.5, 0.7]
+    frame_ids = sorted(set(preds_by_frame) | set(gts_by_frame))
+    aps, ars = [], []
+    for thresh in iou_thresholds:
+        tp = fp = fn = 0
+        for fid in frame_ids:
+            pairs, unmatched_pred, unmatched_gt = _match_boxes(
+                preds_by_frame.get(fid, []), gts_by_frame.get(fid, []), thresh)
+            tp += len(pairs)
+            fp += len(unmatched_pred)
+            fn += len(unmatched_gt)
+        aps.append(tp / (tp + fp) if (tp + fp) > 0 else 0.0)
+        ars.append(tp / (tp + fn) if (tp + fn) > 0 else 0.0)
+
+    matched_ious = []
+    for fid in frame_ids:
+        pairs, _, _ = _match_boxes(
+            preds_by_frame.get(fid, []), gts_by_frame.get(fid, []), 0.5)
+        matched_ious.extend(p[2] for p in pairs)
+    return {
+        "map_3d": float(np.mean(aps)) if aps else 0.0,
+        "mar_3d": float(np.mean(ars)) if ars else 0.0,
+        "mean_iou_3d": float(np.mean(matched_ious)) if matched_ious else 0.0,
     }
 
 

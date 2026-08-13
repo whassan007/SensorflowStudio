@@ -12,6 +12,7 @@ import {
   usePoll,
 } from '../services/labeleval';
 import { useLabelEval } from '../context/LabelEvalContext';
+import { glossaryKeyForStatus } from '../content/glossary';
 import DatasetSelector from '../components/labeleval/DatasetSelector';
 import {
   SectionCard,
@@ -106,7 +107,10 @@ export default function DatasetsPage() {
       ) : null}
 
       {activeDatasetId ? (
-        <SectionCard title={`Quality Groups — ${activeDatasetId}`}>
+        <SectionCard
+          title={`Quality Groups — ${activeDatasetId}`}
+          help="The dataset's annotations partitioned by lifecycle outcome: verified (human-confirmed), non-verified (auto-graded but untouched by humans), HITL (in review) and rejected. Click a group to see its quality profile and which gates its labels failed."
+        >
           {groups.error && !groups.data ? <ErrorNote error={groups.error} /> : null}
           {groups.data ? (
             <>
@@ -158,13 +162,13 @@ export default function DatasetsPage() {
                 {groupDetail.name.replace(/_/g, ' ').toUpperCase()} — quality profile
               </Typography>
               <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
-                <MetricCard label="Precision" value={fmtPct(groupDetail.precision)} />
-                <MetricCard label="Recall" value={fmtPct(groupDetail.recall)} />
-                <MetricCard label="F1" value={fmtPct(groupDetail.f1)} />
-                <MetricCard label="3D IoU" value={fmtNum(groupDetail.mean_iou_3d)} />
-                <MetricCard label="Consensus" value={fmtPct(groupDetail.mean_consensus)} />
-                <MetricCard label="Anomaly" value={fmtNum(groupDetail.mean_anomaly_score)} />
-                <MetricCard label="Tracking quality" value={fmtNum(groupDetail.tracking_quality)} />
+                <MetricCard label="Precision" value={fmtPct(groupDetail.precision)} term="precision" />
+                <MetricCard label="Recall" value={fmtPct(groupDetail.recall)} term="recall" />
+                <MetricCard label="F1" value={fmtPct(groupDetail.f1)} term="f1" />
+                <MetricCard label="3D IoU" value={fmtNum(groupDetail.mean_iou_3d)} term="iou_3d" />
+                <MetricCard label="Consensus" value={fmtPct(groupDetail.mean_consensus)} term="grader_consensus" />
+                <MetricCard label="Anomaly" value={fmtNum(groupDetail.mean_anomaly_score)} term="anomaly_score" />
+                <MetricCard label="Tracking quality" value={fmtNum(groupDetail.tracking_quality)} term="track_quality" />
               </Box>
               {failureRows.length > 0 ? (
                 <>
@@ -176,6 +180,7 @@ export default function DatasetsPage() {
                       <HBar
                         key={reason}
                         label={reason.replace(/_/g, ' ')}
+                        term={glossaryKeyForStatus(reason) ?? undefined}
                         value={count}
                         max={maxFailure}
                         color="#ef5350"

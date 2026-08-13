@@ -16,8 +16,10 @@ import {
   Database,
   Tag,
   Radar,
+  Pickaxe,
   ShieldCheck,
   TrendingDown,
+  Microscope,
   Filter,
   UserCheck,
   Rocket,
@@ -27,6 +29,27 @@ import {
   Workflow,
   Map as MapIcon,
   AppWindow,
+  Mountain,
+  CircuitBoard,
+  Grid3x3,
+  GitBranch,
+  FileCheck2,
+  AlertTriangle,
+  Crosshair,
+  GitCompareArrows,
+  Library,
+  Sparkles,
+  LineChart,
+  Layers,
+  Shapes,
+  Network,
+  LayoutGrid,
+  Undo2,
+  RefreshCcwDot,
+  Scale,
+  ClipboardCheck,
+  BadgeCheck,
+  TrafficCone,
 } from 'lucide-react';
 import { LabelEvalContext, type PageId, ALL_PAGE_IDS } from './context/LabelEvalContext';
 import { getOverview, useStream } from './services/labeleval';
@@ -46,6 +69,31 @@ import PipelineArchitecturePage from './pages/PipelineArchitecturePage';
 import SSAMSafetyDashboard from './pages/SSAMSafetyDashboard';
 import LegacyStudioPage from './pages/LegacyStudioPage';
 import CommandCenterPage from './pages/CommandCenterPage';
+import RootCauseLabPage from './pages/rca/RootCauseLabPage';
+import RareMinePage from './pages/raremine/RareMinePage';
+import HillClimbSection from './pages/hillclimb/HillClimbSection';
+import VitisPage from './pages/vitis/VitisPage';
+import OddCoveragePage from './pages/safety/OddCoveragePage';
+import ReleaseGatesPage from './pages/safety/ReleaseGatesPage';
+import EvidencePage from './pages/safety/EvidencePage';
+import SsamConflictPage from './pages/safety/SsamConflictPage';
+import CalibrationPage from './pages/safety/CalibrationPage';
+import DiscrepancyPage from './pages/safety/DiscrepancyPage';
+import ScenarioDbPage from './pages/safety/ScenarioDbPage';
+import SemanticSearchPage from './pages/safety/SemanticSearchPage';
+import SeqevalPage from './pages/engines/SeqevalPage';
+import BevFusionPage from './pages/engines/BevFusionPage';
+import ScenarioComposerPage from './pages/studio/ScenarioComposerPage';
+import PipelineBuilderPage from './pages/studio/PipelineBuilderPage';
+import MyDashboardPage from './pages/studio/MyDashboardPage';
+import RetroAnalyzerPage from './pages/retro/RetroAnalyzerPage';
+import ClosedLoopLabPage from './pages/nextgen/ClosedLoopLabPage';
+import LaunchReadinessPage from './pages/agentic/LaunchReadinessPage';
+import Studio2GovernancePage from './pages/studio2/Studio2GovernancePage';
+import ProductionReadinessPage from './pages/hardening/ProductionReadinessPage';
+import RotrControlCenterPage from './pages/rotr/RotrControlCenterPage';
+import PageIntro from './components/help/PageIntro';
+import HelpMenu from './components/help/HelpMenu';
 
 const DRAWER_WIDTH = 230;
 
@@ -61,8 +109,10 @@ const PLATFORM_NAV: NavItem[] = [
   { id: 'datasets', label: 'Datasets', icon: <Database size={18} /> },
   { id: 'label-generation', label: 'Label Generation', icon: <Tag size={18} /> },
   { id: 'rare-events', label: 'Rare Events', icon: <Radar size={18} /> },
+  { id: 'raremine', label: 'Rare-Event Miner', icon: <Pickaxe size={18} /> },
   { id: 'quality', label: 'Quality Engine', icon: <ShieldCheck size={18} /> },
   { id: 'regression', label: 'Regression', icon: <TrendingDown size={18} /> },
+  { id: 'rca', label: 'Root Cause Lab', icon: <Microscope size={18} /> },
   { id: 'triage', label: 'Triage', icon: <Filter size={18} /> },
   { id: 'review', label: 'Human Review', icon: <UserCheck size={18} /> },
   { id: 'training', label: 'Training', icon: <Rocket size={18} /> },
@@ -70,6 +120,36 @@ const PLATFORM_NAV: NavItem[] = [
   { id: 'evaluation', label: 'Evaluation', icon: <ListChecks size={18} /> },
   { id: 'audit', label: 'Audit', icon: <ScrollText size={18} /> },
   { id: 'pipeline', label: 'Pipeline Architecture', icon: <Workflow size={18} /> },
+  { id: 'hillclimb', label: 'Hill Climbing EM', icon: <Mountain size={18} /> },
+  { id: 'vitis', label: 'Hardware Acceleration', icon: <CircuitBoard size={18} /> },
+  { id: 'production-readiness', label: 'Production Readiness', icon: <BadgeCheck size={18} /> },
+];
+
+const STUDIO_NAV: NavItem[] = [
+  { id: 'my-dashboard', label: 'My Dashboard', icon: <LayoutGrid size={18} /> },
+  { id: 'scenario-composer', label: 'Scenario Composer', icon: <Shapes size={18} /> },
+  { id: 'pipeline-builder', label: 'Pipeline Builder', icon: <Network size={18} /> },
+];
+
+const ENGINES_NAV: NavItem[] = [
+  { id: 'seqeval', label: 'Sequential Regression', icon: <LineChart size={18} /> },
+  { id: 'bevfusion', label: 'Perception Engines', icon: <Layers size={18} /> },
+  { id: 'closed-loop-lab', label: 'Closed-Loop Lab', icon: <RefreshCcwDot size={18} /> },
+];
+
+const SAFETY_NAV: NavItem[] = [
+  { id: 'safety-odd', label: 'ODD Coverage', icon: <Grid3x3 size={18} /> },
+  { id: 'safety-gates', label: 'Release Gates', icon: <GitBranch size={18} /> },
+  { id: 'safety-evidence', label: 'Evidence Package', icon: <FileCheck2 size={18} /> },
+  { id: 'safety-ssam', label: 'SSAM Conflicts', icon: <AlertTriangle size={18} /> },
+  { id: 'safety-calibration', label: 'Calibration', icon: <Crosshair size={18} /> },
+  { id: 'safety-discrepancy', label: 'Discrepancy Mining', icon: <GitCompareArrows size={18} /> },
+  { id: 'safety-scenarios', label: 'Scenario DB', icon: <Library size={18} /> },
+  { id: 'safety-search', label: 'Semantic Search', icon: <Sparkles size={18} /> },
+  { id: 'retro', label: 'Retrospective Analyzer', icon: <Undo2 size={18} /> },
+  { id: 'launch-readiness', label: 'Launch Readiness', icon: <Scale size={18} /> },
+  { id: 'studio2', label: 'Studio 2.0 Governance', icon: <ClipboardCheck size={18} /> },
+  { id: 'rotr', label: 'ROTR Control Center', icon: <TrafficCone size={18} /> },
 ];
 
 const LEGACY_NAV: NavItem[] = [
@@ -83,8 +163,10 @@ const PAGE_TITLES: Record<PageId, string> = {
   datasets: 'Datasets',
   'label-generation': 'Label Generation',
   'rare-events': 'Rare Event Detection',
+  raremine: 'Rare-Event Miner (Costumed Pedestrians)',
   quality: 'Quality Engine',
   regression: 'Regression Tracking',
+  rca: 'Root Cause Lab',
   triage: 'Automated Triage',
   review: 'Human Review (HITL)',
   training: 'Training Flywheel',
@@ -92,8 +174,29 @@ const PAGE_TITLES: Record<PageId, string> = {
   evaluation: 'Evaluation Records',
   audit: 'Audit & Process Units',
   pipeline: 'Pipeline Architecture',
+  hillclimb: 'Hill Climbing EM',
+  vitis: 'Hardware Acceleration (Vitis Vision)',
   ssam: 'SSAM Safety Dashboard',
+  'safety-odd': 'ODD Coverage',
+  'safety-gates': 'Release Gates',
+  'safety-evidence': 'Safety Evidence Package',
+  'safety-ssam': 'SSAM Conflict Analysis',
+  'safety-calibration': 'Sensor Calibration Validation',
+  'safety-discrepancy': 'Discrepancy Mining',
+  'safety-scenarios': 'Scenario Database',
+  'safety-search': 'Semantic Scenario Search',
+  seqeval: 'Sequential Regression Evaluation',
+  bevfusion: 'Perception Engines (BEV Fusion)',
+  'scenario-composer': 'Scenario Composer',
+  'pipeline-builder': 'Pipeline Builder',
+  'my-dashboard': 'My Dashboard',
+  retro: 'Retrospective Safety Analyzer',
+  'closed-loop-lab': 'Closed-Loop Lab',
+  'launch-readiness': 'Launch Readiness (Agentic Triage)',
+  studio2: 'Studio 2.0 Governance (Control Plane & Release)',
   legacy: 'Legacy Studio',
+  'production-readiness': 'Production Readiness (Hardening Audit)',
+  rotr: 'ROTR Control Center (Right-of-the-Road)',
 };
 
 function parseHash(): { page: PageId; entityId: string | null } {
@@ -211,6 +314,7 @@ export default function App() {
                 sx={{ ml: 1, bgcolor: '#232a31', fontFamily: 'monospace', fontSize: 11 }}
               />
             ) : null}
+            <HelpMenu />
           </Toolbar>
         </AppBar>
 
@@ -243,6 +347,36 @@ export default function App() {
               dense
               subheader={
                 <ListSubheader sx={{ bgcolor: 'transparent', fontSize: 11, letterSpacing: 1.2, lineHeight: '32px' }}>
+                  STUDIO
+                </ListSubheader>
+              }
+            >
+              {STUDIO_NAV.map(renderNavItem)}
+            </List>
+            <List
+              dense
+              subheader={
+                <ListSubheader sx={{ bgcolor: 'transparent', fontSize: 11, letterSpacing: 1.2, lineHeight: '32px' }}>
+                  ENGINES &amp; REGRESSION
+                </ListSubheader>
+              }
+            >
+              {ENGINES_NAV.map(renderNavItem)}
+            </List>
+            <List
+              dense
+              subheader={
+                <ListSubheader sx={{ bgcolor: 'transparent', fontSize: 11, letterSpacing: 1.2, lineHeight: '32px' }}>
+                  SAFETY &amp; COMPLIANCE
+                </ListSubheader>
+              }
+            >
+              {SAFETY_NAV.map(renderNavItem)}
+            </List>
+            <List
+              dense
+              subheader={
+                <ListSubheader sx={{ bgcolor: 'transparent', fontSize: 11, letterSpacing: 1.2, lineHeight: '32px' }}>
                   LEGACY / EXISTING
                 </ListSubheader>
               }
@@ -264,21 +398,32 @@ export default function App() {
         >
           <Toolbar variant="dense" sx={{ minHeight: 52, flexShrink: 0 }} />
           {fullBleed ? (
-            <Box sx={{ flex: 1, minHeight: 0 }} className={page === 'ssam' ? 'ssam-embed' : undefined}>
-              {page === 'ssam' ? <SSAMSafetyDashboard /> : <LegacyStudioPage />}
+            <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <Box sx={{ px: 2, pt: 1, flexShrink: 0, borderBottom: '1px solid #232a31', bgcolor: '#12171d' }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+                  {PAGE_TITLES[page]}
+                </Typography>
+                <PageIntro page={page} dense />
+              </Box>
+              <Box sx={{ flex: 1, minHeight: 0 }} className={page === 'ssam' ? 'ssam-embed' : undefined}>
+                {page === 'ssam' ? <SSAMSafetyDashboard /> : <LegacyStudioPage />}
+              </Box>
             </Box>
           ) : (
             <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', p: 2.5 }}>
-              <Typography variant="h5" sx={{ fontWeight: 800, mb: 2 }}>
+              <Typography variant="h5" sx={{ fontWeight: 800, mb: 0.5 }}>
                 {PAGE_TITLES[page]}
               </Typography>
+              <PageIntro page={page} />
               {page === 'command' ? <CommandCenterPage /> : null}
               {page === 'overview' ? <OverviewPage /> : null}
               {page === 'datasets' ? <DatasetsPage /> : null}
               {page === 'label-generation' ? <LabelGenerationPage /> : null}
               {page === 'rare-events' ? <RareEventDashboard /> : null}
+              {page === 'raremine' ? <RareMinePage /> : null}
               {page === 'quality' ? <QualityEnginePage /> : null}
               {page === 'regression' ? <RegressionPage /> : null}
+              {page === 'rca' ? <RootCauseLabPage /> : null}
               {page === 'triage' ? <TriagePage /> : null}
               {page === 'review' ? <HumanReviewPage /> : null}
               {page === 'training' ? <TrainingPage /> : null}
@@ -286,6 +431,27 @@ export default function App() {
               {page === 'evaluation' ? <EvaluationPage /> : null}
               {page === 'audit' ? <AuditPage /> : null}
               {page === 'pipeline' ? <PipelineArchitecturePage /> : null}
+              {page === 'hillclimb' ? <HillClimbSection initialView={entityId} /> : null}
+              {page === 'vitis' ? <VitisPage /> : null}
+              {page === 'safety-odd' ? <OddCoveragePage /> : null}
+              {page === 'safety-gates' ? <ReleaseGatesPage /> : null}
+              {page === 'safety-evidence' ? <EvidencePage /> : null}
+              {page === 'safety-ssam' ? <SsamConflictPage /> : null}
+              {page === 'safety-calibration' ? <CalibrationPage /> : null}
+              {page === 'safety-discrepancy' ? <DiscrepancyPage /> : null}
+              {page === 'safety-scenarios' ? <ScenarioDbPage /> : null}
+              {page === 'safety-search' ? <SemanticSearchPage /> : null}
+              {page === 'seqeval' ? <SeqevalPage /> : null}
+              {page === 'bevfusion' ? <BevFusionPage /> : null}
+              {page === 'scenario-composer' ? <ScenarioComposerPage /> : null}
+              {page === 'pipeline-builder' ? <PipelineBuilderPage /> : null}
+              {page === 'my-dashboard' ? <MyDashboardPage /> : null}
+              {page === 'retro' ? <RetroAnalyzerPage /> : null}
+              {page === 'closed-loop-lab' ? <ClosedLoopLabPage /> : null}
+              {page === 'launch-readiness' ? <LaunchReadinessPage /> : null}
+              {page === 'studio2' ? <Studio2GovernancePage /> : null}
+              {page === 'production-readiness' ? <ProductionReadinessPage /> : null}
+              {page === 'rotr' ? <RotrControlCenterPage /> : null}
             </Box>
           )}
         </Box>

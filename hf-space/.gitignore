@@ -62,6 +62,9 @@ logs/
 /tmp/
 temp/
 
+# Local Gradio / HF tooling scratch
+.tmp_gradio/
+
 # Generated runtime/test artifacts
 runs/labeleval/
 runs/megaeval/
@@ -70,3 +73,6 @@ runs/pipeline/qg_test/
 runs/pipeline/roundtrip/
 runs/pipeline/test_seq/
 runs/pipeline/test_waymo/
+
+# Generated run artifacts (all engines)
+runs/

@@ -43,7 +43,10 @@ export default function VerificationFunnel({ funnel }: { funnel: FunnelResponse 
   const maxMain = Math.max(1, ...funnel.main_path.map((s) => s.count));
   const maxSide = Math.max(1, ...funnel.side_path.map((s) => s.count));
   return (
-    <SectionCard title="Verification Funnel">
+    <SectionCard
+      title="Verification Funnel"
+      help="Where labels are in their lifecycle. Main path: frames → auto-labeled → evaluated → auto-graded → verified. Side branch: labels that failed a quality gate detour through human review, re-labeling and re-validation before re-joining as verified. Percentages are relative to the funnel's input stage."
+    >
       <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
         <Box sx={{ flex: '2 1 380px' }}>
           <Typography variant="caption" sx={{ color: '#4fc3f7', fontWeight: 700 }}>

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import zlib
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -117,7 +118,12 @@ class PerceptionAutomator:
             pts = np.fromfile(path, dtype=np.float32)
             if len(pts) % 3 == 0:
                 return pts.reshape(-1, 3)
-        return np.random.randn(500, 3).astype(np.float32) * 2
+        # SYNTHETIC_FALLBACK: no LiDAR file available. The point cloud is
+        # simulated, seeded deterministically from the requested path so that
+        # repeated runs over the same input produce identical proposals.
+        seed = zlib.crc32((path or "missing").encode("utf-8")) & 0xFFFFFFFF
+        rng = np.random.default_rng(seed)
+        return (rng.standard_normal((500, 3)) * 2).astype(np.float32)
 
     def _lift_masks_to_3d(
         self,

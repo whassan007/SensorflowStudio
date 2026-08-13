@@ -9,6 +9,8 @@ import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import type { ClassMetrics, QualityMetrics, ScenarioMetrics } from '../../types/labeleval';
 import { SectionCard, MetricCard, fmtPct, fmtInt } from './shared';
+import { ExplainTip, HeadCell } from '../help/InfoTip';
+import { glossaryKeyForStatus } from '../../content/glossary';
 
 function PrTable({ title, rows }: { title: string; rows: Array<ClassMetrics | ScenarioMetrics> }) {
   return (
@@ -25,10 +27,18 @@ function PrTable({ title, rows }: { title: string; rows: Array<ClassMetrics | Sc
           <TableHead>
             <TableRow>
               <TableCell>{'class_name' in (rows[0] ?? {}) ? 'Class' : 'Scenario'}</TableCell>
-              <TableCell align="right">Precision</TableCell>
-              <TableCell align="right">Recall</TableCell>
-              <TableCell align="right">F1</TableCell>
-              <TableCell align="right">Support</TableCell>
+              <TableCell align="right">
+                <HeadCell label="Precision" term="precision" />
+              </TableCell>
+              <TableCell align="right">
+                <HeadCell label="Recall" term="recall" />
+              </TableCell>
+              <TableCell align="right">
+                <HeadCell label="F1" term="f1" />
+              </TableCell>
+              <TableCell align="right">
+                <HeadCell label="Support" title="Support" detail="Number of reference objects behind this row — small support means noisy metrics." />
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -62,7 +72,10 @@ function PrTable({ title, rows }: { title: string; rows: Array<ClassMetrics | Sc
 export default function GroundTruthComparison({ metrics }: { metrics: QualityMetrics | null }) {
   const gtType = metrics?.gt_type ?? null;
   return (
-    <SectionCard title="Ground Truth Comparison">
+    <SectionCard
+      title="Ground Truth Comparison"
+      help="Precision/recall of the auto-labels measured against this dataset's reference labels. The trustworthiness of these numbers depends entirely on the GT tier — hover the GT type chip. Against pseudo-GT they are directional signals only."
+    >
       {!metrics ? (
         <Typography variant="body2" sx={{ color: '#8a949e' }}>
           No quality metrics yet — run the evaluation pipeline.
@@ -80,18 +93,25 @@ export default function GroundTruthComparison({ metrics }: { metrics: QualityMet
               }}
             />
             {gtType ? (
-              <Chip
-                size="small"
-                label={gtType.replace(/_/g, ' ')}
-                sx={{
-                  bgcolor: gtType === 'PSEUDO_GROUND_TRUTH' ? '#4a2c00' : '#1b3a24',
-                  color: gtType === 'PSEUDO_GROUND_TRUTH' ? '#ffcc80' : '#a5d6a7',
-                  fontWeight: 700,
-                }}
-              />
+              <ExplainTip term={glossaryKeyForStatus(gtType) ?? 'gt_coverage'}>
+                <Chip
+                  size="small"
+                  label={gtType.replace(/_/g, ' ')}
+                  sx={{
+                    bgcolor: gtType === 'PSEUDO_GROUND_TRUTH' ? '#4a2c00' : '#1b3a24',
+                    color: gtType === 'PSEUDO_GROUND_TRUTH' ? '#ffcc80' : '#a5d6a7',
+                    fontWeight: 700,
+                    cursor: 'help',
+                  }}
+                />
+              </ExplainTip>
             ) : null}
-            <MetricCard label="Coverage" value={fmtPct(metrics.gt_coverage)} />
-            <MetricCard label="Evaluation confidence" value={metrics.gt_available ? 'per-dataset' : 'none'} />
+            <MetricCard label="Coverage" value={fmtPct(metrics.gt_coverage)} term="gt_coverage" />
+            <MetricCard
+              label="Evaluation confidence"
+              value={metrics.gt_available ? 'per-dataset' : 'none'}
+              info="How much to trust GT-based metrics here: high for human-verified/gold references, medium for vendor labels, low for pseudo-GT, none without any reference."
+            />
           </Box>
 
           {gtType === 'PSEUDO_GROUND_TRUTH' ? (

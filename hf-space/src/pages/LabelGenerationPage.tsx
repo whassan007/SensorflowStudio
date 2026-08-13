@@ -17,6 +17,7 @@ import { getDatasets, getFrameIds, getFrame, usePoll } from '../services/labelev
 import { useLabelEval } from '../context/LabelEvalContext';
 import InputStage from '../components/labeleval/InputStage';
 import { SectionCard, StatusChip, LoadingBox, ErrorNote, fmtNum } from '../components/labeleval/shared';
+import { HeadCell } from '../components/help/InfoTip';
 
 export default function LabelGenerationPage() {
   const { activeDatasetId, setActiveDatasetId } = useLabelEval();
@@ -51,7 +52,10 @@ export default function LabelGenerationPage() {
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <InputStage dataset={activeDataset} />
 
-      <SectionCard title="Frame Browser — automated label hypotheses">
+      <SectionCard
+        title="Frame Browser — automated label hypotheses"
+        help="Browse individual frames of the active dataset and the candidate labels the auto-labeler emitted for each. Status shows where each annotation is in the evaluation lifecycle — hover a status chip for its meaning."
+      >
         <Alert severity="info" variant="outlined" sx={{ mb: 2 }}>
           Auto-generated labels are <strong>hypotheses, not truth</strong> — every annotation below must pass the
           evaluation pipeline (anomaly detection, grading, strict validation and triage) before it can be verified.
@@ -128,10 +132,20 @@ export default function LabelGenerationPage() {
                       <TableRow>
                         <TableCell>Annotation</TableCell>
                         <TableCell>Class</TableCell>
-                        <TableCell align="right">Confidence</TableCell>
-                        <TableCell>Model</TableCell>
+                        <TableCell align="right">
+                          <HeadCell label="Confidence" term="confidence" />
+                        </TableCell>
+                        <TableCell>
+                          <HeadCell label="Model" title="Model" detail="The auto-labeling model that produced this hypothesis." />
+                        </TableCell>
                         <TableCell>Version</TableCell>
-                        <TableCell>Status</TableCell>
+                        <TableCell>
+                          <HeadCell
+                            label="Status"
+                            title="Triage status"
+                            detail="Current lifecycle state of this label. Hover the chip itself for the specific status definition."
+                          />
+                        </TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
