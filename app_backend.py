@@ -1433,6 +1433,10 @@ def get_mitl_queue(sequence_id: str = "seq_001"):
     return {"status": "ok", "queue": copilot.get_queue(sequence_id)}
 
 
+# BEV-Fusion perception engine (camera+LiDAR fusion, masklet tracking, self-eval).
+from sensorflow.bevfusion.api import router as bevfusion_router
+app.include_router(bevfusion_router)
+
 # Mount static folder
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
