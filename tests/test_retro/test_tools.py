@@ -128,3 +128,63 @@ def test_tool_schemas_declared(registry):
         assert spec.output_schema.get("properties") is not None
         assert spec.timeout_s > 0
         assert spec.description
+
+
+# ---------------------------------------------- megaeval delegation (real data)
+
+@pytest.fixture(scope="module")
+def mega_run(tmp_path_factory):
+    """A real, published megaeval run in an isolated store (public API only)."""
+    from sensorflow.megaeval import population as pop_mod
+    from sensorflow.megaeval.runs import get_mega_store, reset_mega_store
+
+    root = tmp_path_factory.mktemp("retro-megaeval")
+    pop_mod.set_mega_root(str(root))
+    reset_mega_store()
+    # 20k objects: large enough that skewed cohorts clear distribution_shift's
+    # default min_eval_count=300 / rel_threshold=0.35 (8k leaves zero eligible)
+    meta = pop_mod.generate_population("retro-delegation-pop",
+                                       num_objects=20_000, seed=23)
+    store = get_mega_store()
+    run = store.create_run(population_id=meta["population_id"],
+                           model_version="retro-delegation-model",
+                           worker_delay_s=0.0)
+    store.execute_sync(run)
+    assert run.status == "published", run.error
+
+    yield run
+
+    pop_mod.set_mega_root("runs/megaeval")
+    reset_mega_store()
+
+
+def test_distribution_analysis_delegates_to_megaeval(registry, mega_run):
+    """The SUCCESS path: import + call chain into megaeval actually works."""
+    res = registry.call("distribution_analysis", {"run_id": mega_run.run_id})
+    assert res.ok
+    out = res.result
+    # delegation succeeded — not the graceful-degradation branch
+    assert out["source"] == "sensorflow.megaeval.analysis.distribution_shift"
+    assert out["shift"]["run_id"] == mega_run.run_id
+    assert "train mix vs eval mix" in out["shift"]["method"]
+    # the synthetic training mix is deliberately skewed (night/rain cohorts),
+    # so a real run surfaces genuine shifted cohorts
+    shifts = out["shift"]["shifts"]
+    assert len(shifts) > 0
+    for s in shifts:
+        assert {"cohort", "train_share", "eval_share",
+                "relative_change"} <= set(s)
+    assert any("cohort" in f for f in out["findings"])
+    # the call is audited like any other tool call
+    audited = [r for r in registry.audit_log
+               if r.tool == "distribution_analysis" and r.status == "ok"]
+    assert audited and len(audited[0].result_hash) == 64
+
+
+def test_distribution_analysis_degrades_for_unknown_run(registry, mega_run):
+    """Graceful degradation is reserved for genuinely missing data."""
+    res = registry.call("distribution_analysis", {"run_id": "eval-nonexistent"})
+    assert res.ok
+    assert res.result["source"] == "megaeval-delegation-failed"
+    assert res.result["shift"] is None
+    assert "no distribution claim is made" in res.result["findings"][0]

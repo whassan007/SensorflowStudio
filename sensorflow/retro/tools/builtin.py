@@ -205,12 +205,28 @@ def distribution_analysis(inp: DistributionInput) -> DistributionOutput:
         # Delegate to the platform's megaeval statistics when a real run exists.
         try:
             from sensorflow.megaeval.analysis import distribution_shift
-            from sensorflow.megaeval.runs import get_run, get_store
-            run = get_run(get_store(), inp.run_id)
-            res = distribution_shift(get_store(), run)
+            from sensorflow.megaeval.runs import get_mega_store
+            store = get_mega_store()
+            run = store.runs.get(inp.run_id)
+            if run is None:
+                raise KeyError(f"unknown megaeval run {inp.run_id!r}")
+            if run.status != "published":
+                raise ValueError(
+                    f"megaeval run {inp.run_id!r} not published "
+                    f"(status={run.status}); artifacts unavailable")
+            res = distribution_shift(store, run)
+            shifts = res.get("shifts", [])
+            findings = [f"megaeval shift analysis for run {inp.run_id}: "
+                        f"{len(shifts)} shifted cohort(s) above threshold"]
+            for s in shifts[:3]:
+                findings.append(
+                    f"cohort {s['cohort']}: train share {s['train_share']:.4f} "
+                    f"-> eval share {s['eval_share']:.4f} "
+                    f"(rel {s['relative_change']:+.2f}), cohort recall "
+                    f"{s['cohort_recall']} vs overall {s['overall_recall']}")
             return DistributionOutput(
                 source="sensorflow.megaeval.analysis.distribution_shift",
-                findings=[f"megaeval shift analysis for run {inp.run_id}"],
+                findings=findings,
                 shift=res)
         except Exception as exc:
             return DistributionOutput(
