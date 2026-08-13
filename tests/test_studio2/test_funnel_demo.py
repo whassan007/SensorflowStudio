@@ -20,17 +20,40 @@ def test_funnel_on_empty_root_reports_unavailable_not_fabricated(registry, tmp_p
     assert f["drift"]["available"] is False
 
 
-def test_funnel_on_real_repo_flags_match_data_presence(registry):
-    f = build_funnel(repo_root=".", registry=registry)
-    for stage in f["stages"]:
-        if stage["available"]:
-            assert isinstance(stage.get("data"), dict) and stage["data"], stage
-        else:
-            assert stage.get("reason"), stage
-    # this repo has published megaeval runs, so these must be real
-    evaluated = next(s for s in f["stages"] if s["stage"] == "evaluated")
-    assert evaluated["available"] is True
-    assert evaluated["data"]["objects_evaluated"] > 0
+def test_funnel_flags_match_data_presence_with_real_run(registry, tmp_path):
+    """Same honesty contract, against a root holding a REAL published megaeval
+    run. Seeds the run in an isolated root rather than assuming the dev
+    checkout's runs/ artifacts exist (they are gitignored, so a clean worktree
+    has none)."""
+    from sensorflow.megaeval import population as pop_mod
+    from sensorflow.megaeval.runs import get_mega_store, reset_mega_store
+
+    root = tmp_path / "repo"
+    pop_mod.set_mega_root(str(root / "runs" / "megaeval"))
+    reset_mega_store()
+    try:
+        meta = pop_mod.generate_population("funnel-honesty-pop",
+                                           num_objects=2_000, seed=7)
+        store = get_mega_store()
+        run = store.create_run(population_id=meta["population_id"],
+                               model_version="funnel-honesty-model",
+                               worker_delay_s=0.0)
+        store.execute_sync(run)
+        assert run.status == "published", run.error
+
+        f = build_funnel(repo_root=str(root), registry=registry)
+        for stage in f["stages"]:
+            if stage["available"]:
+                assert isinstance(stage.get("data"), dict) and stage["data"], stage
+            else:
+                assert stage.get("reason"), stage
+        # the seeded published run must surface as real evaluated data
+        evaluated = next(s for s in f["stages"] if s["stage"] == "evaluated")
+        assert evaluated["available"] is True
+        assert evaluated["data"]["objects_evaluated"] > 0
+    finally:
+        pop_mod.set_mega_root("runs/megaeval")
+        reset_mega_store()
 
 
 def test_demo_is_deterministic_and_registers_regression_dataset(registry):
