@@ -8,7 +8,8 @@ Flags (spec §18):
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+import math
+from typing import Dict, List, Optional, Tuple
 
 from sensorflow.evaluation.records import (
     EvalStore,
@@ -18,17 +19,44 @@ from sensorflow.evaluation.records import (
 )
 
 # metric -> (tolerance, direction). "up" means higher is better.
+# "proportion" marks metrics that are rates in [0, 1] backed by trial counts,
+# eligible for the confidence-interval decision path in compare_runs.
 METRIC_SPECS: Dict[str, Dict] = {
-    "precision": {"tolerance": 0.03, "better": "up", "kind": "performance"},
-    "recall": {"tolerance": 0.03, "better": "up", "kind": "performance"},
-    "safety_critical_recall": {"tolerance": 0.02, "better": "up", "kind": "performance"},
-    "idf1": {"tolerance": 0.05, "better": "up", "kind": "tracking"},
-    "id_swap_rate": {"tolerance": 0.02, "better": "down", "kind": "tracking"},
-    "fragmentation_rate": {"tolerance": 0.03, "better": "down", "kind": "tracking"},
-    "mean_iou_3d": {"tolerance": 0.03, "better": "up", "kind": "annotation"},
-    "mean_position_error": {"tolerance": 0.10, "better": "down", "kind": "annotation"},
-    "mean_orientation_error_deg": {"tolerance": 3.0, "better": "down", "kind": "annotation"},
+    "precision": {"tolerance": 0.03, "better": "up", "kind": "performance", "proportion": True},
+    "recall": {"tolerance": 0.03, "better": "up", "kind": "performance", "proportion": True},
+    "safety_critical_recall": {"tolerance": 0.02, "better": "up", "kind": "performance", "proportion": True},
+    "idf1": {"tolerance": 0.05, "better": "up", "kind": "tracking", "proportion": True},
+    "id_swap_rate": {"tolerance": 0.02, "better": "down", "kind": "tracking", "proportion": True},
+    "fragmentation_rate": {"tolerance": 0.03, "better": "down", "kind": "tracking", "proportion": True},
+    "mean_iou_3d": {"tolerance": 0.03, "better": "up", "kind": "annotation", "proportion": False},
+    "mean_position_error": {"tolerance": 0.10, "better": "down", "kind": "annotation", "proportion": False},
+    "mean_orientation_error_deg": {"tolerance": 3.0, "better": "down", "kind": "annotation", "proportion": False},
 }
+
+_Z_95 = 1.959963984540054  # two-sided 95%
+
+
+def wilson_interval(p: float, n: int, z: float = _Z_95) -> Tuple[float, float]:
+    """Wilson score interval for a binomial proportion (never degenerate at 0/1)."""
+    if n <= 0:
+        return (0.0, 1.0)
+    denom = 1.0 + z * z / n
+    center = (p + z * z / (2 * n)) / denom
+    half = z * math.sqrt(max(p * (1 - p) / n + z * z / (4 * n * n), 0.0)) / denom
+    return (max(0.0, center - half), min(1.0, center + half))
+
+
+def newcombe_delta_ci(p_base: float, n_base: int,
+                      p_cur: float, n_cur: int,
+                      z: float = _Z_95) -> Tuple[float, float]:
+    """Newcombe hybrid-score CI for the difference (p_cur - p_base).
+
+    Combines the two Wilson intervals; well-behaved for small n and
+    boundary proportions, unlike the Wald interval.
+    """
+    lb, ub = wilson_interval(p_base, n_base, z)
+    lc, uc = wilson_interval(p_cur, n_cur, z)
+    return (lc - ub, uc - lb)
 
 
 def compare_runs(
@@ -41,8 +69,23 @@ def compare_runs(
     baseline_version: Optional[str] = None,
     affected_classes: Optional[List[str]] = None,
     affected_scenarios: Optional[List[str]] = None,
+    sample_sizes: Optional[Dict[str, Tuple[int, int]]] = None,
 ) -> RegressionResult:
-    """Compare current run metrics vs a baseline run; persist RegressionResult."""
+    """Compare current run metrics vs a baseline run; persist RegressionResult.
+
+    sample_sizes (optional, additive): metric -> (n_baseline, n_current) trial
+    counts. When provided for a proportion metric, the regression decision uses
+    a Newcombe 95% CI on the delta with the tolerance acting as the
+    practical-significance margin: a regression is flagged only when the
+    ENTIRE interval lies beyond the tolerance in the bad direction. This
+    prevents noise-flagging on small runs and adds sensitivity on large runs.
+    Without sample_sizes the legacy point-delta rule is preserved.
+
+    For repeated/sequential monitoring across many runs, delegate to
+    sensorflow.seqeval (anytime-valid e-processes, e-BH multiplicity) instead
+    of calling this per run: fixed-level CIs are not valid under continuous
+    monitoring.
+    """
     deltas: List[RegressionMetricDelta] = []
     kinds: List[str] = []
     regressed_any = False
@@ -54,7 +97,17 @@ def compare_runs(
             if base is None or cur is None:
                 continue
             delta = cur - base
-            if spec["better"] == "up":
+            ns = (sample_sizes or {}).get(metric)
+            use_ci = (spec.get("proportion") and ns is not None
+                      and ns[0] > 0 and ns[1] > 0
+                      and 0.0 <= base <= 1.0 and 0.0 <= cur <= 1.0)
+            if use_ci:
+                lo, hi = newcombe_delta_ci(base, ns[0], cur, ns[1])
+                if spec["better"] == "up":
+                    regressed = hi < -spec["tolerance"]
+                else:
+                    regressed = lo > spec["tolerance"]
+            elif spec["better"] == "up":
                 regressed = delta < -spec["tolerance"]
             else:
                 regressed = delta > spec["tolerance"]

@@ -115,8 +115,13 @@ class QueryCache:
 
     @staticmethod
     def key(dataset_version: str, model_version: str, filters: Dict,
-            group_by: List[str], metrics: List[str]) -> str:
+            group_by: List[str], metrics: List[str], run_id: str = "") -> str:
+        # run_id pins the full run lineage (label version, overrides, seed,
+        # threshold config). Without it, two runs on the same population+model
+        # (e.g. a baseline and a run with injected regressions) collide and
+        # the cache serves one run's rows for the other.
         blob = json.dumps({
+            "r": run_id,
             "d": dataset_version, "m": model_version,
             "f": {k: sorted(v) for k, v in sorted((filters or {}).items())},
             "g": list(group_by or []), "x": sorted(metrics or []),
@@ -227,7 +232,8 @@ class QueryRouter:
         t0 = time.perf_counter()
         metrics = metrics or []
         key = QueryCache.key(run.population_id, run.model_version,
-                             filters or {}, group_by or [], metrics)
+                             filters or {}, group_by or [], metrics,
+                             run_id=getattr(run, "run_id", ""))
         cached = self.cache.get(key)
         if cached is not None:
             return {**cached,

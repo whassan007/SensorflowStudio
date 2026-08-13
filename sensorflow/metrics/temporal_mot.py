@@ -9,10 +9,16 @@ from typing import Dict, List, Tuple
 def compute_id_swap_rate(
     pred_tracks: List[Dict],
     gt_tracks: List[Dict],
+    match_threshold_m: float = 2.0,
 ) -> float:
     """
     Count ID swaps: when GT instance_id is stable but pred track_id changes.
     pred_tracks/gt_tracks: [{track_id/instance_id, frames: [{frame_id, bbox_3d}]}]
+
+    Candidate pred tracks must lie within `match_threshold_m` of the GT box
+    (same gate as fragmentation). Without the gate, an arbitrarily distant
+    track becomes the "match" whenever the true one is absent, manufacturing
+    phantom swaps (or hiding real ones).
     """
     swaps = 0
     total_updates = 0
@@ -40,7 +46,7 @@ def compute_id_swap_rate(
             for tid, pframes in pred_by_track.items():
                 if fid in pframes:
                     dist = _center_dist(pframes[fid], gt_frames[fid])
-                    if dist < best_dist:
+                    if dist < best_dist and dist < match_threshold_m:
                         best_dist = dist
                         best_tid = tid
             if best_tid is not None:

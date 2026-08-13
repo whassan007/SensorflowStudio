@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from sensorflow.metrics.perception_3d import (
     bev_iou,
-    compute_map_mar,
+    compute_map_mar_by_frame,
     mean_orientation_error,
     mean_position_error,
 )
@@ -41,10 +41,19 @@ class QualityGate:
         pred_tracks: List[Dict],
         stages_run: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
-        all_preds, all_gts = self._collect_boxes(sequence, pred_tracks)
-        map_metrics = compute_map_mar(all_preds, all_gts)
+        # Matching is scoped per frame: a prediction may only match ground
+        # truth from the same timestamp. Pooling boxes across all frames
+        # (the previous behavior) allowed physically impossible cross-frame
+        # matches, inflating mAP/mAR and corrupting error statistics.
+        preds_by_frame, gts_by_frame = self._collect_boxes_by_frame(sequence, pred_tracks)
+        all_preds = [b for boxes in preds_by_frame.values() for b in boxes]
+        all_gts = [b for boxes in gts_by_frame.values() for b in boxes]
+        map_metrics = compute_map_mar_by_frame(preds_by_frame, gts_by_frame)
 
-        matched_pairs = self._match_for_errors(all_preds, all_gts)
+        matched_pairs = []
+        for fid in sorted(set(preds_by_frame) | set(gts_by_frame)):
+            matched_pairs.extend(self._match_for_errors(
+                preds_by_frame.get(fid, []), gts_by_frame.get(fid, [])))
         orient_err = mean_orientation_error(matched_pairs)
         pos_err = mean_position_error(matched_pairs)
 
@@ -100,6 +109,21 @@ class QualityGate:
             for gt in frame.ground_truth:
                 all_gts.append(gt.bbox_3d)
         return all_preds, all_gts
+
+    def _collect_boxes_by_frame(
+        self,
+        sequence: UnifiedSequence,
+        pred_tracks: List[Dict],
+    ) -> Tuple[Dict[str, List[List[float]]], Dict[str, List[List[float]]]]:
+        preds_by_frame: Dict[str, List[List[float]]] = {}
+        gts_by_frame: Dict[str, List[List[float]]] = {}
+        for track in pred_tracks:
+            for fr in track.get("frames", []):
+                preds_by_frame.setdefault(fr["frame_id"], []).append(fr["bbox_3d"])
+        for frame in sequence.frames:
+            for gt in frame.ground_truth:
+                gts_by_frame.setdefault(frame.frame_id, []).append(gt.bbox_3d)
+        return preds_by_frame, gts_by_frame
 
     def _match_for_errors(
         self,

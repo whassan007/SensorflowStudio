@@ -251,6 +251,18 @@ export const PAGE_HELP: Record<PageId, PageHelpEntry> = {
     dataFlow:
       'Reads the persisted stores of megaeval, seqeval, safety, agentic, nextgen, bevfusion and vitis (best-effort, availability-flagged). Writes only under runs/studio2/: registry entities, release decisions, approvals and an append-only audit trail. Failures found by the demo feed back as protected REGRESSION-role dataset entries.',
   },
+  'production-readiness': {
+    subtitle:
+      'The hardening audit as a living page: every finding with file:line references, a readiness scorecard computed from the audit (never hand-written), the live data funnel, and the fix-now vs follow-up remediation board.',
+    purpose:
+      'An honest answer to "is this platform production ready?". The scorecard is derived from docs/hardening/audit.json and is hard-wired to report NOT PRODUCTION READY while any Critical finding is open — no one can flip the status without closing the findings.',
+    reading:
+      'The banner shows the overall verdict, finding counts by severity, and fixed-now vs deferred totals. Scorecard cards map each category to its prototype state, production requirement, and open gap IDs. The funnel bars are live counts from the labeleval store (source labeled). The findings table filters by area / severity / disposition; refs are FILE:LINE into this repository. The kanban splits work already done in this pass from documented follow-ups with effort badges (S/M/L).',
+    actions:
+      'Filter and read findings; use the refs to jump into the code. No mutations happen from this page — it is a read-only audit browser.',
+    dataFlow:
+      'All content is served by /api/hardening from docs/hardening/audit.{md,json} plus read-only funnel counts from runs/labeleval. Fixes land in code; the audit document is updated with dispositions; this page re-derives everything from it.',
+  },
   ssam: {
     subtitle:
       'Surrogate-safety analysis of real intersections: conflicts ranked by TTC / PET / severity on an interactive map — the safety context the label platform feeds.',

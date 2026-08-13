@@ -39,7 +39,8 @@ export type GlossaryCategory =
   | 'Retrospective safety'
   | 'Closed-loop evaluation'
   | 'Launch readiness'
-  | 'Release governance';
+  | 'Release governance'
+  | 'Production hardening';
 
 export const GLOSSARY: Record<string, GlossaryEntry> = {
   // ------------------------------------------------------------ detection metrics
@@ -1107,6 +1108,27 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     short: 'The separate recorded action (approver + rationale) that authorizes deployment after a GO decision.',
     detail: 'Only GO decisions can be approved; REVIEW and NO-GO must be re-evaluated after their conditions are resolved. The approval is a first-class registry entity and lands in the append-only audit trail — the gate recommends, humans authorize.',
   },
+
+  // ------------------------------------------------------------ Production hardening
+  hardening_finding: {
+    term: 'Hardening finding',
+    category: 'Production hardening',
+    short: 'One audited defect or gap with FILE:LINE references, a severity (Critical/High/Medium/Low), and a disposition (fixed now vs documented follow-up).',
+    detail: 'Findings live in docs/hardening/audit.json and drive everything on the Production Readiness page. "Fixed now" items were implemented surgically (API-preserving) or as a layered capability in sensorflow/hardening; follow-ups carry an explicit reason (usually an API-breaking change or the concurrent-edit freeze on app_backend.py).',
+  },
+  readiness_scorecard: {
+    term: 'Readiness scorecard',
+    category: 'Production hardening',
+    short: 'Category-level prototype-vs-production gap grid, computed from the audit findings — never hand-written.',
+    detail: 'Each category maps its findings to a status (blocked-critical / gaps-open / partially-hardened / closed). The overall verdict is hard-wired to NOT PRODUCTION READY while any Critical finding is open, so the status cannot be flipped without closing findings.',
+  },
+  label_provenance: {
+    term: 'Label provenance',
+    category: 'Production hardening',
+    short: 'Where a label came from: MODEL_PREDICTION → AUTO_LABEL / VLM_INFERENCE → HUMAN_LABEL → CERTIFIED_GROUND_TRUTH, in increasing order of trust.',
+    detail: 'Defined in sensorflow/hardening/contracts.py and mandatory on every hardening contract. Nothing lower on the ladder may silently substitute for a level above it — e.g. a quality gate must refuse AUTO_LABEL "ground truth". Adapters map existing records (labeleval GT types, pipeline proposals) onto the ladder.',
+    caveat: 'Existing packages are not yet rewritten to these contracts; adapters bridge until their next breaking release.',
+  },
 };
 
 export type GlossaryKey = keyof typeof GLOSSARY;
@@ -1188,4 +1210,5 @@ export const GLOSSARY_CATEGORIES: GlossaryCategory[] = [
   'Retrospective safety',
   'Launch readiness',
   'Release governance',
+  'Production hardening',
 ];

@@ -43,6 +43,7 @@ import {
   Layers,
   RefreshCcwDot,
   ClipboardCheck,
+  BadgeCheck,
   Shapes,
   Network,
   LayoutGrid,
@@ -86,6 +87,7 @@ import PipelineBuilderPage from './pages/studio/PipelineBuilderPage';
 import MyDashboardPage from './pages/studio/MyDashboardPage';
 import ClosedLoopLabPage from './pages/nextgen/ClosedLoopLabPage';
 import Studio2GovernancePage from './pages/studio2/Studio2GovernancePage';
+import ProductionReadinessPage from './pages/hardening/ProductionReadinessPage';
 import RetroAnalyzerPage from './pages/retro/RetroAnalyzerPage';
 import LaunchReadinessPage from './pages/agentic/LaunchReadinessPage';
 import PageIntro from './components/help/PageIntro';
@@ -118,6 +120,7 @@ const PLATFORM_NAV: NavItem[] = [
   { id: 'pipeline', label: 'Pipeline Architecture', icon: <Workflow size={18} /> },
   { id: 'hillclimb', label: 'Hill Climbing EM', icon: <Mountain size={18} /> },
   { id: 'vitis', label: 'Hardware Acceleration', icon: <CircuitBoard size={18} /> },
+  { id: 'production-readiness', label: 'Production Readiness', icon: <BadgeCheck size={18} /> },
 ];
 
 const STUDIO_NAV: NavItem[] = [
@@ -188,6 +191,7 @@ const PAGE_TITLES: Record<PageId, string> = {
   'closed-loop-lab': 'Closed-Loop Lab',
   'launch-readiness': 'Launch Readiness (Agentic Triage)',
   studio2: 'Studio 2.0 Governance (Control Plane & Release)',
+  'production-readiness': 'Production Readiness (Hardening Audit)',
   legacy: 'Legacy Studio',
 };
 
@@ -442,6 +446,7 @@ export default function App() {
               {page === 'launch-readiness' ? <LaunchReadinessPage /> : null}
               {page === 'closed-loop-lab' ? <ClosedLoopLabPage /> : null}
               {page === 'studio2' ? <Studio2GovernancePage /> : null}
+              {page === 'production-readiness' ? <ProductionReadinessPage /> : null}
             </Box>
           )}
         </Box>

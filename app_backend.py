@@ -1515,6 +1515,11 @@ app.include_router(nextgen_router)
 from sensorflow.studio2.api import router as studio2_router
 app.include_router(studio2_router)
 
+# Production hardening layer (audit browser, readiness scorecard, funnel,
+# sampling/quality/HITL demos on seeded synthetic fixtures).
+from sensorflow.hardening.api import router as hardening_router
+app.include_router(hardening_router)
+
 # Multimodal rare-event mining & perception QA (costumed-pedestrian miner).
 from sensorflow.raremine.api import router as raremine_router
 app.include_router(raremine_router)

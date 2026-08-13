@@ -205,6 +205,7 @@ const PAGE_ORDER: PageId[] = [
   'launch-readiness',
   'studio2',
   'legacy',
+  'production-readiness',
 ];
 
 const PAGE_NAMES: Record<PageId, string> = {
@@ -245,6 +246,7 @@ const PAGE_NAMES: Record<PageId, string> = {
   'launch-readiness': 'Launch Readiness',
   studio2: 'Studio 2.0 Governance',
   legacy: 'Legacy Studio',
+  'production-readiness': 'Production Readiness',
 };
 
 function PageIndex({ goTo }: { goTo: (p: PageId) => void }) {

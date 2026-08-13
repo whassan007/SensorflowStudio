@@ -1,0 +1,415 @@
+{
+  "audit_version": "1.0.0",
+  "generated": "2026-08-12",
+  "scope": "app_backend.py, main.py, static/, sensorflow/{evaluation,megaeval,safety,seqeval,rca,raremine,bevfusion,vitis,metrics,schemas,adapters} + sensorflow root modules. In-flight namespaces (agentic, nextgen, hillclimb, retro, studio_ux) were READ for context but not audited for fixes.",
+  "severity_scale": ["Critical", "High", "Medium", "Low"],
+  "findings": [
+    {
+      "id": "F-001",
+      "area": "Determinism / mock-presented-as-real",
+      "severity": "Critical",
+      "refs": ["app_backend.py:959-1096", "app_backend.py:804-821"],
+      "existing_approach": "A hard-coded list `_CA_INTERSECTIONS` of ~110 invented intersections with invented TTC/PET/speed values is served by /api/ssam/statewide as the 'California Statewide SSAM Intersection Safety Dataset', and DATASET_METADATA_STORE claims FHWA public-domain provenance, '845 rows, 100% ingested'.",
+      "problem": "Fabricated data presented as a real federal safety dataset with false provenance claims. Any downstream consumer (severity ranking, map, annotations) is building on fiction with no simulation marker.",
+      "correct_approach": "Label every synthetic payload with an explicit provenance field (e.g. data_provenance: SYNTHETIC_ILLUSTRATIVE), remove the FHWA provenance claim or gate it behind an actual ingest, and drive severity from the versioned config in sensorflow/hardening/safety_config.py.",
+      "disposition": "follow_up",
+      "disposition_reason": "app_backend.py is under a one-additive-edit budget while five agents are in flight; the extracted, provenance-labeled severity/threshold config is implemented now in sensorflow/hardening/safety_config.py so the wiring change is a one-line import when the file unfreezes.",
+      "effort": "S"
+    },
+    {
+      "id": "F-002",
+      "area": "Mock-presented-as-real",
+      "severity": "Critical",
+      "refs": ["app_backend.py:492-581"],
+      "existing_approach": "/api/nvidia/load responds 'Successfully ingested nvidia/PhysicalAI-Autonomous-Vehicles samples from HF' while serving hard-coded Unsplash stock photo URLs, invented telemetry and invented chain-of-causation traces (NVIDIA_SAMPLES). The HfApi call is decorative (result discarded, exception swallowed).",
+      "problem": "The API affirmatively lies about ingestion. A user cannot distinguish this from a real dataset load; annotations saved against it inherit false lineage.",
+      "correct_approach": "Return status: 'mock' with an explicit simulated flag and provenance enum (see hardening/contracts.py LabelProvenance), or actually ingest.",
+      "disposition": "follow_up",
+      "disposition_reason": "app_backend.py edit budget (see F-001).",
+      "effort": "S"
+    },
+    {
+      "id": "F-003",
+      "area": "Temporal tracking",
+      "severity": "Critical",
+      "refs": ["sensorflow/temporal_tracker.py:120-121"],
+      "existing_approach": "Association cost adds a 'velocity penalty' computed as `yaw_diff = abs(track.state[2] if len(track.state) > 2 else 0 - prop.bbox_3d[6])`.",
+      "problem": "Operator-precedence bug: because the Kalman state is [x, y, vx, vy] (len 4 > 2), the expression always evaluates to abs(vx) — the track's forward velocity — not a yaw difference. The 'yaw penalty' is physically meaningless: it penalizes fast-moving objects regardless of orientation, corrupts Hungarian costs, and is compared against a distance gate in meters.",
+      "correct_approach": "Compute a wrapped angular difference between the track's last observed box yaw and the proposal yaw (the state carries no yaw), and document the penalty's units.",
+      "disposition": "fix_now",
+      "effort": "S",
+      "fix": "temporal_tracker._associate now computes the wrapped yaw difference from the last observed history box; regression test pins it."
+    },
+    {
+      "id": "F-004",
+      "area": "Leakage / contamination",
+      "severity": "Critical",
+      "refs": ["sensorflow/perception_automator.py:83-104", "sensorflow/perception_automator.py:167-173", "sensorflow/quality_gate.py:38-56"],
+      "existing_approach": "When SAM is unavailable, _fallback_masks builds proposal masks directly from ground-truth boxes, and _assign_taxonomy copies GT class names onto proposals by list index. QualityGate then benchmarks those proposals against the very same GT and the launch gate blocks/permits export on the result.",
+      "problem": "Circular evaluation: predictions are derived from the reference they are scored against, so quality-gate metrics are inflated and the export gate can pass on leaked information. Class assignment by index conflates MODEL_PREDICTION with AUTO_LABEL-from-GT provenance.",
+      "correct_approach": "Proposals must carry provenance (LabelProvenance enum); anything derived from GT must be marked and excluded from gate metrics, or the gate must refuse to certify a run whose proposals are GT-derived.",
+      "disposition": "follow_up",
+      "disposition_reason": "Removing the GT fallback changes the public demo contract (pipelines without SAM would emit nothing) and shifts every downstream metric; needs a coordinated change with in-flight consumers. Provenance contracts + adapters shipped now in hardening/contracts.py; determinism half of the finding fixed now (F-008).",
+      "effort": "M"
+    },
+    {
+      "id": "F-005",
+      "area": "Mock-presented-as-real",
+      "severity": "Critical",
+      "refs": ["app_backend.py:234-237"],
+      "existing_approach": "When training-log parsing yields no losses, /api/train/status fabricates a 'dummy decreasing loss' curve and returns it in the same field as real parsed losses.",
+      "problem": "The UI cannot distinguish a real converging run from a parser miss; a diverging run whose logs failed to parse renders as a healthy descending curve.",
+      "correct_approach": "Return an empty list plus a parse_status field; never synthesize values into a field that otherwise carries measurements.",
+      "disposition": "follow_up",
+      "disposition_reason": "app_backend.py edit budget.",
+      "effort": "S"
+    },
+    {
+      "id": "F-006",
+      "area": "Cache correctness",
+      "severity": "Critical",
+      "refs": ["sensorflow/megaeval/cube.py:106-124", "sensorflow/megaeval/cube.py:229-231"],
+      "existing_approach": "QueryCache.key hashes (population_id, model_version, filters, group_by, metrics). The router cache is shared across all runs in the MegaStore.",
+      "problem": "The key omits run identity: label_version, threshold_config, parameter overrides and seed all live in run.lineage and all change results. Two runs with the same population+model but different overrides (e.g. an injected regression) collide — queries for run B can silently return run A's cached rows.",
+      "correct_approach": "Key the cache on the immutable run_id (which pins the full lineage) plus query shape; in a multi-node deployment add evaluator_code_version and metric_version.",
+      "disposition": "fix_now",
+      "effort": "S",
+      "fix": "QueryRouter.query now scopes the key with run.run_id (API-preserving; QueryCache.key signature unchanged). Test pins that two runs with different overrides no longer share cache entries."
+    },
+    {
+      "id": "F-007",
+      "area": "Safety thresholds",
+      "severity": "High",
+      "refs": ["app_backend.py:1099-1111", "app_backend.py:1136-1140", "sensorflow/evaluation/rare_events.py:84-89"],
+      "existing_approach": "_compute_severity buries magic weights (0.5/0.2/0.3), caps (TTC 1.5s / PET 5.0s / speed 18 m/s) and band cutoffs (0.7/0.45/0.25) as literals; the legacy /api/ssam/streets endpoint uses a DIFFERENT weighting (0.7/0.3) for the same severity concept; rare_events.py hard-codes TTC<3.0/1.8 and PET<1.5 corridor literals.",
+      "problem": "Safety-relevant constants have no provenance, no version, and are inconsistent between two endpoints computing 'the same' severity — the same intersection gets two severities depending on the route called.",
+      "correct_approach": "Single versioned threshold registry with per-parameter provenance labels (FHWA_SSAM_DEFAULT vs ILLUSTRATIVE_THRESHOLD), consumed by both endpoints.",
+      "disposition": "fix_now_partial",
+      "disposition_reason": "Registry implemented now (sensorflow/hardening/safety_config.py) with every legacy literal captured and labeled; rewiring app_backend.py is a documented follow-up under the edit budget.",
+      "effort": "S"
+    },
+    {
+      "id": "F-008",
+      "area": "Determinism",
+      "severity": "High",
+      "refs": ["sensorflow/perception_automator.py:115-120"],
+      "existing_approach": "_load_lidar silently substitutes `np.random.randn(500, 3) * 2` — unseeded — when the LiDAR file is missing.",
+      "problem": "Unseeded randomness in a production labeling path: two identical runs produce different proposals, and the fake point cloud carries no synthetic marker.",
+      "correct_approach": "Deterministic seed derived from the file path; explicit SYNTHETIC_FALLBACK labeling in code and docstring.",
+      "disposition": "fix_now",
+      "effort": "S",
+      "fix": "Seeded per-path RNG (stable hash), documented as a synthetic fallback. Test pins determinism."
+    },
+    {
+      "id": "F-009",
+      "area": "Regression statistics / metrics validity",
+      "severity": "High",
+      "refs": ["sensorflow/quality_gate.py:90-123", "sensorflow/metrics/perception_3d.py:104-125"],
+      "existing_approach": "_collect_boxes pools every predicted box and every GT box across ALL frames into two flat lists before matching; compute_map_mar and _match_for_errors then match across the pooled lists.",
+      "problem": "A prediction in frame 1 may match a GT box in frame 50 if their coordinates coincide. On any multi-frame sequence the reported mAP/mAR/mean-IoU/position error are computed over physically impossible matches, and the launch gate consumes these numbers.",
+      "correct_approach": "Match per frame; aggregate TP/FP/FN and matched-pair errors across frames.",
+      "disposition": "fix_now",
+      "effort": "M",
+      "fix": "QualityGate now groups boxes by frame_id and matches within frames only (evaluate() signature and result shape unchanged). Test pins that cross-frame coincidences no longer match."
+    },
+    {
+      "id": "F-010",
+      "area": "Regression statistics",
+      "severity": "High",
+      "refs": ["sensorflow/evaluation/regression.py:50-72"],
+      "existing_approach": "compare_runs flags a regression whenever a point-estimate delta exceeds a fixed tolerance (e.g. recall drop > 0.03). No sample sizes, no confidence intervals, no power, no multiple-testing policy across the 9 metrics tested.",
+      "problem": "On small runs a 3pp delta is noise (a 500-object run has ~±4pp Wilson width at p=0.9); on huge runs a real 2.9pp regression is silently ignored. Nine metrics tested independently inflates false-alarm probability. This is exactly the class of naive comparison seqeval was built to replace.",
+      "correct_approach": "Proportion deltas should use CI-aware decisions (Wilson two-proportion or seqeval's paired anytime-valid test) with the tolerance acting as a practical-significance margin; multiple metrics need a family-wise policy (seqeval ships e-BH).",
+      "disposition": "fix_now_partial",
+      "effort": "M",
+      "fix": "compare_runs gained an optional, API-preserving `sample_sizes` argument: when counts are provided for a proportion metric, the regression flag requires the Wilson CI of the delta to exclude the tolerance band (delta_ci recorded on the RegressionMetricDelta). Default behavior without counts is unchanged. Full seqeval delegation for the pipeline path is a documented follow-up."
+    },
+    {
+      "id": "F-011",
+      "area": "Regression statistics",
+      "severity": "High",
+      "refs": ["sensorflow/evaluation/pipeline.py:339-342"],
+      "existing_approach": "After every run, the current run's metrics overwrite store.meta['baseline_metrics']; each run is compared only to the immediately preceding run.",
+      "problem": "Rolling baseline: a model can regress 1pp per run for ten runs and never trip the 3pp tolerance — classic slow-drift masking.",
+      "correct_approach": "Pin the baseline to a released/blessed run; compare against pinned baseline AND previous run; alert on cumulative drift.",
+      "disposition": "follow_up",
+      "disposition_reason": "Changing baseline semantics alters the public behavior of every subsequent pipeline run; needs a product decision on which run is 'blessed'. Documented with proposed pinned-baseline design.",
+      "effort": "M"
+    },
+    {
+      "id": "F-012",
+      "area": "Grader independence",
+      "severity": "High",
+      "refs": ["sensorflow/evaluation/graders.py:170-231", "sensorflow/evaluation/graders.py:176-177"],
+      "existing_approach": "Five grader sources vote; consensus = reliability-weighted majority share (weights 2.0/1.0/0.75/0.75/0.5 — arbitrary) blended 0.5/0.35/0.15 with spatial/temporal agreement. Grader errors are simulated independently per grader.",
+      "problem": "Consensus treats graders as independent evidence. In reality historical_model, vlm_label and independent_detector may share training data, backbones, or sensor blind spots; agreement among correlated graders is worth far less than the naive consensus implies. There is no dependence discount anywhere.",
+      "correct_approach": "Model pairwise grader dependence (shared backbone/data/architecture) and compute an independence-adjusted effective grader count alongside naive consensus; route on the adjusted value.",
+      "disposition": "fix_now_layered",
+      "effort": "M",
+      "fix": "sensorflow/hardening/quality.py implements a grader-dependence model (shared-resource dependence matrix -> effective number of independent graders -> adjusted confidence) layered on top of graders.py without modifying it; tests pin that correlated panels always score below naive consensus."
+    },
+    {
+      "id": "F-013",
+      "area": "Security / production gap",
+      "severity": "High",
+      "refs": ["app_backend.py:80-104"],
+      "existing_approach": "/api/yaml/content reads and /api/yaml/save writes ANY absolute or relative filesystem path supplied by the client.",
+      "problem": "Arbitrary file read/write from an unauthenticated HTTP endpoint (path traversal by design). Acceptable only on a loopback dev box; disqualifying anywhere else.",
+      "correct_approach": "Allowlist a config directory, resolve+verify the path prefix, reject absolute paths.",
+      "disposition": "follow_up",
+      "disposition_reason": "app_backend.py edit budget.",
+      "effort": "S"
+    },
+    {
+      "id": "F-014",
+      "area": "Mock-presented-as-real",
+      "severity": "High",
+      "refs": ["main.py:17-90", "main.py:208-277"],
+      "existing_approach": "The accident-analysis gateway runs Mock* classes that return constant fabricated values (quality_score 0.95, risk_index 0.75, confidence_score 0.89, hard-coded hotspots) and reports 'status: success' with `processing_time_seconds: len(clean_df)` (row count masquerading as seconds).",
+      "problem": "Class names say Mock internally but the API response carries no simulation marker — callers receive fabricated risk indices as if computed, plus a nonsense processing-time value.",
+      "correct_approach": "Additive `simulated: true` + `analysis_provenance` markers on every response built from mock engines; measure actual elapsed time.",
+      "disposition": "fix_now",
+      "effort": "S",
+      "fix": "main.py responses now carry simulated/analysis_provenance markers and a real measured processing_time_seconds (additive fields; existing fields unchanged)."
+    },
+    {
+      "id": "F-015",
+      "area": "HITL routing",
+      "severity": "High",
+      "refs": ["sensorflow/evaluation/pipeline.py:376-399", "sensorflow/mitl_copilot.py:40-66"],
+      "existing_approach": "Triage decisions are explainable (per-gate lines — a genuine strength), but everything FLAGGED lands in a flat FIFO review batch with no prioritization; mitl_copilot routes on 3 duplicated thresholds and attaches `pred_tracks[:3]` (the first three tracks, unrelated to the failure) as 'evidence'; severities are hard-coded strings.",
+      "problem": "Review effort is not allocated by information value: a near-miss VRU ambiguity queues behind a low-stakes dimension quibble. No acceptance metrics exist for the routing itself (HITL precision, critical-miss-rate, workload), so the queue can silently degrade.",
+      "correct_approach": "Score each flagged item by Risk x Uncertainty x Novelty x TrainingValue (or Pareto rank on the components); track HITL precision/recall/workload/critical-miss-rate/false-routing-rate as first-class metrics.",
+      "disposition": "fix_now_layered",
+      "effort": "M",
+      "fix": "sensorflow/hardening/hitl.py implements both prioritizers with a documented comparison and the acceptance-metric calculator; wiring the labeleval review queue through it is a follow-up (queue semantics owned by evaluation package consumers)."
+    },
+    {
+      "id": "F-016",
+      "area": "Temporal tracking",
+      "severity": "Medium",
+      "refs": ["sensorflow/temporal_tracker.py:26-39"],
+      "existing_approach": "Kalman process noise Q = 0.1*I and measurement noise R = 0.5*I, identical across position and velocity states.",
+      "problem": "Uncalibrated, unitless noise constants with no provenance; velocity noise in (m/s)^2 sharing a scalar with position noise in m^2 is physically incoherent.",
+      "correct_approach": "Derive Q from an assumed acceleration noise (white-noise-acceleration model) and R from sensor spec; expose as config.",
+      "disposition": "follow_up",
+      "effort": "S"
+    },
+    {
+      "id": "F-017",
+      "area": "Scoring provenance",
+      "severity": "Medium",
+      "refs": ["sensorflow/quality_gate.py:158-169", "sensorflow/quality_gate.py:104-123"],
+      "existing_approach": "quality_score = map*40 + (1-orient/45)*20 + (1-swap/0.1)*20 + (1-frag/0.2)*20; error matching uses greedy IoU>0.3.",
+      "problem": "Magic weights and denominators with no documented rationale produce a headline '0-100 quality score' that looks authoritative but is arbitrary.",
+      "correct_approach": "Keep the decomposed metric card authoritative; if a scalar is needed, document the weighting as ILLUSTRATIVE and version it.",
+      "disposition": "follow_up",
+      "effort": "S"
+    },
+    {
+      "id": "F-018",
+      "area": "Metric naming",
+      "severity": "Medium",
+      "refs": ["sensorflow/metrics/perception_3d.py:104-125"],
+      "existing_approach": "compute_map_mar reports 'mAP' that is actually precision at fixed IoU thresholds — no confidence ranking, no PR curve integration; also recomputes the full matching three times.",
+      "problem": "Metric misnomer: consumers comparing this 'mAP' against literature mAP will draw wrong conclusions.",
+      "correct_approach": "Rename or document as precision@IoU; implement ranked AP if mAP is required.",
+      "disposition": "fix_now_partial",
+      "effort": "S",
+      "fix": "Docstring corrected to state exactly what is computed (non-breaking); the rename is an API-breaking follow-up."
+    },
+    {
+      "id": "F-019",
+      "area": "Temporal metrics",
+      "severity": "Medium",
+      "refs": ["sensorflow/metrics/temporal_mot.py:37-52"],
+      "existing_approach": "ID-swap attribution matches each GT frame to the nearest predicted box with NO distance gate.",
+      "problem": "A predicted track 500m away 'matches' a GT instance if it is merely the nearest, manufacturing phantom ID swaps (or hiding real ones) on sparse scenes.",
+      "correct_approach": "Gate the match at the same threshold fragmentation already uses (2.0 m default).",
+      "disposition": "fix_now",
+      "effort": "S",
+      "fix": "compute_id_swap_rate gained match_threshold_m (default 2.0, matching fragmentation) applied to candidate matches; API-preserving keyword."
+    },
+    {
+      "id": "F-020",
+      "area": "Novelty / rarity scoring",
+      "severity": "Medium",
+      "refs": ["sensorflow/evaluation/rare_events.py:152-165"],
+      "existing_approach": "rarity = clip(1 - freq*4, 0.05, 1) and confidence = clip(0.55 + 0.4*rarity, 0, 0.99).",
+      "problem": "The '4' is arbitrary; worse, 'confidence' is fabricated FROM rarity — a rare event is automatically a confident detection, which inverts how evidence works. It is not a placeholder-free novelty score (no kNN/density/embedding basis).",
+      "correct_approach": "Rarity from inverse frequency is fine if documented; confidence must derive from evidence strength (sensor count, anomaly score), not rarity. Real novelty scoring (kNN + centroid distance) implemented in sensorflow/hardening/sampling.py.",
+      "disposition": "follow_up",
+      "disposition_reason": "Changing RareEvent.confidence semantics alters persisted records consumed by the UI; hardening/sampling.py provides the corrected scorer for adoption.",
+      "effort": "S"
+    },
+    {
+      "id": "F-021",
+      "area": "Anomaly ensemble robustness",
+      "severity": "Medium",
+      "refs": ["sensorflow/evaluation/detectors.py:379-385"],
+      "existing_approach": "If a detector raises during fit/score, its scores are silently replaced with zeros and still averaged into the ensemble.",
+      "problem": "Silent degradation: a crashed detector drags every ensemble score toward 'normal' (rank-normalized zeros), masking anomalies with no operator signal.",
+      "correct_approach": "Record and expose per-detector failures; exclude failed detectors from the ensemble average.",
+      "disposition": "fix_now",
+      "effort": "S",
+      "fix": "AnomalyEnsemble.run now records failures in self.failures, excludes failed detectors from the combination, and keeps the return signature unchanged."
+    },
+    {
+      "id": "F-022",
+      "area": "Statistics (fallback)",
+      "severity": "Medium",
+      "refs": ["sensorflow/vitis/hil.py:59-84"],
+      "existing_approach": "When seqeval is unavailable, a paired-t CI on per-frame mean correctness deltas produces the verdict; documented as not anytime-valid.",
+      "problem": "Frames within a sequence are temporally correlated, so frame-level SEM understates variance (no sequence-level clustering); honest labeling mitigates but does not remove the risk.",
+      "correct_approach": "Cluster deltas at sequence level before the t-interval (mirroring seqeval's cluster-mean design).",
+      "disposition": "follow_up",
+      "disposition_reason": "Fallback path only (seqeval is importable in this repo, so the fallback is dormant); low blast radius.",
+      "effort": "S"
+    },
+    {
+      "id": "F-023",
+      "area": "Configuration hygiene",
+      "severity": "Medium",
+      "refs": ["sensorflow/mitl_copilot.py:11-14", "app_backend.py:450-453", "app_backend.py:632-635", "app_backend.py:873-885"],
+      "existing_approach": "A personal Tailscale hostname (dgx-spark.tail16d8d9.ts.net) is hard-coded as the primary LLM endpoint in three places.",
+      "problem": "Environment-specific infrastructure baked into source; both an information leak and a portability failure.",
+      "correct_approach": "Environment-variable override with localhost default.",
+      "disposition": "fix_now_partial",
+      "effort": "S",
+      "fix": "mitl_copilot.py endpoints are now env-overridable (SENSORFLOW_OLLAMA_URL/MODEL) with unchanged defaults; the app_backend.py occurrences are follow-ups under the edit budget."
+    },
+    {
+      "id": "F-024",
+      "area": "Geometric validation",
+      "severity": "Medium",
+      "refs": ["sensorflow/evaluation/validation.py:129-134"],
+      "existing_approach": "ground_contact_error assumes a global flat ground plane at z=0.",
+      "problem": "On sloped/banked roads the check produces physically meaningless penalties; threshold 0.5m is a synthetic-world constant.",
+      "correct_approach": "Use local ground estimate (e.g. lowest LiDAR percentile near the object) as reference.",
+      "disposition": "follow_up",
+      "effort": "M"
+    },
+    {
+      "id": "F-025",
+      "area": "Production gap (security)",
+      "severity": "Medium",
+      "refs": ["main.py:110-117"],
+      "existing_approach": "CORS allow_origins=['*'] combined with allow_credentials=True.",
+      "problem": "Credentials + wildcard origin is a disallowed combination (browsers reject it, and if origin-echo middleware were added it would become a CSRF vector).",
+      "correct_approach": "Explicit origin allowlist; drop credentials if wildcard is required.",
+      "disposition": "follow_up",
+      "disposition_reason": "Behavioral change to a standalone demo app's cross-origin contract; documented.",
+      "effort": "S"
+    },
+    {
+      "id": "F-026",
+      "area": "Scalability claims",
+      "severity": "Medium",
+      "refs": ["sensorflow/evaluation/records.py:21", "sensorflow/megaeval/runs.py:363-371", "sensorflow/vitis/store.py", "app_backend.py:17-22"],
+      "existing_approach": "All stores are JSON/npz files under runs/ plus in-process singletons; app_backend holds training state in module globals; megaeval narrates Spark-executor semantics while running threads on one node.",
+      "problem": "The aggregate-first architecture is genuinely scale-shaped (a strength), but there is no storage/compute interface seam: nothing separates 'local demo store' from 'production store', so every store is silently single-node, single-process, lost-on-restart.",
+      "correct_approach": "Interface protocols (VectorDB, ObjectStorage, DistributedCompute, GPUInference, FeatureCache, MetadataStore, ExperimentTracking, Observability) with the current implementations registered as explicitly-labeled LOCAL/MOCK.",
+      "disposition": "fix_now_layered",
+      "effort": "M",
+      "fix": "sensorflow/hardening/interfaces.py defines the eight protocols with local implementations registered and labeled LOCAL, and docstrings naming production options."
+    },
+    {
+      "id": "F-027",
+      "area": "Cache correctness (secondary)",
+      "severity": "Low",
+      "refs": ["sensorflow/megaeval/runs.py:434-437"],
+      "existing_approach": "MegaStore._artifacts evicts the oldest-inserted entry when >6 cached run artifact sets.",
+      "problem": "Insertion-order eviction (not LRU) can evict the hot run; no integrity check on npz artifacts (a truncated file loads as a crash, not a checksum failure).",
+      "correct_approach": "LRU + artifact checksums; see hardening/cache_manifest.py for the manifest design.",
+      "disposition": "follow_up",
+      "effort": "S"
+    },
+    {
+      "id": "F-028",
+      "area": "Mock-presented-as-real (mitigated)",
+      "severity": "Low",
+      "refs": ["app_backend.py:663-724"],
+      "existing_approach": "/api/benchmark/compare falls back to invented per-model metrics but does label the payload source: 'fallback_mock'.",
+      "problem": "The label is good practice; the invented numbers (latencies, recalls for named public models) still risk being quoted.",
+      "correct_approach": "Keep the label; replace invented numbers with nulls + descriptions.",
+      "disposition": "follow_up",
+      "effort": "S"
+    },
+    {
+      "id": "F-029",
+      "area": "Sampling / estimation (verified strength with caveat)",
+      "severity": "Low",
+      "refs": ["sensorflow/megaeval/sampling.py:100-111", "sensorflow/megaeval/sampling.py:37"],
+      "existing_approach": "Stratified risk-weighted review sampling with true population weights (classic stratified estimator) and Wilson per-stratum CIs; simulated reviewers at HUMAN_FIDELITY=0.985 (documented).",
+      "problem": "VERIFIED CORRECT: over-sampling risky strata is undone by W_h weighting, so estimates are honest (the reweighting the audit was told to verify). Residual caveats: _allocate's max(1, ...) rounding can overshoot target_n slightly, and reviewer error (1.5%) is not deconvolved from the estimate.",
+      "correct_approach": "Optionally largest-remainder allocation and Rogan-Gladen correction for reviewer error.",
+      "disposition": "follow_up",
+      "effort": "S"
+    },
+    {
+      "id": "F-030",
+      "area": "Meta-classifier supervision",
+      "severity": "Low",
+      "refs": ["sensorflow/evaluation/pipeline.py:217-220"],
+      "existing_approach": "Optional meta_classifier ensemble strategy is supervised by injected_errors — the synthetic generator's own error labels — with a held-out split.",
+      "problem": "Held-out split avoids memorization, but the supervision signal only exists for synthetic data; if this strategy were enabled on real data the code path would silently have no labels. Default strategy is weighted_average, so dormant.",
+      "correct_approach": "Guard the strategy behind an explicit synthetic-data check.",
+      "disposition": "follow_up",
+      "effort": "S"
+    }
+  ],
+  "strengths": [
+    {
+      "package": "sensorflow/seqeval",
+      "refs": ["sensorflow/seqeval/sequential.py:1-115"],
+      "what": "Anytime-valid sequential testing done properly: empirical-Bernstein confidence sequences, betting e-processes with Ville's inequality, three-outcome decisions against a practical margin, cluster-mean inputs for correlation, e-BH for multiplicity. This is the statistical gold standard in the repo — regression.py and vitis/hil.py fallbacks should delegate here.",
+      "reuse": "power.py in the hardening package delegates all sequential sizing to seqeval; hil.py already prefers it."
+    },
+    {
+      "package": "sensorflow/megaeval",
+      "refs": ["sensorflow/megaeval/sampling.py:1-50", "sensorflow/megaeval/runs.py:111-126"],
+      "what": "Correct stratified estimation (risk-weighted allocation with true-weight recombination, Wilson CIs) and a complete lineage record (dataset/model/label/evaluator/metric versions, threshold config, seed, hardware) on every run. The aggregate-first cube with honest scan fallback is the right architecture for scale.",
+      "reuse": "hardening/sampling.py reuses the W_h recombination pattern; the lineage field set seeds the FeatureCacheEntry manifest design."
+    },
+    {
+      "package": "sensorflow/raremine",
+      "refs": ["sensorflow/raremine/lineage.py:52-91", "sensorflow/raremine/miner.py:63-95"],
+      "what": "The leakage guard is real: protected eval destinations force training_eligible=False, promotion of protected examples raises LeakageError absent an audited governance override, unvalidated candidates can never route to training. Modality discipline is hard-enforced (evidence from absent modalities raises).",
+      "reuse": "hardening/contracts.py provenance rules mirror this guard; the audit verified evaluation/synthetic and megaeval paths cannot cross it because they never construct raremine destinations."
+    },
+    {
+      "package": "sensorflow/rca",
+      "refs": ["sensorflow/rca/stats.py:112-159"],
+      "what": "Cluster-robust paired deltas with ICC/design-effect effective n, PSI with practical-effect labels, three-way CI outcomes. Explicitly defers to seqeval for sequential use.",
+      "reuse": "hardening/power.py reuses the design-effect formulation for pairing/clustering corrections."
+    },
+    {
+      "package": "sensorflow/safety/ssam_ext",
+      "refs": ["sensorflow/safety/ssam_ext.py:27-31", "sensorflow/safety/ssam_ext.py:43-51"],
+      "what": "Honest labeling done right: FHWA-defaulted thresholds carry provenance comments, synthetic trajectories and the reaction-time mapping are explicitly marked simulated ('not a physics-validated driver model'), and TTC/PET use real geometry (support functions, zone-grid occupancy).",
+      "reuse": "safety_config.py adopts its provenance-comment convention as the ILLUSTRATIVE_THRESHOLD pattern."
+    },
+    {
+      "package": "sensorflow/vitis",
+      "refs": ["sensorflow/vitis/backend.py:26-37", "sensorflow/vitis/hil.py:12-18"],
+      "what": "Every modeled number carries 'modeled_not_measured: True'; the hardware backend is an explicit non-constructible stub; the HIL verdict prefers seqeval and labels its fallback.",
+      "reuse": "interfaces.py LOCAL/MOCK labeling convention follows this pattern."
+    },
+    {
+      "package": "sensorflow/evaluation (triage + detectors + graders statistics)",
+      "refs": ["sensorflow/evaluation/triage.py:69-185", "sensorflow/evaluation/detectors.py:46-141", "sensorflow/evaluation/graders.py:38-113"],
+      "what": "Triage decisions store per-gate actual-vs-threshold lines with policy id/values (real explainability); anomaly detection uses genuine kNN/LOF/IsolationForest/OCSVM implementations, seeded, with honest 'numpy stand-in' labels on the deep detectors; Cohen/Fleiss/Krippendorff are used in their correct regimes.",
+      "reuse": "hardening/quality.py routing keeps this decomposed-gates style and layers dependence adjustment on top."
+    }
+  ],
+  "summary": {
+    "critical": 6,
+    "high": 9,
+    "medium": 11,
+    "low": 4,
+    "fixed_now": 7,
+    "fixed_now_partial": 4,
+    "fixed_now_layered": 3,
+    "deferred": 16
+  }
+}
