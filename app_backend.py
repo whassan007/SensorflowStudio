@@ -1480,6 +1480,10 @@ app.include_router(bevfusion_router)
 from sensorflow.safety.api import router as safety_router
 app.include_router(safety_router)
 
+# Regression Root Cause Analysis workbench (staged offline-vs-shadow forensics).
+from sensorflow.rca.api import router as rca_router
+app.include_router(rca_router)
+
 # Mount static folder
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():

@@ -18,6 +18,7 @@ import {
   Radar,
   ShieldCheck,
   TrendingDown,
+  Microscope,
   Filter,
   UserCheck,
   Rocket,
@@ -46,6 +47,7 @@ import PipelineArchitecturePage from './pages/PipelineArchitecturePage';
 import SSAMSafetyDashboard from './pages/SSAMSafetyDashboard';
 import LegacyStudioPage from './pages/LegacyStudioPage';
 import CommandCenterPage from './pages/CommandCenterPage';
+import RootCauseLabPage from './pages/rca/RootCauseLabPage';
 import PageIntro from './components/help/PageIntro';
 import HelpMenu from './components/help/HelpMenu';
 
@@ -65,6 +67,7 @@ const PLATFORM_NAV: NavItem[] = [
   { id: 'rare-events', label: 'Rare Events', icon: <Radar size={18} /> },
   { id: 'quality', label: 'Quality Engine', icon: <ShieldCheck size={18} /> },
   { id: 'regression', label: 'Regression', icon: <TrendingDown size={18} /> },
+  { id: 'rca', label: 'Root Cause Lab', icon: <Microscope size={18} /> },
   { id: 'triage', label: 'Triage', icon: <Filter size={18} /> },
   { id: 'review', label: 'Human Review', icon: <UserCheck size={18} /> },
   { id: 'training', label: 'Training', icon: <Rocket size={18} /> },
@@ -87,6 +90,7 @@ const PAGE_TITLES: Record<PageId, string> = {
   'rare-events': 'Rare Event Detection',
   quality: 'Quality Engine',
   regression: 'Regression Tracking',
+  rca: 'Root Cause Lab',
   triage: 'Automated Triage',
   review: 'Human Review (HITL)',
   training: 'Training Flywheel',
@@ -291,6 +295,7 @@ export default function App() {
               {page === 'rare-events' ? <RareEventDashboard /> : null}
               {page === 'quality' ? <QualityEnginePage /> : null}
               {page === 'regression' ? <RegressionPage /> : null}
+              {page === 'rca' ? <RootCauseLabPage /> : null}
               {page === 'triage' ? <TriagePage /> : null}
               {page === 'review' ? <HumanReviewPage /> : null}
               {page === 'training' ? <TrainingPage /> : null}

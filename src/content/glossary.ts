@@ -619,6 +619,41 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     detail: 'Keyed by a hash of (run, filters, group-by, metrics). Hit rate shown in the header; identical dashboard queries return in ~0.1 ms.',
     caveat: 'Invalidated when a run publishes new artifacts.',
   },
+
+  // ------------------------------------------------- root cause analysis (RCA)
+  psi: {
+    term: 'PSI (Population Stability Index)',
+    category: 'Aggregation & scale',
+    short: 'Practical magnitude of a distribution change between two populations.',
+    detail: 'Sum over bins of (actual% − expected%) × ln(actual%/expected%). Rule of thumb: <0.02 negligible, <0.1 small, <0.25 moderate, ≥0.25 large. Used in the Root Cause Lab to compare offline vs shadow populations independently of p-values.',
+    caveat: 'At large n almost any change is statistically significant; PSI answers "does it matter", not "is it detectable".',
+  },
+  effective_sample_size: {
+    term: 'Effective sample size',
+    category: 'Human grading & sampling',
+    short: 'The number of independent observations your correlated data is actually worth.',
+    detail: 'Rows from the same entity (scene/track) are correlated; n_eff = n / design-effect where the design effect grows with cluster size and intra-cluster correlation. Confidence intervals in the Root Cause Lab use n_eff, not raw row counts.',
+    caveat: 'Using raw n on clustered evaluation data makes CIs look several times narrower than they really are.',
+  },
+  simpsons_paradox: {
+    term: "Simpson's paradox",
+    category: 'Aggregation & scale',
+    short: 'Aggregate trend reverses the trend present in every segment.',
+    detail: 'If a model improves within every segment but the population mix shifts toward segments where it is weaker, the aggregate can show a regression that no segment shows. The conditional-performance heatmap in the Root Cause Lab surfaces this: consistent per-segment deltas + a mix shift.',
+  },
+  training_serving_skew: {
+    term: 'Training–serving skew',
+    category: 'Operations',
+    short: 'A feature is computed differently offline than in production serving.',
+    detail: 'Unit changes, normalization differences or missing upstream signals make the serving-time feature distribution diverge from the offline one; the model then sees inputs unlike its training data. Detected in the feature-parity stage as a large standardized mean difference concentrated in specific features.',
+    caveat: 'Diagnose within segments: an aggregate feature delta can also be an honest population shift.',
+  },
+  shadow_evaluation: {
+    term: 'Shadow evaluation',
+    category: 'Operations',
+    short: 'Running a candidate model on live traffic without acting on its output.',
+    detail: 'The candidate scores real production inputs in parallel with the incumbent; outcomes are compared post-hoc. Sensitive to sampling bias, serving-config differences and provisional labels — which is why the Root Cause Lab audits the shadow pipeline before trusting its number.',
+  },
 };
 
 export type GlossaryKey = keyof typeof GLOSSARY;

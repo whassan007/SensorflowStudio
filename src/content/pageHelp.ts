@@ -179,6 +179,18 @@ export const PAGE_HELP: Record<PageId, PageHelpEntry> = {
     actions: 'Navigate to any stage\u2019s page; use it as the mental model for the rest of the app.',
     dataFlow: 'This page is the map, not a stage: it visualizes the flows the other pages implement.',
   },
+  rca: {
+    subtitle:
+      'Guided forensic workbench for evaluation discrepancies: when offline says +5% and shadow production says −2%, walk a 13-stage skeptical methodology to find out which number is real — and why.',
+    purpose:
+      'A metric disagreement has at least eight competing explanations (true regression, distribution shift, feature skew, serving mismatch, label latency, sampling bias, noise, offline contamination). Jumping to the plausible one is how bad models ship and good models die. This lab enforces the full measurement-validity → distribution → parity → significance chain before any conclusion is allowed.',
+    reading:
+      'The left rail is the methodology: stages unlock strictly in order, and a stage with critical UNKNOWN findings can only be completed by explicitly acknowledging them (recorded forever). The banner keeps the current working-hypothesis set visible — never a single premature conclusion. Each stage screen shows its diagnostic (validity matrix, PSI-badged shift comparisons, the segment heatmap that surfaces Simpson\u2019s paradox, the 2\u00d72 error-transition matrix, the CI-vs-practical-margin plot, ranked feature-parity deltas). Stage 11 is the Root Cause Board: 8 hypotheses scored purely from recorded findings with evidence links back to their stage.',
+    actions:
+      'Create an investigation (choose a scenario, or a demo with a hidden planted cause for training). Work each stage: review diagnostics, record your own findings, complete or acknowledge-and-proceed. Adjust hypothesis confidences on the board with notes, then export the final report (JSON/markdown) with remediation tiers and the minimum-additional-evidence answer.',
+    dataFlow:
+      'Investigations generate a paired offline + shadow evaluation dataset (persisted under runs/rca/). Every diagnostic is computed from that data — nothing is invented — and every board score traces to a recorded finding. Reports feed promotion decisions and the recommended follow-up experiments.',
+  },
   ssam: {
     subtitle:
       'Surrogate-safety analysis of real intersections: conflicts ranked by TTC / PET / severity on an interactive map — the safety context the label platform feeds.',
