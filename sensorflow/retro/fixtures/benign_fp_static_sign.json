@@ -1,0 +1,85 @@
+{
+  "evaluation_id": "EVAL-2026-0805-BF01",
+  "artifact_kind": "perception_failure_eval_log",
+  "scenario": {
+    "scenario_id": "SCN-SUB-207-A",
+    "description": "Suburban street, clear day. A roadside sign at 55 m is briefly detected as a stopped vehicle in the shoulder; planner applies a gentle precautionary slowdown; no following traffic. Benign false positive.",
+    "road_type": "suburban_street",
+    "weather": "clear",
+    "rain_rate_mmh": 0.0,
+    "time_of_day": "day",
+    "odd_status": "inside",
+    "posted_speed_mps": 13.4
+  },
+  "models": {
+    "baseline": "percept-bev-v41.2",
+    "candidate": "percept-bev-v42.0"
+  },
+  "sensor_metadata": {
+    "camera": {"status": "nominal", "fps": 30},
+    "lidar": {"status": "nominal", "returns_density": "normal", "fps": 10},
+    "radar": {"status": "nominal", "note": "static return, zero doppler"}
+  },
+  "ego": {
+    "speed_mps": 12.0,
+    "heading_deg": 0.0,
+    "grade": 0.0,
+    "road_friction_estimate": 0.8,
+    "lane": 1
+  },
+  "ground_truth": {
+    "object_id": "gt-1180",
+    "class": "traffic_sign",
+    "distance_m": 55.0,
+    "lateral_offset_m": 3.2,
+    "relative_velocity_mps": 0.0,
+    "dimensions_m": [0.1, 0.8, 2.2],
+    "source": "map-verified static asset"
+  },
+  "prediction": {
+    "object_id": "det-45520",
+    "class": "vehicle",
+    "confidence": 0.58,
+    "distance_m": 54.6,
+    "relative_velocity_mps": 0.0,
+    "track_id": "trk-902",
+    "class_history": ["vehicle", "vehicle", "traffic_sign"],
+    "detection_delay_s": 0.0,
+    "note": "resolved to traffic_sign after 3 frames"
+  },
+  "tracks": [
+    {"track_id": "trk-902", "frames": 3, "class_flicker": true,
+     "velocity_variance": "none", "id_switches": 0}
+  ],
+  "timing": {
+    "detection_latency_ms": 110,
+    "planner_latency_ms": 70
+  },
+  "planner_response": {
+    "action": "precautionary_slowdown",
+    "decel_mps2": 1.2,
+    "response_time_s": 0.6
+  },
+  "counterfactual_planner_response": {
+    "action": "maintain_speed",
+    "decel_mps2": 0.0,
+    "response_time_s": 0.6,
+    "source": "resim replay with corrected static-sign classification"
+  },
+  "traffic_context": {
+    "following_vehicle": {"present": true, "time_gap_s": 4.2, "speed_mps": 11.8}
+  },
+  "disengagement": {"occurred": false, "probability_model": 0.03},
+  "collision": {"occurred": false, "near_miss": false},
+  "evaluation_context": {
+    "critical_object_count": 1240,
+    "baseline_missed_critical": 3,
+    "candidate_missed_critical": 3,
+    "metric_delta": {"vehicle_precision": -0.004},
+    "significance": {
+      "method": "seqeval.PairedSequentialTest",
+      "significant": false,
+      "detail": "precision delta CS includes 0 at alpha=0.05 (from run artifact)"
+    }
+  }
+}

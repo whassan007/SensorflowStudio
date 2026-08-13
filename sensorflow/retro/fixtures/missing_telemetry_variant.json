@@ -1,0 +1,70 @@
+{
+  "evaluation_id": "EVAL-2026-0802-MT01",
+  "artifact_kind": "perception_failure_eval_log",
+  "scenario": {
+    "scenario_id": "SCN-URB-042-R-degraded",
+    "description": "Same missed-pedestrian-in-rain event as EVAL-2026-0802-MP01, but the telemetry pipeline dropped the CAN segment: ego speed, relative velocity, and the resim counterfactual are absent. The analyzer must mark the derived safety metrics UNKNOWN, never guess them.",
+    "road_type": "urban_arterial",
+    "weather": "rain",
+    "rain_rate_mmh": 18.0,
+    "time_of_day": "night",
+    "odd_status": "inside",
+    "posted_speed_mps": 15.6
+  },
+  "models": {
+    "baseline": "percept-bev-v41.2",
+    "candidate": "percept-bev-v42.0"
+  },
+  "sensor_metadata": {
+    "camera": {"status": "degraded_contrast", "exposure": "night_mode", "fps": 30},
+    "lidar": {"status": "attenuated", "returns_density": "reduced_by_spray", "fps": 10},
+    "radar": {"status": "telemetry_dropout"}
+  },
+  "ego": {
+    "heading_deg": 0.0,
+    "grade": -0.02,
+    "road_friction_estimate": 0.5,
+    "lane": 1,
+    "telemetry_note": "speed_mps absent: CAN log segment lost in upload"
+  },
+  "ground_truth": {
+    "object_id": "gt-7742",
+    "class": "pedestrian",
+    "distance_m": 26.0,
+    "lateral_offset_m": 1.1,
+    "dimensions_m": [0.6, 0.6, 1.7],
+    "crossing": true,
+    "source": "human-verified replay label"
+  },
+  "prediction": {
+    "object_id": "det-91027",
+    "class": "pedestrian",
+    "confidence": 0.34,
+    "distance_m": 14.8,
+    "track_id": "trk-551",
+    "class_history": ["unknown", "unknown", "pedestrian"],
+    "detection_delay_s": 1.9
+  },
+  "tracks": [
+    {"track_id": "trk-551", "frames": 4, "class_flicker": true,
+     "velocity_variance": "moderate", "id_switches": 0}
+  ],
+  "timing": {
+    "detection_latency_ms": 180,
+    "planner_latency_ms": 100
+  },
+  "planner_response": {
+    "action": "emergency_brake",
+    "decel_mps2": 8.0,
+    "response_time_s": 2.4
+  },
+  "traffic_context": {},
+  "disengagement": {
+    "occurred": true,
+    "probability_model": 0.87
+  },
+  "collision": {"occurred": false, "near_miss": true},
+  "evaluation_context": {
+    "metric_delta": {"recall_pedestrian_rain": -0.021}
+  }
+}

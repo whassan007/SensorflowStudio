@@ -32,7 +32,8 @@ export type GlossaryCategory =
   | 'Ground truth'
   | 'Operations'
   | 'EM readiness'
-  | 'Hardware acceleration';
+  | 'Hardware acceleration'
+  | 'Retrospective safety';
 
 export const GLOSSARY: Record<string, GlossaryEntry> = {
   // ------------------------------------------------------------ detection metrics
@@ -788,6 +789,41 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     detail: 'The Phase-4 simulation tracks ten competing state metrics (performance, safety, reliability, cost, velocity, maintainability, morale, customer impact, risk, schedule) with hard floors — dropping safety below its floor triggers an incident. The balanced multi-objective score rewards keeping all objectives healthy, not maximizing one.',
     caveat: 'Deterministic given the scenario seed: identical intervention sequences replay identically, which is what makes debriefs auditable.',
   },
+
+  // ------------------------------------------------------------ Retrospective safety
+  evidence_tier: {
+    term: 'Evidence tier',
+    category: 'Retrospective safety',
+    short: 'Every claim in a retrospective is tagged by how it was produced: observed, derived, retrieved, or hypothesized.',
+    detail: 'Tier 1 OBSERVED = a fact read directly from the failure log. Tier 2 DERIVED = deterministically computed from observed facts (stopping distance, TTC, SCR impact). Tier 3 RETRIEVED = text returned by the safety-case RAG with full citation. Tier 4 AI_HYPOTHESIS = an LLM inference, never treated as fact. The scorecard renders the distinction explicitly.',
+    caveat: 'A hypothesis with high confidence is still Tier 4 — confidence never promotes an inference to a fact.',
+  },
+  retro_severity: {
+    term: 'Retrospective severity',
+    category: 'Retrospective safety',
+    short: 'BENIGN / DISRUPTIVE / CRITICAL / FATAL — computed deterministically from contextual evidence, not by the LLM.',
+    detail: 'An asymmetric cost model: false negatives are scored by VRU class × safety-relevant distance × relative motion × remaining reaction time; false positives by intervention magnitude × traffic disruption. The LLM may propose a severity, but the deterministic policy engine validates or overrides it, and any divergence is flagged for human review.',
+    caveat: 'Not every miss outranks every phantom: a distant benign FN ranks below a hard-braking phantom FP with tailgating traffic.',
+  },
+  launch_gate_retro: {
+    term: 'Launch recommendation gate',
+    category: 'Retrospective safety',
+    short: 'Deterministic, policy-versioned mapping from severity + evidence completeness to PASS / CONDITIONAL_PASS / FAIL / INSUFFICIENT_EVIDENCE.',
+    detail: 'The gate is pure code with a versioned config: FATAL/CRITICAL fail, DISRUPTIVE passes conditionally, and missing critical telemetry yields INSUFFICIENT_EVIDENCE — which can never be upgraded to PASS. The recommendation is advice to a human decision-maker, never an automatic launch.',
+  },
+  synthetic_standard: {
+    term: 'SYNTHETIC_EXAMPLE standard',
+    category: 'Retrospective safety',
+    short: 'Every document in the safety-case corpus is a labeled synthetic demonstration — never real standard text.',
+    detail: 'Corpus documents (safety requirements, launch criteria, ODD definitions, historical retrospectives) carry SYNTHETIC_EXAMPLE / NOT_A_REAL_STANDARD in both content and metadata; SOTIF entries are concept-level paraphrases explicitly labeled as not standard text. The retriever surfaces these labels with every citation.',
+    caveat: 'Hard rule: the system never cites a safety requirement without a retrieval hit backing it.',
+  },
+  tool_audit_trail: {
+    term: 'Tool audit trail',
+    category: 'Retrospective safety',
+    short: 'Every agent tool call — including denials — is appended to a per-analysis audit log with args, result hash, and timestamp.',
+    detail: 'Tools are read-only by default; the single write tool (CreateEvaluationCase) requires an explicit policy authorization flag. The log reader is path-allowlisted to runs/ and the fixtures directory. The audit trail makes each scorecard reproducible and reviewable.',
+  },
 };
 
 export type GlossaryKey = keyof typeof GLOSSARY;
@@ -863,4 +899,5 @@ export const GLOSSARY_CATEGORIES: GlossaryCategory[] = [
   'Operations',
   'EM readiness',
   'Hardware acceleration',
+  'Retrospective safety',
 ];

@@ -1488,6 +1488,11 @@ app.include_router(rca_router)
 from sensorflow.hillclimb.api import router as hillclimb_router
 app.include_router(hillclimb_router)
 
+# Agentic Retrospective Safety Analyzer (evidence-tiered failure retrospectives,
+# safety-case RAG, deterministic severity + launch policy gate).
+from sensorflow.retro.api import router as retro_router
+app.include_router(retro_router)
+
 # Multimodal rare-event mining & perception QA (costumed-pedestrian miner).
 from sensorflow.raremine.api import router as raremine_router
 app.include_router(raremine_router)

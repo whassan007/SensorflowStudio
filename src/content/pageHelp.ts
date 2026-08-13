@@ -227,6 +227,18 @@ export const PAGE_HELP: Record<PageId, PageHelpEntry> = {
     dataFlow:
       'All state persists under runs/hillclimb/. Exercise submissions, STAR stories, design grades, simulation debriefs and interview transcripts become Evidence artifacts that feed the readiness matrix; the matrix feeds bottleneck analysis and the Next Best Action. The Phase-1 "offline +5% / shadow −2%" exercise family cross-links to the Root Cause Lab as the live practice tool.',
   },
+  retro: {
+    subtitle:
+      'Agentic failure retrospectives: perception failures become a traceable evidence chain — observed facts, derived metrics, retrieved requirements, AI hypotheses — ending in a deterministic policy-gated launch recommendation.',
+    purpose:
+      'A false negative on a pedestrian and a phantom brake on a plastic bag need very different engineering responses. This page runs an evidence-tiered retrospective: deterministic code computes the safety metrics and owns the launch decision; the LLM only interprets, correlates and hypothesizes — and every claim carries its evidence tier.',
+    reading:
+      'The evidence chain flows top-to-bottom from raw failure to human decision; items are color-coded by tier (FACT / DERIVED / RETRIEVED / AI HYPOTHESIS / DETERMINATION). Retrieved standards are SYNTHETIC demonstration documents (badged) — never real standard text. UNKNOWN means the telemetry was absent, never guessed. The hardware card reports honestly whether vLLM can run on this machine.',
+    actions:
+      'Pick a failure fixture and inference backend (mock is deterministic and always available; Ollama when a local server is running; vLLM only on CUDA/ROCm hosts), run the analysis, inspect the chain / scorecard / citations / tool-call audit trail, and reload prior analyses.',
+    dataFlow:
+      'Fixtures live in sensorflow/retro/fixtures; analyses and audit trails persist under runs/retro/. Metric math reuses the SSAM safety extensions; distribution stats delegate to the mega-eval engine; the safety-case corpus is indexed at startup (chromadb or deterministic fallback).',
+  },
   ssam: {
     subtitle:
       'Surrogate-safety analysis of real intersections: conflicts ranked by TTC / PET / severity on an interactive map — the safety context the label platform feeds.',

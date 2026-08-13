@@ -1,0 +1,97 @@
+{
+  "evaluation_id": "EVAL-2026-0731-PB01",
+  "artifact_kind": "perception_failure_eval_log",
+  "scenario": {
+    "scenario_id": "SCN-HWY-118-C",
+    "description": "Divided highway, light traffic. Wind-blown plastic bag crosses lanes ahead of ego; perception classifies it as a vehicle with spurious closing velocity; planner executes an unwarranted emergency brake with a close follower behind.",
+    "road_type": "divided_highway",
+    "weather": "clear",
+    "rain_rate_mmh": 0.0,
+    "time_of_day": "day",
+    "odd_status": "inside",
+    "posted_speed_mps": 29.1
+  },
+  "models": {
+    "baseline": "percept-bev-v41.2",
+    "candidate": "percept-bev-v42.0"
+  },
+  "sensor_metadata": {
+    "camera": {"status": "nominal", "exposure": "auto", "fps": 30},
+    "lidar": {"status": "nominal", "returns_density": "normal", "fps": 10},
+    "radar": {"status": "nominal", "note": "low RCS return consistent with low-mass object"}
+  },
+  "ego": {
+    "speed_mps": 24.6,
+    "heading_deg": 0.0,
+    "grade": 0.0,
+    "road_friction_estimate": 0.85,
+    "lane": 2
+  },
+  "ground_truth": {
+    "object_id": "gt-3312",
+    "class": "plastic_bag",
+    "distance_m": 38.2,
+    "lateral_offset_m": 0.4,
+    "relative_velocity_mps": 1.2,
+    "dimensions_m": [0.5, 0.4, 0.3],
+    "mass_plausibility": "low_mass_deformable",
+    "source": "human-verified replay label"
+  },
+  "prediction": {
+    "object_id": "det-88410",
+    "class": "vehicle",
+    "confidence": 0.91,
+    "distance_m": 37.9,
+    "relative_velocity_mps": 9.8,
+    "track_id": "trk-204",
+    "class_history": ["unknown", "vehicle", "vehicle", "vehicle"],
+    "detection_delay_s": 0.0,
+    "velocity_note": "tracker latched bag flutter as closing velocity toward ego"
+  },
+  "tracks": [
+    {"track_id": "trk-204", "frames": 11, "class_flicker": true,
+     "velocity_variance": "high", "id_switches": 0}
+  ],
+  "timing": {
+    "detection_latency_ms": 120,
+    "planner_latency_ms": 80
+  },
+  "planner_response": {
+    "action": "emergency_brake",
+    "decel_mps2": 6.2,
+    "response_time_s": 0.4,
+    "lateral_action": null
+  },
+  "counterfactual_planner_response": {
+    "action": "maintain_speed",
+    "decel_mps2": 0.0,
+    "response_time_s": 0.4,
+    "source": "resim replay with corrected perception (bag labeled low-mass debris)"
+  },
+  "traffic_context": {
+    "following_vehicle": {"present": true, "time_gap_s": 0.9, "speed_mps": 25.1}
+  },
+  "disengagement": {
+    "occurred": false,
+    "probability_model": 0.41,
+    "note": "safety driver hands hovered; no takeover"
+  },
+  "collision": {"occurred": false, "near_miss": false, "induced_rear_risk": true},
+  "evaluation_context": {
+    "critical_object_count": 1240,
+    "baseline_missed_critical": 3,
+    "candidate_missed_critical": 3,
+    "metric_delta": {"phantom_brake_rate_per_1k_km": 0.8, "vehicle_precision": -0.011},
+    "significance": {
+      "method": "seqeval.PairedSequentialTest",
+      "significant": false,
+      "detail": "phantom-brake rate delta CS still includes 0 at alpha=0.05 (from run artifact)"
+    },
+    "distribution_shift": {
+      "slice": "highway_debris_windblown",
+      "candidate_fp_rate": 0.034,
+      "baseline_fp_rate": 0.012,
+      "relative_change": 1.83
+    }
+  }
+}
