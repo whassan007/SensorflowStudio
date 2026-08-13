@@ -1498,6 +1498,11 @@ app.include_router(retro_router)
 from sensorflow.agentic.api import router as agentic_router
 app.include_router(agentic_router)
 
+# Studio UX support (dashboard layout persistence + BEV frame replay for the
+# interactive canvas). Read-only over other packages' data.
+from sensorflow.studio_ux.api import router as studio_ux_router
+app.include_router(studio_ux_router)
+
 # Multimodal rare-event mining & perception QA (costumed-pedestrian miner).
 from sensorflow.raremine.api import router as raremine_router
 app.include_router(raremine_router)

@@ -19,10 +19,23 @@ export type PageId =
   | 'rca'
   | 'raremine'
   | 'hillclimb'
-  | 'retro'
-  | 'launch-readiness'
   | 'vitis'
   | 'ssam'
+  | 'safety-odd'
+  | 'safety-gates'
+  | 'safety-evidence'
+  | 'safety-ssam'
+  | 'safety-calibration'
+  | 'safety-discrepancy'
+  | 'safety-scenarios'
+  | 'safety-search'
+  | 'seqeval'
+  | 'bevfusion'
+  | 'scenario-composer'
+  | 'pipeline-builder'
+  | 'my-dashboard'
+  | 'retro'
+  | 'launch-readiness'
   | 'legacy';
 
 export const ALL_PAGE_IDS: PageId[] = [
@@ -43,10 +56,23 @@ export const ALL_PAGE_IDS: PageId[] = [
   'rca',
   'raremine',
   'hillclimb',
-  'retro',
-  'launch-readiness',
   'vitis',
   'ssam',
+  'safety-odd',
+  'safety-gates',
+  'safety-evidence',
+  'safety-ssam',
+  'safety-calibration',
+  'safety-discrepancy',
+  'safety-scenarios',
+  'safety-search',
+  'seqeval',
+  'bevfusion',
+  'scenario-composer',
+  'pipeline-builder',
+  'my-dashboard',
+  'retro',
+  'launch-readiness',
   'legacy',
 ];
 

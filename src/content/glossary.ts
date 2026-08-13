@@ -33,6 +33,9 @@ export type GlossaryCategory =
   | 'Operations'
   | 'EM readiness'
   | 'Hardware acceleration'
+  | 'Safety & compliance'
+  | 'Sequential testing'
+  | 'Perception fusion'
   | 'Retrospective safety'
   | 'Launch readiness';
 
@@ -658,8 +661,6 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     short: 'Running a candidate model on live traffic without acting on its output.',
     detail: 'The candidate scores real production inputs in parallel with the incumbent; outcomes are compared post-hoc. Sensitive to sampling bias, serving-config differences and provisional labels — which is why the Root Cause Lab audits the shadow pipeline before trusting its number.',
   },
-
-  // ------------------------------------------------- rare-event mining (raremine)
   costumed_pedestrian: {
     term: 'Costumed pedestrian',
     category: 'Anomaly & rarity',
@@ -678,6 +679,58 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     category: 'Anomaly & rarity',
     short: 'Whether the miner\u2019s stated confidence matches how often it is right.',
     detail: 'Candidates are binned by stated rare-event confidence; within each bin, the observed rate of true (planted) rare events is measured. A calibrated miner\u2019s 80% bin is right about 80% of the time — over-confident bins mean stated confidence cannot be trusted for triage ordering.',
+  },
+
+  // ------------------------------------------------------------ EM readiness (Hill Climbing EM)
+  hc_competency: {
+    term: 'Competency',
+    category: 'EM readiness',
+    short: 'A single skill node in the 4-phase blueprint graph, with prerequisites and a dimension tag.',
+    detail: 'Each competency belongs to a phase (ML depth / system design / execution & people / simulation), lists prerequisite competencies, and is tagged with one dimension (Knowledge, Technical Reasoning, Leadership, Execution). Scores are tracked per competency and per dimension — never collapsed into one number.',
+  },
+  hc_readiness_state: {
+    term: 'Readiness state',
+    category: 'EM readiness',
+    short: 'Per-competency progression: NOT_STARTED → LEARNING → PRACTICING → NEEDS_REVIEW → COMPETENT → STRONG → INTERVIEW_READY.',
+    detail: 'Derived from three separate scores: knowledge (diagnostic/interview answers), application (exercises, design lab, simulation) and evidence (STAR stories and other artifacts). NEEDS_REVIEW is entered when recent attempts contradict earlier strong scores.',
+    caveat: 'States are only as trustworthy as the evidence backing them; with the LLM offline, scoring is rule-based concept coverage, which is stricter but coarser.',
+  },
+  hc_evidence_artifact: {
+    term: 'Evidence artifact',
+    category: 'EM readiness',
+    short: 'A stored, quotable record (attempt, STAR story, design grade, simulation debrief, interview transcript) that justifies a score.',
+    detail: 'The scoring rule is "no score without evidence": every evaluation must quote specific user statements. Artifacts persist under runs/hillclimb/ and are browsable in the Evidence Library; clicking any matrix score shows the artifacts behind it.',
+  },
+  hc_bottleneck: {
+    term: 'Bottleneck competency',
+    category: 'EM readiness',
+    short: 'The weak prerequisite blocking the most downstream competencies — not merely the lowest score.',
+    detail: 'Computed from the prerequisite graph: for each weak competency, count the downstream competencies transitively gated on it; the highest-leverage weakness wins. Fixing the bottleneck unblocks more of the graph than fixing the globally lowest score.',
+  },
+  hc_next_best_action: {
+    term: 'Next best action',
+    category: 'EM readiness',
+    short: 'Exactly one concept to study, one exercise to attempt and one assessment to take, aimed at the current bottleneck.',
+    detail: 'Regenerated whenever the readiness matrix changes. Deliberately singular: a ranked to-do list invites cherry-picking easy items; one action per category forces work on the highest-leverage weakness.',
+  },
+  hc_claim_vs_evidence: {
+    term: 'Claim vs evidence',
+    category: 'EM readiness',
+    short: 'STAR Story Box flag: an unquantified claim ("improved performance") vs measurable evidence (numbers, before/after, named mechanism).',
+    detail: 'Claim sentences are detected by improvement verbs without attached quantities. Each flag asks for the missing strengthening: the metric, the baseline, the delta, or the mechanism that caused it. Interviewers apply the same test — so the diagnoser applies it first.',
+  },
+  hc_anti_gaming: {
+    term: 'Anti-gaming rule',
+    category: 'EM readiness',
+    short: 'Verbosity alone must not raise scores: concept coverage, tradeoffs and quantified results are scored, not length.',
+    detail: 'The evaluator scores rubric-concept coverage, tradeoff discussion and quantified statements. Length is not a feature, and low information density is penalized — a long waffle scores below a short precise answer (enforced by test).',
+  },
+  hc_hill_climbing: {
+    term: 'Hill climbing (simulation)',
+    category: 'EM readiness',
+    short: 'Iterative optimization loop: hypothesis → intervention → measure → keep/reject → repeat, under competing objectives.',
+    detail: 'The Phase-4 simulation tracks ten competing state metrics (performance, safety, reliability, cost, velocity, maintainability, morale, customer impact, risk, schedule) with hard floors — dropping safety below its floor triggers an incident. The balanced multi-objective score rewards keeping all objectives healthy, not maximizing one.',
+    caveat: 'Deterministic given the scenario seed: identical intervention sequences replay identically, which is what makes debriefs auditable.',
   },
 
   // ------------------------------------------------------------ hardware acceleration (Vitis)
@@ -739,59 +792,142 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     detail: 'Every generated augmentation variant carries training_eligible: false, evaluation_only: true and destination REGRESSION_EVALUATION_SET, plus complete lineage (recipe with resolved parameters, seed, source frame, backend config). Mirrors the rare-event miner\u2019s protected-destination leakage guard: stress data that leaked into training would corrupt the very regression signal it exists to protect.',
   },
 
-  // ------------------------------------------------------------ EM readiness (Hill Climbing EM)
-  hc_competency: {
-    term: 'Competency',
-    category: 'EM readiness',
-    short: 'A single skill node in the 4-phase blueprint graph, with prerequisites and a dimension tag.',
-    detail: 'Each competency belongs to a phase (ML depth / system design / execution & people / simulation), lists prerequisite competencies, and is tagged with one dimension (Knowledge, Technical Reasoning, Leadership, Execution). Scores are tracked per competency and per dimension — never collapsed into one number.',
+  // ------------------------------------------------------------ safety & compliance
+  odd: {
+    term: 'ODD (Operational Design Domain)',
+    category: 'Safety & compliance',
+    short: 'The set of conditions the autonomy system is designed — and validated — to operate in.',
+    detail: 'Formalized here as a taxonomy of dimensions (object class, weather, lighting, traffic density, road type). Every claim of safety only holds inside the ODD cells that have adequate evaluation evidence.',
   },
-  hc_readiness_state: {
-    term: 'Readiness state',
-    category: 'EM readiness',
-    short: 'Per-competency progression: NOT_STARTED → LEARNING → PRACTICING → NEEDS_REVIEW → COMPETENT → STRONG → INTERVIEW_READY.',
-    detail: 'Derived from three separate scores: knowledge (diagnostic/interview answers), application (exercises, design lab, simulation) and evidence (STAR stories and other artifacts). NEEDS_REVIEW is entered when recent attempts contradict earlier strong scores.',
-    caveat: 'States are only as trustworthy as the evidence backing them; with the LLM offline, scoring is rule-based concept coverage, which is stricter but coarser.',
+  odd_coverage: {
+    term: 'ODD coverage',
+    category: 'Safety & compliance',
+    short: 'Fraction of ODD cells with enough evaluation samples and acceptable performance.',
+    detail: 'A cell (class × condition) counts as covered when its evaluation sample count meets the per-cell requirement and its recall clears the policy floor. Production-weighted coverage weights each cell by its real-world exposure frequency, so covering a common cell counts more than an exotic one.',
+    caveat: 'Coverage measures evidence quantity, not difficulty: a covered cell can still hide a hard sub-population.',
   },
-  hc_evidence_artifact: {
-    term: 'Evidence artifact',
-    category: 'EM readiness',
-    short: 'A stored, quotable record (attempt, STAR story, design grade, simulation debrief, interview transcript) that justifies a score.',
-    detail: 'The scoring rule is "no score without evidence": every evaluation must quote specific user statements. Artifacts persist under runs/hillclimb/ and are browsable in the Evidence Library; clicking any matrix score shows the artifacts behind it.',
+  coverage_gap: {
+    term: 'Coverage gap',
+    category: 'Safety & compliance',
+    short: 'An ODD cell with too little evaluation evidence (or too-low performance) to support a safety claim.',
+    detail: 'Gaps are ranked by risk score = production exposure × class severity × statistical uncertainty. The top-ranked gap is the highest-value target for scenario generation or data collection.',
   },
-  hc_bottleneck: {
-    term: 'Bottleneck competency',
-    category: 'EM readiness',
-    short: 'The weak prerequisite blocking the most downstream competencies — not merely the lowest score.',
-    detail: 'Computed from the prerequisite graph: for each weak competency, count the downstream competencies transitively gated on it; the highest-leverage weakness wins. Fixing the bottleneck unblocks more of the graph than fixing the globally lowest score.',
+  release_gate: {
+    term: 'Release gate',
+    category: 'Safety & compliance',
+    short: 'A named safety criterion that must pass before a model can be promoted.',
+    detail: 'Each gate bundles concrete checks (measured value vs policy threshold): overall quality, safety-critical recall, non-regression vs baseline, ODD coverage, and calibration health. One failing check blocks the gate; one blocked gate blocks the release.',
   },
-  hc_next_best_action: {
-    term: 'Next best action',
-    category: 'EM readiness',
-    short: 'Exactly one concept to study, one exercise to attempt and one assessment to take, aimed at the current bottleneck.',
-    detail: 'Regenerated whenever the readiness matrix changes. Deliberately singular: a ranked to-do list invites cherry-picking easy items; one action per category forces work on the highest-leverage weakness.',
+  evidence_package: {
+    term: 'Safety evidence package',
+    category: 'Safety & compliance',
+    short: 'A structured document assembling all evaluation evidence behind a release decision.',
+    detail: 'Generated per candidate run: scope, gate results, coverage summary, calibration status, known limitations and sign-off placeholders, in the spirit of ISO 21448 (SOTIF) / UL 4600 argumentation.',
+    caveat: 'The package generated in this demo is a synthetic demonstration artifact — not a real certification document.',
   },
-  hc_claim_vs_evidence: {
-    term: 'Claim vs evidence',
-    category: 'EM readiness',
-    short: 'STAR Story Box flag: an unquantified claim ("improved performance") vs measurable evidence (numbers, before/after, named mechanism).',
-    detail: 'Claim sentences are detected by improvement verbs without attached quantities. Each flag asks for the missing strengthening: the metric, the baseline, the delta, or the mechanism that caused it. Interviewers apply the same test — so the diagnoser applies it first.',
+  drac: {
+    term: 'DRAC',
+    category: 'Safety (SSAM)',
+    short: 'Deceleration Rate to Avoid Crash — braking intensity required to prevent the collision.',
+    detail: 'Computed from relative speed and gap at the conflict point: DRAC = Δv² / (2·distance). Values above ~3.35 m/s² conventionally mark an emergency-braking-level conflict.',
   },
-  hc_anti_gaming: {
-    term: 'Anti-gaming rule',
-    category: 'EM readiness',
-    short: 'Verbosity alone must not raise scores: concept coverage, tradeoffs and quantified results are scored, not length.',
-    detail: 'The evaluator scores rubric-concept coverage, tradeoff discussion and quantified statements. Length is not a feature, and low information density is penalized — a long waffle scores below a short precise answer (enforced by test).',
+  delta_s: {
+    term: 'ΔS (speed differential)',
+    category: 'Safety (SSAM)',
+    short: 'Relative speed of the two road users at the conflict point.',
+    detail: 'Higher ΔS means higher kinetic energy in a hypothetical collision — it scales the severity component of conflict indices.',
   },
-  hc_hill_climbing: {
-    term: 'Hill climbing (simulation)',
-    category: 'EM readiness',
-    short: 'Iterative optimization loop: hypothesis → intervention → measure → keep/reject → repeat, under competing objectives.',
-    detail: 'The Phase-4 simulation tracks ten competing state metrics (performance, safety, reliability, cost, velocity, maintainability, morale, customer impact, risk, schedule) with hard floors — dropping safety below its floor triggers an incident. The balanced multi-objective score rewards keeping all objectives healthy, not maximizing one.',
-    caveat: 'Deterministic given the scenario seed: identical intervention sequences replay identically, which is what makes debriefs auditable.',
+  csi: {
+    term: 'CSI (Conflict Severity Index)',
+    category: 'Safety (SSAM)',
+    short: 'Composite 0–1 severity score combining proximity (TTC/PET), required braking (DRAC) and speed differential.',
+    detail: 'Blends the surrogate measures into a single ranking score so conflicts from different mechanisms (crossing, rear-end, merging) are comparable. Used to rank conflicts and compare scenarios.',
+    caveat: 'The blend weights are a documented convention; always inspect the underlying TTC/PET/DRAC values before acting on a CSI ranking.',
+  },
+  extrinsic_calibration: {
+    term: 'Extrinsic calibration',
+    category: 'Safety & compliance',
+    short: 'The rigid transform (rotation + translation) mapping one sensor\u2019s frame into another\u2019s.',
+    detail: 'Validated cross-sensor: project LiDAR objects into the camera frame and measure residual offsets. A consistent directional residual across all objects indicates miscalibration; large residuals on a few objects indicate perception failures.',
+  },
+  residual: {
+    term: 'Calibration residual',
+    category: 'Safety & compliance',
+    short: 'Per-object positional disagreement between camera and LiDAR after applying the calibration transform.',
+    detail: 'Plotted as a 2D scatter (lateral × longitudinal offset). Healthy: tight cloud at origin. Miscalibrated: whole cloud shifted/rotated coherently. Perception failure: tight cloud plus isolated far outliers.',
+  },
+  discrepancy_mining: {
+    term: 'Discrepancy mining',
+    category: 'Safety & compliance',
+    short: 'Systematically finding objects where auto-labels, human labels and model predictions disagree.',
+    detail: 'Disagreements are typed (missing box, spurious box, class confusion, geometry drift) and aggregated per cohort. A cohort with a high discrepancy rate is where labeling quality is systematically weakest — without needing any new ground truth.',
+  },
+  semantic_search_stage: {
+    term: 'Hybrid semantic search',
+    category: 'Safety & compliance',
+    short: 'Concept search = symbolic dimension filter → reasoning scorer → blended ranking, with per-stage explanations.',
+    detail: 'The symbolic stage parses hard constraints from the query (e.g. lighting=night); the reasoning stage scores conceptual relevance; the blend combines them. Each result explains its score per stage, and a provider badge states whether an LLM or the deterministic fallback did the scoring.',
   },
 
-  // ------------------------------------------------------------ Retrospective safety
+  // ------------------------------------------------------------ sequential testing
+  evalue: {
+    term: 'E-value / e-process',
+    category: 'Sequential testing',
+    short: 'Betting-style evidence measure that stays valid under continuous monitoring — no peeking penalty.',
+    detail: 'An e-process accumulates multiplicative evidence against a hypothesis; its running value can be checked after every sample, and rejecting when it crosses 1/α controls the error rate at α regardless of when you stop. The sequential-evidence chart plots log e-values, so the stopping boundary is a horizontal line.',
+  },
+  stopping_boundary: {
+    term: 'Stopping boundary',
+    category: 'Sequential testing',
+    short: 'The evidence threshold that ends the sequential test the moment it is crossed.',
+    detail: 'Crossing the upper (rejection) boundary = enough evidence of regression → BLOCK; crossing the lower boundary = enough evidence of safety → PASS. Running out of budget between the boundaries yields INSUFFICIENT_EVIDENCE.',
+  },
+  n_eff: {
+    term: 'Effective n',
+    category: 'Sequential testing',
+    short: 'The information-equivalent sample count after accounting for correlation and weighting.',
+    detail: 'Samples that are correlated (same scene, same track) carry less independent information than their raw count suggests. Decisions report both raw n used and effective n; a large gap flags heavy within-cluster correlation.',
+  },
+  safety_primary_node: {
+    term: 'Safety-primary node',
+    category: 'Sequential testing',
+    short: 'A tested slice flagged as safety-critical and held to stricter sequential thresholds.',
+    detail: 'Safety-primary nodes (e.g. pedestrian-at-night) get tighter regression tolerances and higher evidence requirements — a marginal regression that would pass on a comfort slice blocks on a safety-primary one.',
+  },
+  sample_budget: {
+    term: 'Sample budget',
+    category: 'Sequential testing',
+    short: 'The maximum labeled samples the sequential run may spend before it must decide.',
+    detail: 'The budget funnel shows planned budget vs actually used vs the full population size: the gap between used and population is the labeling cost the sequential design saved over a fixed-n evaluation.',
+  },
+
+  // ------------------------------------------------------------ perception fusion
+  bev: {
+    term: 'BEV (bird\u2019s-eye view)',
+    category: 'Perception fusion',
+    short: 'Top-down ego-centric view of the scene — the natural frame for fusing multi-sensor detections.',
+    detail: 'All detections and boxes are expressed in the ego frame (x forward, y left, meters) and rasterized or drawn top-down. Distance rings and an ego marker anchor the geometry.',
+  },
+  along_ray_uncertainty: {
+    term: 'Along-ray uncertainty',
+    category: 'Perception fusion',
+    short: 'Monocular camera depth error: large along the viewing ray, small across it.',
+    detail: 'A camera fixes bearing precisely but estimates depth poorly, so its position covariance is an elongated ellipse pointing along the ray from the camera — exactly what the BEV canvas draws. Fusion with LiDAR (precise range) collapses that ellipse.',
+  },
+  masklet_propagation: {
+    term: 'Masklet propagation',
+    category: 'Perception fusion',
+    short: 'Carrying a track through detection gaps using its motion model instead of dropping it.',
+    detail: 'When a tracked object gets no detection this frame (occlusion, dropout), the tracker propagates the box along the track\u2019s estimated velocity for a bounded number of frames — drawn dashed on the canvas. Identity survives the gap, which is what improves IDF1 and cuts fragmentation.',
+    caveat: 'Propagation is a prediction, not an observation: propagated boxes carry reduced confidence and expire if no detection re-associates.',
+  },
+  fused_track: {
+    term: 'Fused track',
+    category: 'Perception fusion',
+    short: 'An object hypothesis maintained over time from camera + LiDAR detections fused in BEV.',
+    detail: 'Camera and LiDAR detections are associated and merged per frame (covariance-weighted), then linked over time by the tracker. The canvas shows fused boxes filled, with the track ID label — click one to follow it across frames.',
+  },
+  // ------------------------------------------------------------ retrospective safety
   evidence_tier: {
     term: 'Evidence tier',
     category: 'Retrospective safety',
@@ -877,6 +1013,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     short: 'Every stage transition, agent output, policy evaluation and human decision is appended to a per-failure JSONL log where each record hashes its predecessor.',
     detail: 'Records carry a monotonically increasing sequence number and a prev_hash → hash chain; any edit, deletion or reordering breaks recomputation and is reported as a broken chain. The log is append-only by construction.',
   },
+
 };
 
 export type GlossaryKey = keyof typeof GLOSSARY;
@@ -952,6 +1089,9 @@ export const GLOSSARY_CATEGORIES: GlossaryCategory[] = [
   'Operations',
   'EM readiness',
   'Hardware acceleration',
+  'Safety & compliance',
+  'Sequential testing',
+  'Perception fusion',
   'Retrospective safety',
   'Launch readiness',
 ];

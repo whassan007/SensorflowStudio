@@ -30,9 +30,22 @@ import {
   Map as MapIcon,
   AppWindow,
   Mountain,
+  CircuitBoard,
+  Grid3x3,
+  GitBranch,
+  FileCheck2,
+  AlertTriangle,
+  Crosshair,
+  GitCompareArrows,
+  Library,
+  Sparkles,
+  LineChart,
+  Layers,
+  Shapes,
+  Network,
+  LayoutGrid,
   Undo2,
   Scale,
-  CircuitBoard,
 } from 'lucide-react';
 import { LabelEvalContext, type PageId, ALL_PAGE_IDS } from './context/LabelEvalContext';
 import { getOverview, useStream } from './services/labeleval';
@@ -54,8 +67,21 @@ import LegacyStudioPage from './pages/LegacyStudioPage';
 import CommandCenterPage from './pages/CommandCenterPage';
 import RootCauseLabPage from './pages/rca/RootCauseLabPage';
 import RareMinePage from './pages/raremine/RareMinePage';
-import VitisPage from './pages/vitis/VitisPage';
 import HillClimbSection from './pages/hillclimb/HillClimbSection';
+import VitisPage from './pages/vitis/VitisPage';
+import OddCoveragePage from './pages/safety/OddCoveragePage';
+import ReleaseGatesPage from './pages/safety/ReleaseGatesPage';
+import EvidencePage from './pages/safety/EvidencePage';
+import SsamConflictPage from './pages/safety/SsamConflictPage';
+import CalibrationPage from './pages/safety/CalibrationPage';
+import DiscrepancyPage from './pages/safety/DiscrepancyPage';
+import ScenarioDbPage from './pages/safety/ScenarioDbPage';
+import SemanticSearchPage from './pages/safety/SemanticSearchPage';
+import SeqevalPage from './pages/engines/SeqevalPage';
+import BevFusionPage from './pages/engines/BevFusionPage';
+import ScenarioComposerPage from './pages/studio/ScenarioComposerPage';
+import PipelineBuilderPage from './pages/studio/PipelineBuilderPage';
+import MyDashboardPage from './pages/studio/MyDashboardPage';
 import RetroAnalyzerPage from './pages/retro/RetroAnalyzerPage';
 import LaunchReadinessPage from './pages/agentic/LaunchReadinessPage';
 import PageIntro from './components/help/PageIntro';
@@ -87,9 +113,31 @@ const PLATFORM_NAV: NavItem[] = [
   { id: 'audit', label: 'Audit', icon: <ScrollText size={18} /> },
   { id: 'pipeline', label: 'Pipeline Architecture', icon: <Workflow size={18} /> },
   { id: 'hillclimb', label: 'Hill Climbing EM', icon: <Mountain size={18} /> },
+  { id: 'vitis', label: 'Hardware Acceleration', icon: <CircuitBoard size={18} /> },
+];
+
+const STUDIO_NAV: NavItem[] = [
+  { id: 'my-dashboard', label: 'My Dashboard', icon: <LayoutGrid size={18} /> },
+  { id: 'scenario-composer', label: 'Scenario Composer', icon: <Shapes size={18} /> },
+  { id: 'pipeline-builder', label: 'Pipeline Builder', icon: <Network size={18} /> },
+];
+
+const ENGINES_NAV: NavItem[] = [
+  { id: 'seqeval', label: 'Sequential Regression', icon: <LineChart size={18} /> },
+  { id: 'bevfusion', label: 'Perception Engines', icon: <Layers size={18} /> },
+];
+
+const SAFETY_NAV: NavItem[] = [
+  { id: 'safety-odd', label: 'ODD Coverage', icon: <Grid3x3 size={18} /> },
+  { id: 'safety-gates', label: 'Release Gates', icon: <GitBranch size={18} /> },
+  { id: 'safety-evidence', label: 'Evidence Package', icon: <FileCheck2 size={18} /> },
+  { id: 'safety-ssam', label: 'SSAM Conflicts', icon: <AlertTriangle size={18} /> },
+  { id: 'safety-calibration', label: 'Calibration', icon: <Crosshair size={18} /> },
+  { id: 'safety-discrepancy', label: 'Discrepancy Mining', icon: <GitCompareArrows size={18} /> },
+  { id: 'safety-scenarios', label: 'Scenario DB', icon: <Library size={18} /> },
+  { id: 'safety-search', label: 'Semantic Search', icon: <Sparkles size={18} /> },
   { id: 'retro', label: 'Retrospective Analyzer', icon: <Undo2 size={18} /> },
   { id: 'launch-readiness', label: 'Launch Readiness', icon: <Scale size={18} /> },
-  { id: 'vitis', label: 'Hardware Acceleration', icon: <CircuitBoard size={18} /> },
 ];
 
 const LEGACY_NAV: NavItem[] = [
@@ -115,10 +163,23 @@ const PAGE_TITLES: Record<PageId, string> = {
   audit: 'Audit & Process Units',
   pipeline: 'Pipeline Architecture',
   hillclimb: 'Hill Climbing EM',
-  retro: 'Retrospective Safety Analyzer',
-  'launch-readiness': 'Launch Readiness (Agentic Triage)',
   vitis: 'Hardware Acceleration (Vitis Vision)',
   ssam: 'SSAM Safety Dashboard',
+  'safety-odd': 'ODD Coverage',
+  'safety-gates': 'Release Gates',
+  'safety-evidence': 'Safety Evidence Package',
+  'safety-ssam': 'SSAM Conflict Analysis',
+  'safety-calibration': 'Sensor Calibration Validation',
+  'safety-discrepancy': 'Discrepancy Mining',
+  'safety-scenarios': 'Scenario Database',
+  'safety-search': 'Semantic Scenario Search',
+  seqeval: 'Sequential Regression Evaluation',
+  bevfusion: 'Perception Engines (BEV Fusion)',
+  'scenario-composer': 'Scenario Composer',
+  'pipeline-builder': 'Pipeline Builder',
+  'my-dashboard': 'My Dashboard',
+  retro: 'Retrospective Safety Analyzer',
+  'launch-readiness': 'Launch Readiness (Agentic Triage)',
   legacy: 'Legacy Studio',
 };
 
@@ -270,6 +331,36 @@ export default function App() {
               dense
               subheader={
                 <ListSubheader sx={{ bgcolor: 'transparent', fontSize: 11, letterSpacing: 1.2, lineHeight: '32px' }}>
+                  STUDIO
+                </ListSubheader>
+              }
+            >
+              {STUDIO_NAV.map(renderNavItem)}
+            </List>
+            <List
+              dense
+              subheader={
+                <ListSubheader sx={{ bgcolor: 'transparent', fontSize: 11, letterSpacing: 1.2, lineHeight: '32px' }}>
+                  ENGINES &amp; REGRESSION
+                </ListSubheader>
+              }
+            >
+              {ENGINES_NAV.map(renderNavItem)}
+            </List>
+            <List
+              dense
+              subheader={
+                <ListSubheader sx={{ bgcolor: 'transparent', fontSize: 11, letterSpacing: 1.2, lineHeight: '32px' }}>
+                  SAFETY &amp; COMPLIANCE
+                </ListSubheader>
+              }
+            >
+              {SAFETY_NAV.map(renderNavItem)}
+            </List>
+            <List
+              dense
+              subheader={
+                <ListSubheader sx={{ bgcolor: 'transparent', fontSize: 11, letterSpacing: 1.2, lineHeight: '32px' }}>
                   LEGACY / EXISTING
                 </ListSubheader>
               }
@@ -325,9 +416,22 @@ export default function App() {
               {page === 'audit' ? <AuditPage /> : null}
               {page === 'pipeline' ? <PipelineArchitecturePage /> : null}
               {page === 'hillclimb' ? <HillClimbSection initialView={entityId} /> : null}
+              {page === 'vitis' ? <VitisPage /> : null}
+              {page === 'safety-odd' ? <OddCoveragePage /> : null}
+              {page === 'safety-gates' ? <ReleaseGatesPage /> : null}
+              {page === 'safety-evidence' ? <EvidencePage /> : null}
+              {page === 'safety-ssam' ? <SsamConflictPage /> : null}
+              {page === 'safety-calibration' ? <CalibrationPage /> : null}
+              {page === 'safety-discrepancy' ? <DiscrepancyPage /> : null}
+              {page === 'safety-scenarios' ? <ScenarioDbPage /> : null}
+              {page === 'safety-search' ? <SemanticSearchPage /> : null}
+              {page === 'seqeval' ? <SeqevalPage /> : null}
+              {page === 'bevfusion' ? <BevFusionPage /> : null}
+              {page === 'scenario-composer' ? <ScenarioComposerPage /> : null}
+              {page === 'pipeline-builder' ? <PipelineBuilderPage /> : null}
+              {page === 'my-dashboard' ? <MyDashboardPage /> : null}
               {page === 'retro' ? <RetroAnalyzerPage /> : null}
               {page === 'launch-readiness' ? <LaunchReadinessPage /> : null}
-              {page === 'vitis' ? <VitisPage /> : null}
             </Box>
           )}
         </Box>

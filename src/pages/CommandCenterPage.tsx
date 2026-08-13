@@ -40,11 +40,13 @@ import CompareTab from '../components/megaeval/CompareTab';
 import ReviewTab from '../components/megaeval/ReviewTab';
 import ShiftTab from '../components/megaeval/ShiftTab';
 import LineageCard from '../components/megaeval/LineageCard';
+import VisualQueryTab from '../components/megaeval/VisualQueryTab';
 
 const ACTIVE_STATUSES: RunStatus[] = ['created', 'queued', 'running', 'reducing', 'materializing'];
 
 type TabId =
   | 'quality'
+  | 'visual-query'
   | 'cohorts'
   | 'containers'
   | 'investigation'
@@ -286,6 +288,7 @@ export default function CommandCenterPage() {
             }}
           >
             <Tab label="Quality" value="quality" title="Per-class quality, error distribution, quality funnel, run trend and sketch distributions" />
+            <Tab label="Query Builder" value="visual-query" title="Build metric-cube queries visually: drag dimensions into group-by / filter wells with a live result preview" />
             <Tab label="Cohorts" value="cohorts" title="Drill the population by dimension (class, weather, lighting…) and run Why? decompositions" />
             <Tab label="Containers" value="containers" title="Per-scene quality table with risk sort presets; drill into the forensic object table" />
             <Tab label="Investigation" value="investigation" title="Multi-criteria search over the error index: worst containers and top examples" />
@@ -298,6 +301,7 @@ export default function CommandCenterPage() {
           {tab === 'quality' ? (
             <QualityTab runId={selectedRun.run_id} runs={runs} refreshKey={publishTick} />
           ) : null}
+          {tab === 'visual-query' ? <VisualQueryTab runId={selectedRun.run_id} /> : null}
           {tab === 'cohorts' ? <CohortTab runId={selectedRun.run_id} refreshKey={publishTick} /> : null}
           {tab === 'containers' ? (
             <ContainersTab
