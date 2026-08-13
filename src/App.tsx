@@ -41,14 +41,15 @@ import {
   Sparkles,
   LineChart,
   Layers,
-  RefreshCcwDot,
-  ClipboardCheck,
-  BadgeCheck,
   Shapes,
   Network,
   LayoutGrid,
   Undo2,
+  RefreshCcwDot,
   Scale,
+  ClipboardCheck,
+  BadgeCheck,
+  TrafficCone,
 } from 'lucide-react';
 import { LabelEvalContext, type PageId, ALL_PAGE_IDS } from './context/LabelEvalContext';
 import { getOverview, useStream } from './services/labeleval';
@@ -85,11 +86,12 @@ import BevFusionPage from './pages/engines/BevFusionPage';
 import ScenarioComposerPage from './pages/studio/ScenarioComposerPage';
 import PipelineBuilderPage from './pages/studio/PipelineBuilderPage';
 import MyDashboardPage from './pages/studio/MyDashboardPage';
+import RetroAnalyzerPage from './pages/retro/RetroAnalyzerPage';
 import ClosedLoopLabPage from './pages/nextgen/ClosedLoopLabPage';
+import LaunchReadinessPage from './pages/agentic/LaunchReadinessPage';
 import Studio2GovernancePage from './pages/studio2/Studio2GovernancePage';
 import ProductionReadinessPage from './pages/hardening/ProductionReadinessPage';
-import RetroAnalyzerPage from './pages/retro/RetroAnalyzerPage';
-import LaunchReadinessPage from './pages/agentic/LaunchReadinessPage';
+import RotrControlCenterPage from './pages/rotr/RotrControlCenterPage';
 import PageIntro from './components/help/PageIntro';
 import HelpMenu from './components/help/HelpMenu';
 
@@ -144,9 +146,10 @@ const SAFETY_NAV: NavItem[] = [
   { id: 'safety-discrepancy', label: 'Discrepancy Mining', icon: <GitCompareArrows size={18} /> },
   { id: 'safety-scenarios', label: 'Scenario DB', icon: <Library size={18} /> },
   { id: 'safety-search', label: 'Semantic Search', icon: <Sparkles size={18} /> },
-  { id: 'studio2', label: 'Studio 2.0 Governance', icon: <ClipboardCheck size={18} /> },
   { id: 'retro', label: 'Retrospective Analyzer', icon: <Undo2 size={18} /> },
   { id: 'launch-readiness', label: 'Launch Readiness', icon: <Scale size={18} /> },
+  { id: 'studio2', label: 'Studio 2.0 Governance', icon: <ClipboardCheck size={18} /> },
+  { id: 'rotr', label: 'ROTR Control Center', icon: <TrafficCone size={18} /> },
 ];
 
 const LEGACY_NAV: NavItem[] = [
@@ -191,8 +194,9 @@ const PAGE_TITLES: Record<PageId, string> = {
   'closed-loop-lab': 'Closed-Loop Lab',
   'launch-readiness': 'Launch Readiness (Agentic Triage)',
   studio2: 'Studio 2.0 Governance (Control Plane & Release)',
-  'production-readiness': 'Production Readiness (Hardening Audit)',
   legacy: 'Legacy Studio',
+  'production-readiness': 'Production Readiness (Hardening Audit)',
+  rotr: 'ROTR Control Center (Right-of-the-Road)',
 };
 
 function parseHash(): { page: PageId; entityId: string | null } {
@@ -443,10 +447,11 @@ export default function App() {
               {page === 'pipeline-builder' ? <PipelineBuilderPage /> : null}
               {page === 'my-dashboard' ? <MyDashboardPage /> : null}
               {page === 'retro' ? <RetroAnalyzerPage /> : null}
-              {page === 'launch-readiness' ? <LaunchReadinessPage /> : null}
               {page === 'closed-loop-lab' ? <ClosedLoopLabPage /> : null}
+              {page === 'launch-readiness' ? <LaunchReadinessPage /> : null}
               {page === 'studio2' ? <Studio2GovernancePage /> : null}
               {page === 'production-readiness' ? <ProductionReadinessPage /> : null}
+              {page === 'rotr' ? <RotrControlCenterPage /> : null}
             </Box>
           )}
         </Box>

@@ -227,42 +227,6 @@ export const PAGE_HELP: Record<PageId, PageHelpEntry> = {
     dataFlow:
       'Scenes and engines come read-only from the bevfusion package; sequential verdicts use seqeval\u2019s anytime-valid tests when importable (local paired-t fallback otherwise). Runs persist under runs/vitis/. Generated variants are evaluation-set supplements tagged evaluation-only (never training-eligible) and are offered to the raremine candidate flow when that package is available.',
   },
-  'closed-loop-lab': {
-    subtitle:
-      'Next-generation evaluation: counterfactual scenario generation with a validity gate, closed-loop behavioral metrics with causal replay, safety-informed metrics, and a priority-scheduled launch gauntlet with compute deduplication.',
-    purpose:
-      'Open-loop metrics (mAP/recall) cannot tell you whether a perception error would have changed vehicle behavior, and aggregate recall can improve while safety-critical recall degrades. This lab generates labeled counterfactual scenarios, runs the full perception→planner→vehicle loop, and answers the causal question directly: replay the same scenario with corrected perception and diff the outcomes.',
-    reading:
-      'Every datum carries a REAL / REPLAYED / SIMULATED / GENERATED / COUNTERFACTUAL provenance label. Counterfactuals show fidelity / validity / realism scores from the gate; low-fidelity scenarios are weight-capped so they cannot dominate launch decisions. The causal replay banner is the key verdict: METRIC_ONLY (visible in metrics, no behavioral change) vs BEHAVIORALLY_CONSEQUENTIAL (the error changes the safety outcome). The Gauntlet tab shows priority strata (safety-critical first), anytime-valid early-stop events, and measured compute savings.',
-    actions:
-      'Build transformation recipes and generate counterfactuals; run the validity gate; run closed-loop replays and causal comparisons with planted perception faults; run the safety-metric divergence demo; launch a 100k-unit gauntlet against a candidate profile and inspect the launch recommendation; read the architecture decision docs.',
-    dataFlow:
-      'Counterfactuals are transformations of bevfusion scenes; safety math reuses the SSAM extensions; sequential early stopping delegates to seqeval; distribution similarity delegates to the mega-eval statistics. Artifacts persist under runs/nextgen/. A run with incomplete lineage is marked INVALID for launch purposes.',
-  },
-  studio2: {
-    subtitle:
-      'The Studio 2.0 control plane: versioned entities for the whole system, one deterministic release decision composed from the real engines (safety gates + seqeval + megaeval shift + agentic/nextgen when available), hardware-stratified gating, and the unified observability funnel.',
-    purpose:
-      'The engines exist; what was missing is the layer that composes them. This page answers "can this candidate ship?" with a GO / REVIEW / NO-GO decision backed by a full evidence tuple, keeps humans (not gates) as the deployment authority, and makes cross-package entities (models, datasets with roles, policies, runs) first-class and browsable.',
-    reading:
-      'Release Board: the decision banner shows status, confidence and evidence completeness; blocking conditions, named degraded inputs and unresolved questions below it; the evidence tuple lists exactly which subsystem artifacts the decision was computed from. A GO decision still shows "deployment not authorized" until the separate human approval is recorded. Control Plane: role badges (REGRESSION/LAUNCH/TEST are PROTECTED by the contamination guard) and REPRODUCIBLE / NON-REPRODUCIBLE badges (a run missing any tuple component is non-reproducible, with the missing parts listed). Hardware Gates: each row is a region × platform × sensor-generation combination; a failing CRITICAL row blocks even when the global aggregate passes; amber rows lack sufficient evidence and never count as passing. Funnel: stage bars are log-scaled; absent sources show UNAVAILABLE with the reason — numbers are never fabricated.',
-    actions:
-      'Evaluate a candidate from live sources, run the end-to-end closed-loop demo (bevfusion scenario → seqeval verdict → nextgen replay → safety gates → release decision → flywheel registration), browse and auto-ingest registry entities, transition dataset roles (guarded transitions demand an audited override), recompute the hardware matrix, and record human deployment approvals.',
-    dataFlow:
-      'Reads the persisted stores of megaeval, seqeval, safety, agentic, nextgen, bevfusion and vitis (best-effort, availability-flagged). Writes only under runs/studio2/: registry entities, release decisions, approvals and an append-only audit trail. Failures found by the demo feed back as protected REGRESSION-role dataset entries.',
-  },
-  'production-readiness': {
-    subtitle:
-      'The hardening audit as a living page: every finding with file:line references, a readiness scorecard computed from the audit (never hand-written), the live data funnel, and the fix-now vs follow-up remediation board.',
-    purpose:
-      'An honest answer to "is this platform production ready?". The scorecard is derived from docs/hardening/audit.json and is hard-wired to report NOT PRODUCTION READY while any Critical finding is open — no one can flip the status without closing the findings.',
-    reading:
-      'The banner shows the overall verdict, finding counts by severity, and fixed-now vs deferred totals. Scorecard cards map each category to its prototype state, production requirement, and open gap IDs. The funnel bars are live counts from the labeleval store (source labeled). The findings table filters by area / severity / disposition; refs are FILE:LINE into this repository. The kanban splits work already done in this pass from documented follow-ups with effort badges (S/M/L).',
-    actions:
-      'Filter and read findings; use the refs to jump into the code. No mutations happen from this page — it is a read-only audit browser.',
-    dataFlow:
-      'All content is served by /api/hardening from docs/hardening/audit.{md,json} plus read-only funnel counts from runs/labeleval. Fixes land in code; the audit document is updated with dispositions; this page re-derives everything from it.',
-  },
   ssam: {
     subtitle:
       'Surrogate-safety analysis of real intersections: conflicts ranked by TTC / PET / severity on an interactive map — the safety context the label platform feeds.',
@@ -442,6 +406,18 @@ export const PAGE_HELP: Record<PageId, PageHelpEntry> = {
     dataFlow:
       'Fixtures live in sensorflow/retro/fixtures; analyses and audit trails persist under runs/retro/. Metric math reuses the SSAM safety extensions; distribution stats delegate to the mega-eval engine; the safety-case corpus is indexed at startup (chromadb or deterministic fallback).',
   },
+  'closed-loop-lab': {
+    subtitle:
+      'Next-generation evaluation: counterfactual scenario generation with a validity gate, closed-loop behavioral metrics with causal replay, safety-informed metrics, and a priority-scheduled launch gauntlet with compute deduplication.',
+    purpose:
+      'Open-loop metrics (mAP/recall) cannot tell you whether a perception error would have changed vehicle behavior, and aggregate recall can improve while safety-critical recall degrades. This lab generates labeled counterfactual scenarios, runs the full perception→planner→vehicle loop, and answers the causal question directly: replay the same scenario with corrected perception and diff the outcomes.',
+    reading:
+      'Every datum carries a REAL / REPLAYED / SIMULATED / GENERATED / COUNTERFACTUAL provenance label. Counterfactuals show fidelity / validity / realism scores from the gate; low-fidelity scenarios are weight-capped so they cannot dominate launch decisions. The causal replay banner is the key verdict: METRIC_ONLY (visible in metrics, no behavioral change) vs BEHAVIORALLY_CONSEQUENTIAL (the error changes the safety outcome). The Gauntlet tab shows priority strata (safety-critical first), anytime-valid early-stop events, and measured compute savings.',
+    actions:
+      'Build transformation recipes and generate counterfactuals; run the validity gate; run closed-loop replays and causal comparisons with planted perception faults; run the safety-metric divergence demo; launch a 100k-unit gauntlet against a candidate profile and inspect the launch recommendation; read the architecture decision docs.',
+    dataFlow:
+      'Counterfactuals are transformations of bevfusion scenes; safety math reuses the SSAM extensions; sequential early stopping delegates to seqeval; distribution similarity delegates to the mega-eval statistics. Artifacts persist under runs/nextgen/. A run with incomplete lineage is marked INVALID for launch purposes.',
+  },
   'launch-readiness': {
     subtitle:
       'Agentic launch readiness & misclassification triage: a five-layer pipeline (detection → evidence → analysis → decision → flywheel) where AI agents only recommend and a deterministic, versioned policy engine plus recorded human review own every launch decision.',
@@ -454,6 +430,18 @@ export const PAGE_HELP: Record<PageId, PageHelpEntry> = {
     dataFlow:
       'Detection scans a seeded synthetic campaign (bevfusion scenes + a paired rate population). Statistics delegate to seqeval; safety replays reuse the SSAM extensions; Option C checks use the ODD taxonomy. Validated failures feed evaluation suites (contamination-guarded) under runs/agentic/, and every action lands in a hash-chained append-only audit log.',
   },
+  studio2: {
+    subtitle:
+      'The Studio 2.0 control plane: versioned entities for the whole system, one deterministic release decision composed from the real engines (safety gates + seqeval + megaeval shift + agentic/nextgen when available), hardware-stratified gating, and the unified observability funnel.',
+    purpose:
+      'The engines exist; what was missing is the layer that composes them. This page answers "can this candidate ship?" with a GO / REVIEW / NO-GO decision backed by a full evidence tuple, keeps humans (not gates) as the deployment authority, and makes cross-package entities (models, datasets with roles, policies, runs) first-class and browsable.',
+    reading:
+      'Release Board: the decision banner shows status, confidence and evidence completeness; blocking conditions, named degraded inputs and unresolved questions below it; the evidence tuple lists exactly which subsystem artifacts the decision was computed from. A GO decision still shows "deployment not authorized" until the separate human approval is recorded. Control Plane: role badges (REGRESSION/LAUNCH/TEST are PROTECTED by the contamination guard) and REPRODUCIBLE / NON-REPRODUCIBLE badges (a run missing any tuple component is non-reproducible, with the missing parts listed). Hardware Gates: each row is a region × platform × sensor-generation combination; a failing CRITICAL row blocks even when the global aggregate passes; amber rows lack sufficient evidence and never count as passing. Funnel: stage bars are log-scaled; absent sources show UNAVAILABLE with the reason — numbers are never fabricated.',
+    actions:
+      'Evaluate a candidate from live sources, run the end-to-end closed-loop demo (bevfusion scenario → seqeval verdict → nextgen replay → safety gates → release decision → flywheel registration), browse and auto-ingest registry entities, transition dataset roles (guarded transitions demand an audited override), recompute the hardware matrix, and record human deployment approvals.',
+    dataFlow:
+      'Reads the persisted stores of megaeval, seqeval, safety, agentic, nextgen, bevfusion and vitis (best-effort, availability-flagged). Writes only under runs/studio2/: registry entities, release decisions, approvals and an append-only audit trail. Failures found by the demo feed back as protected REGRESSION-role dataset entries.',
+  },
   legacy: {
     subtitle:
       'The original vanilla-JS studio, embedded unchanged — kept for workflows not yet migrated to the React platform.',
@@ -461,6 +449,30 @@ export const PAGE_HELP: Record<PageId, PageHelpEntry> = {
     reading: 'The iframe below is the old UI as-is; features may overlap with the new pages.',
     actions: 'Use legacy workflows; open in a new tab for full-window work.',
     dataFlow: 'Talks to the same backend and datasets as the new platform.',
+  },
+  'production-readiness': {
+    subtitle:
+      'The hardening audit as a living page: every finding with file:line references, a readiness scorecard computed from the audit (never hand-written), the live data funnel, and the fix-now vs follow-up remediation board.',
+    purpose:
+      'An honest answer to "is this platform production ready?". The scorecard is derived from docs/hardening/audit.json and is hard-wired to report NOT PRODUCTION READY while any Critical finding is open — no one can flip the status without closing the findings.',
+    reading:
+      'The banner shows the overall verdict, finding counts by severity, and fixed-now vs deferred totals. Scorecard cards map each category to its prototype state, production requirement, and open gap IDs. The funnel bars are live counts from the labeleval store (source labeled). The findings table filters by area / severity / disposition; refs are FILE:LINE into this repository. The kanban splits work already done in this pass from documented follow-ups with effort badges (S/M/L).',
+    actions:
+      'Filter and read findings; use the refs to jump into the code. No mutations happen from this page — it is a read-only audit browser.',
+    dataFlow:
+      'All content is served by /api/hardening from docs/hardening/audit.{md,json} plus read-only funnel counts from runs/labeleval. Fixes land in code; the audit document is updated with dispositions; this page re-derives everything from it.',
+  },
+  rotr: {
+    subtitle:
+      'Right-of-the-road violation detection, triage, evaluation & training: deterministic rule verdicts, causal-layer attribution (never auto-blamed on perception), counterfactual consequence replay, seqeval-gated regression, and a contamination-guarded flywheel.',
+    purpose:
+      'A ROTR violation ("failed to yield to a crossing pedestrian") is only actionable once three separate questions are answered: did it happen (rule engine vs ground truth), why (per-layer evidence: perception / prediction / planning / localization / map / control), and did it matter (counterfactual replay of the corrected stack). This page runs that pipeline on deterministic planted-violation scenario banks and closes the loop into a protected regression suite.',
+    reading:
+      'The gate banner is the deterministic stop-ship verdict (VRU + missed detection + safety-critical exposure ⇒ NO_GO; policy-versioned, not LLM-driven). Executive: recall / SC-recall / BCR / CFR tiles and the six-outcome regression status. Engineering: the attribution heatmap colors each violation × layer cell SUPPORTED / RULED_OUT / UNKNOWN with a ring on the primary layer — click a row to open the BEV replay of observed (red) vs corrected (green dashed) trajectories. Data: coverage of the planted bank, the HITL queue, and training candidates whose REGRESSION-role members show a PROTECTED guard chip. Infrastructure: measured wall time and seqeval sample counts; unmeasured figures say NOT MEASURED.',
+    actions:
+      'Generate a scenario bank and run detection for one of three stack profiles; compare two runs through seqeval; mine violations with the six-axis structured query (text parses through a deterministic keyword map); validate or reject HITL items (validation creates a protected regression artifact); attempt training promotion — the contamination guard blocks protected members unless a reasoned governance override is recorded.',
+    dataFlow:
+      'Scenario banks and all run artifacts persist under runs/rotr/. Regression statistics delegate to seqeval over a megaeval population; validated artifacts mirror to the studio2 registry when available; NO_GO events forward to the agentic policy engine as advisory input. Everything is reproducible from bank id + seed + version pins.',
   },
 };
 

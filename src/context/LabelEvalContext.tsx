@@ -39,7 +39,8 @@ export type PageId =
   | 'launch-readiness'
   | 'studio2'
   | 'legacy'
-  | 'production-readiness';
+  | 'production-readiness'
+  | 'rotr';
 
 export const ALL_PAGE_IDS: PageId[] = [
   'command',
@@ -80,6 +81,7 @@ export const ALL_PAGE_IDS: PageId[] = [
   'studio2',
   'legacy',
   'production-readiness',
+  'rotr',
 ];
 
 /** Maps backend evidence_link.page strings (unknown vocabulary) onto our page ids. */

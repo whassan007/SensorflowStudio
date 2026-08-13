@@ -40,7 +40,8 @@ export type GlossaryCategory =
   | 'Closed-loop evaluation'
   | 'Launch readiness'
   | 'Release governance'
-  | 'Production hardening';
+  | 'Production hardening'
+  | 'ROTR (right-of-the-road)';
 
 export const GLOSSARY: Record<string, GlossaryEntry> = {
   // ------------------------------------------------------------ detection metrics
@@ -964,59 +965,6 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     short: 'Every agent tool call — including denials — is appended to a per-analysis audit log with args, result hash, and timestamp.',
     detail: 'Tools are read-only by default; the single write tool (CreateEvaluationCase) requires an explicit policy authorization flag. The log reader is path-allowlisted to runs/ and the fixtures directory. The audit trail makes each scorecard reproducible and reviewable.',
   },
-
-  // ------------------------------------------------------------ launch readiness (agentic triage)
-  policy_outcome: {
-    term: 'Policy outcome (four-way)',
-    category: 'Launch readiness',
-    short: 'AUTOMATIC_STOP_SHIP / LAUNCH_REVIEW_REQUIRED / CONTINUE_INVESTIGATION / NO_LAUNCH_IMPACT — decided by the deterministic policy engine, never by an agent.',
-    detail: 'The versioned stop-ship policy evaluates explicit conditions over severity × exposure × frequency × confidence × novelty × downstream consequence. Automatic stop-ship fires only on pre-authorized conditions; anything with missing ground truth, incomplete lineage, failed fusion verification or conflicting agents resolves to INDETERMINATE (a fail-safe escalation), never a pass.',
-    caveat: 'All numeric thresholds in the shipped policy are example placeholders (flagged placeholder_values: true); a real deployment must set organization-approved values through the versioned policy API.',
-  },
-  severity_taxonomy: {
-    term: 'Severity taxonomy (S0–S5)',
-    category: 'Launch readiness',
-    short: 'S0 cosmetic → S5 collision-in-replay, assigned by deterministic criteria over class criticality, containment and observed behavioral impact.',
-    detail: 'S4 requires OBSERVED unsafe downstream behavior in replay evidence — a hypothesized consequence cannot reach S4. S3 is a safety-critical misclassification whose downstream effect is not shown to be contained.',
-  },
-  evidence_status_tag: {
-    term: 'Evidence status (OBSERVED / DERIVED / HYPOTHESIS / UNAVAILABLE)',
-    category: 'Launch readiness',
-    short: 'Every node in the failure evidence graph carries an explicit epistemic status; missing evidence is shown as UNAVAILABLE rather than guessed.',
-    detail: 'OBSERVED = measured from campaign data or replay; DERIVED = computed deterministically from observed data; HYPOTHESIS = produced by an advisory agent and requires confirmation; UNAVAILABLE = the evidence does not exist yet. Agents cannot upgrade their own hypotheses.',
-  },
-  option_c_reduced_odd: {
-    term: 'Option C — reduced ODD',
-    category: 'Launch readiness',
-    short: 'Ship while excluding the concentrated failure region from the operational design domain — allowed only when the region is reliably detectable at runtime.',
-    detail: 'Feasibility checks use the ODD taxonomy: the concentrating dimension must be an instrumented ODD dimension, the runtime detector recall must meet MIN_REQUIRED_SAFETY_RECALL, the post-exclusion residual rate must meet MAX_ACCEPTABLE_FAILURE_PROBABILITY, evidence confidence must reach the configured minimum, and the exclusion must not exceed MAX_ALLOWED_ODD_EXCLUSION.',
-    caveat: 'A geographic bucket is not an instrumented ODD dimension, so geo-concentration alone can never justify Option C.',
-  },
-  hard_safety_constraint: {
-    term: 'Safety as a hard constraint',
-    category: 'Launch readiness',
-    short: 'Expected loss is computed for every option, but options whose residual failure rate violates the policy limit are excluded from selection no matter how cheap they are.',
-    detail: 'Business optimization happens only inside the safe feasible region: the option matrix skips a matched row whose option is safety-infeasible, and if no feasible row remains the engine fails safe to human safety review. Tested explicitly: a cheaper unsafe option is never selected.',
-  },
-  contamination_guard: {
-    term: 'Contamination guard',
-    category: 'Launch readiness',
-    short: 'Members of flywheel evaluation suites are never training-eligible without an explicit recorded override (who + why).',
-    detail: 'Prevents the learning flywheel from leaking its own evaluation examples into training data, which would silently invalidate future evaluations. Promotion without an actor and reason raises a leakage error (reusing the raremine lineage guard); overrides are recorded on the suite and in the audit trail.',
-  },
-  small_sample_instability: {
-    term: 'Small-sample instability flag',
-    category: 'Launch readiness',
-    short: 'Raised when event counts are too small for the rate estimate to be stable (e.g. 25 events on a 240k denominator), capping evidence confidence.',
-    detail: 'A ~0.01% rate estimated from a handful of events has a wide Wilson interval and an unstable relative risk. The statistical agent flags this, the evidence-quality level drops to LIKELY or below, and automatic stop-ship (which requires CONFIRMED) cannot fire on it — the case routes to human review instead.',
-  },
-  audit_hash_chain: {
-    term: 'Hash-chained audit log',
-    category: 'Launch readiness',
-    short: 'Every stage transition, agent output, policy evaluation and human decision is appended to a per-failure JSONL log where each record hashes its predecessor.',
-    detail: 'Records carry a monotonically increasing sequence number and a prev_hash → hash chain; any edit, deletion or reordering breaks recomputation and is reported as a broken chain. The log is append-only by construction.',
-  },
-
   data_label: {
     term: 'Data provenance label',
     category: 'Closed-loop evaluation',
@@ -1070,7 +1018,59 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     detail: 'Cache keys hash (scenario, sensor_version, preprocessing_version, backbone_version, feature_schema_version); any version bump changes the key, so stale cross-version reuse is structurally impossible. Savings are measured, not estimated.',
   },
 
-  // ------------------------------------------------------------ Release governance (Studio 2.0)
+  // ------------------------------------------------------------ launch readiness (agentic triage)
+  policy_outcome: {
+    term: 'Policy outcome (four-way)',
+    category: 'Launch readiness',
+    short: 'AUTOMATIC_STOP_SHIP / LAUNCH_REVIEW_REQUIRED / CONTINUE_INVESTIGATION / NO_LAUNCH_IMPACT — decided by the deterministic policy engine, never by an agent.',
+    detail: 'The versioned stop-ship policy evaluates explicit conditions over severity × exposure × frequency × confidence × novelty × downstream consequence. Automatic stop-ship fires only on pre-authorized conditions; anything with missing ground truth, incomplete lineage, failed fusion verification or conflicting agents resolves to INDETERMINATE (a fail-safe escalation), never a pass.',
+    caveat: 'All numeric thresholds in the shipped policy are example placeholders (flagged placeholder_values: true); a real deployment must set organization-approved values through the versioned policy API.',
+  },
+  severity_taxonomy: {
+    term: 'Severity taxonomy (S0–S5)',
+    category: 'Launch readiness',
+    short: 'S0 cosmetic → S5 collision-in-replay, assigned by deterministic criteria over class criticality, containment and observed behavioral impact.',
+    detail: 'S4 requires OBSERVED unsafe downstream behavior in replay evidence — a hypothesized consequence cannot reach S4. S3 is a safety-critical misclassification whose downstream effect is not shown to be contained.',
+  },
+  evidence_status_tag: {
+    term: 'Evidence status (OBSERVED / DERIVED / HYPOTHESIS / UNAVAILABLE)',
+    category: 'Launch readiness',
+    short: 'Every node in the failure evidence graph carries an explicit epistemic status; missing evidence is shown as UNAVAILABLE rather than guessed.',
+    detail: 'OBSERVED = measured from campaign data or replay; DERIVED = computed deterministically from observed data; HYPOTHESIS = produced by an advisory agent and requires confirmation; UNAVAILABLE = the evidence does not exist yet. Agents cannot upgrade their own hypotheses.',
+  },
+  option_c_reduced_odd: {
+    term: 'Option C — reduced ODD',
+    category: 'Launch readiness',
+    short: 'Ship while excluding the concentrated failure region from the operational design domain — allowed only when the region is reliably detectable at runtime.',
+    detail: 'Feasibility checks use the ODD taxonomy: the concentrating dimension must be an instrumented ODD dimension, the runtime detector recall must meet MIN_REQUIRED_SAFETY_RECALL, the post-exclusion residual rate must meet MAX_ACCEPTABLE_FAILURE_PROBABILITY, evidence confidence must reach the configured minimum, and the exclusion must not exceed MAX_ALLOWED_ODD_EXCLUSION.',
+    caveat: 'A geographic bucket is not an instrumented ODD dimension, so geo-concentration alone can never justify Option C.',
+  },
+  hard_safety_constraint: {
+    term: 'Safety as a hard constraint',
+    category: 'Launch readiness',
+    short: 'Expected loss is computed for every option, but options whose residual failure rate violates the policy limit are excluded from selection no matter how cheap they are.',
+    detail: 'Business optimization happens only inside the safe feasible region: the option matrix skips a matched row whose option is safety-infeasible, and if no feasible row remains the engine fails safe to human safety review. Tested explicitly: a cheaper unsafe option is never selected.',
+  },
+  contamination_guard: {
+    term: 'Contamination guard',
+    category: 'Launch readiness',
+    short: 'Members of flywheel evaluation suites are never training-eligible without an explicit recorded override (who + why).',
+    detail: 'Prevents the learning flywheel from leaking its own evaluation examples into training data, which would silently invalidate future evaluations. Promotion without an actor and reason raises a leakage error (reusing the raremine lineage guard); overrides are recorded on the suite and in the audit trail.',
+  },
+  small_sample_instability: {
+    term: 'Small-sample instability flag',
+    category: 'Launch readiness',
+    short: 'Raised when event counts are too small for the rate estimate to be stable (e.g. 25 events on a 240k denominator), capping evidence confidence.',
+    detail: 'A ~0.01% rate estimated from a handful of events has a wide Wilson interval and an unstable relative risk. The statistical agent flags this, the evidence-quality level drops to LIKELY or below, and automatic stop-ship (which requires CONFIRMED) cannot fire on it — the case routes to human review instead.',
+  },
+  audit_hash_chain: {
+    term: 'Hash-chained audit log',
+    category: 'Launch readiness',
+    short: 'Every stage transition, agent output, policy evaluation and human decision is appended to a per-failure JSONL log where each record hashes its predecessor.',
+    detail: 'Records carry a monotonically increasing sequence number and a prev_hash → hash chain; any edit, deletion or reordering breaks recomputation and is reported as a broken chain. The log is append-only by construction.',
+  },
+
+  // ------------------------------------------------------------ release governance (studio2)
   release_decision: {
     term: 'Release decision (GO / REVIEW / NO-GO)',
     category: 'Release governance',
@@ -1108,8 +1108,6 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     short: 'The separate recorded action (approver + rationale) that authorizes deployment after a GO decision.',
     detail: 'Only GO decisions can be approved; REVIEW and NO-GO must be re-evaluated after their conditions are resolved. The approval is a first-class registry entity and lands in the append-only audit trail — the gate recommends, humans authorize.',
   },
-
-  // ------------------------------------------------------------ Production hardening
   hardening_finding: {
     term: 'Hardening finding',
     category: 'Production hardening',
@@ -1128,6 +1126,45 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     short: 'Where a label came from: MODEL_PREDICTION → AUTO_LABEL / VLM_INFERENCE → HUMAN_LABEL → CERTIFIED_GROUND_TRUTH, in increasing order of trust.',
     detail: 'Defined in sensorflow/hardening/contracts.py and mandatory on every hardening contract. Nothing lower on the ladder may silently substitute for a level above it — e.g. a quality gate must refuse AUTO_LABEL "ground truth". Adapters map existing records (labeleval GT types, pipeline proposals) onto the ladder.',
     caveat: 'Existing packages are not yet rewritten to these contracts; adapters bridge until their next breaking release.',
+  },
+  rotr_violation: {
+    term: 'ROTR violation',
+    category: 'ROTR (right-of-the-road)',
+    short: 'A deterministic rule-engine verdict that the executed trajectory broke the expected-behavior envelope (yielding, legal path, right-of-way, stopping).',
+    detail: 'Computed as a function of five evidence structures: ego state, road context, actor states, observed behavior and expected behavior. Each record carries a versioned rule id, structured evidence fields and provenance. Detection runs against the ACTUAL (ground-truth) world; plan compliance runs separately against the stack\u2019s believed world.',
+    caveat: 'A violation verdict says nothing about cause or consequence — those are separate analyses (attribution, counterfactual replay).',
+  },
+  rotr_attribution: {
+    term: 'Causal-layer attribution',
+    category: 'ROTR (right-of-the-road)',
+    short: 'Per-violation, per-layer evidence tests: each of perception / prediction / planning / localization / map / control / data-label / policy-rule is independently SUPPORTED, RULED_OUT or UNKNOWN.',
+    detail: 'The load-bearing invariant: a violation is NEVER auto-attributed to perception. Each layer needs its own positive evidence (e.g. GT-vs-detected diff for perception, correct-perception-but-noncompliant-plan for planning). The primary layer is the highest-confidence SUPPORTED entry; with none, the row stays unattributed and goes to HITL.',
+  },
+  rotr_consequence: {
+    term: 'Behavioral consequence class',
+    category: 'ROTR (right-of-the-road)',
+    short: 'What the violation actually cost, measured by counterfactual replay: NO_MATERIAL_CONSEQUENCE, DEGRADED_COMFORT, PLANNER_INTERVENTION or SAFETY_CRITICAL.',
+    detail: 'The attributed layer\u2019s inputs are corrected and the scenario is re-planned (nextgen closed-loop when importable, else a self-contained IDM-style planner). Observed vs corrected trajectories are compared on TTC, PET, clearance, stopping distance, braking intensity and lateral deviation.',
+    caveat: 'Surrogate-safety measures (TTC/PET/clearance) indicate exposure, not collision certainty — they alone do not establish collision risk.',
+  },
+  sc_rotr_recall: {
+    term: 'SC-ROTR recall',
+    category: 'ROTR (right-of-the-road)',
+    short: 'Safety-critical-weighted violation recall: misses on dangerous violations cost more than misses on cosmetic ones.',
+    detail: 'Weights are exposure-derived per stratum — the fraction of that stratum\u2019s violations whose counterfactual consequence was safety-critical, normalized so weights average 1 — with the calibration method and version recorded next to the number. Not arbitrary class multipliers.',
+    caveat: 'On synthetic banks the weights are calibrated on the bank itself; a production system would calibrate on fleet exposure data.',
+  },
+  rotr_stopship: {
+    term: 'ROTR stop-ship trigger',
+    category: 'ROTR (right-of-the-road)',
+    short: 'Deterministic NO_GO on the strict conjunction: VRU involved AND perception missed the actor AND counterfactual consequence is safety-critical.',
+    detail: 'Policy-versioned and explicitly not LLM-driven. Partial matches never fire. NO_GO events are forwarded to the agentic policy engine as advisory input when importable; the gate outcome is recorded locally either way.',
+  },
+  rotr_six_axis: {
+    term: 'Six-axis ROTR taxonomy',
+    category: 'ROTR (right-of-the-road)',
+    short: 'Actor / Vulnerability / Legality / Environment / Interaction / Behavior — plus road-geometry, traffic-control and visibility extensions — for structured violation mining.',
+    detail: 'Text like "failed to yield to pedestrian at uncontrolled intersection during low visibility" parses through a deterministic keyword map into the same filterable query object as the dropdown chips. Violations cluster into recurring patterns by structured signature.',
   },
 };
 
@@ -1211,4 +1248,5 @@ export const GLOSSARY_CATEGORIES: GlossaryCategory[] = [
   'Launch readiness',
   'Release governance',
   'Production hardening',
+  'ROTR (right-of-the-road)',
 ];

@@ -201,11 +201,12 @@ const PAGE_ORDER: PageId[] = [
   'safety-scenarios',
   'safety-search',
   'retro',
-  'closed-loop-lab',
   'launch-readiness',
+  'closed-loop-lab',
   'studio2',
   'legacy',
   'production-readiness',
+  'rotr',
 ];
 
 const PAGE_NAMES: Record<PageId, string> = {
@@ -247,6 +248,7 @@ const PAGE_NAMES: Record<PageId, string> = {
   studio2: 'Studio 2.0 Governance',
   legacy: 'Legacy Studio',
   'production-readiness': 'Production Readiness',
+  rotr: 'ROTR Control Center',
 };
 
 function PageIndex({ goTo }: { goTo: (p: PageId) => void }) {
