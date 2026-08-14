@@ -32,9 +32,13 @@ class StudioConfig(BaseModel):
     model_type: str = "yolov8"
     pipeline_mode: str = "3d"
     sam_checkpoint: str = "models/sam_vit_b.pth"
-    vendors: List[str] = ["alpamayo", "waymo"]
+    vendors: List[str] = ["alpamayo"]
     gate_thresholds_path: str = "runs/pipeline/gate_thresholds.json"
     sequence_id: str = "seq_001"
+    waymo_root: Optional[str] = None
+    alpamayo_root: Optional[str] = None
+    a2d2_root: Optional[str] = None
+    allow_stub: bool = True
 
 class TrainParams(BaseModel):
     model: str = "yolov8n.pt"
@@ -823,7 +827,15 @@ DATASET_METADATA_STORE = {
 
 @app.get("/api/dataset/details")
 def get_dataset_details(type: str = "local"):
-    metadata = DATASET_METADATA_STORE.get(type, DATASET_METADATA_STORE["local"])
+    metadata = dict(DATASET_METADATA_STORE.get(type, DATASET_METADATA_STORE["local"]))
+    # Catalog KPIs are reference stats for the selected dataset type — not proof that
+    # frames are on disk or browsable in Studio.
+    metadata["browsable"] = False
+    metadata["catalog_only"] = True
+    metadata["browse_hint"] = (
+        "These percentages are catalog estimates. Use Validate & Browse Images Path "
+        "or run 3D Ingest, then open Pipeline Outputs to view real frames."
+    )
     return {"status": "ok", "metadata": metadata}
 
 @app.post("/api/dataset/preprocess")
@@ -832,13 +844,23 @@ def preprocess_dataset(params: dict):
     import time
     time.sleep(0.3)
     
-    meta = DATASET_METADATA_STORE.get(dataset_type, DATASET_METADATA_STORE["local"])
+    meta = dict(DATASET_METADATA_STORE.get(dataset_type, DATASET_METADATA_STORE["local"]))
+    meta["browsable"] = False
+    meta["catalog_only"] = True
+    meta["browse_hint"] = (
+        "Preprocess updates catalog metadata only. Browse real frames via "
+        "Validate & Browse Images Path or Pipeline Outputs after ingest."
+    )
     
     return {
         "status": "ok",
-        "message": f"Dataset {meta['name']} loaded and preprocessed successfully.",
+        "message": (
+            f"Catalog metadata for {meta['name']} applied — not the same as loading "
+            f"browsable frames onto disk."
+        ),
         "dataset_type": dataset_type,
         "total_frames": meta["loaded_rows"],
+        "browsable": False,
         "metadata": meta
     }
 
@@ -1273,8 +1295,24 @@ def annotate_street(req: AnnotateStreetRequest):
 # -----------------------------------------------------------------------
 
 class IngestParams(BaseModel):
-    vendors: List[str] = ["alpamayo", "waymo"]
+    vendors: List[str] = ["alpamayo"]
     sequence_id: str = "seq_001"
+    source_path: Optional[str] = None
+    max_frames: Optional[int] = None
+    allow_mix: bool = False
+
+
+class LoadAllDatasetsParams(BaseModel):
+    """Load each selected vendor into its own homogeneous pipeline sequence."""
+    sequence_prefix: str = "seq_001"
+    vendors: Optional[List[str]] = None
+    source_path: Optional[str] = None
+    waymo_root: Optional[str] = None
+    alpamayo_root: Optional[str] = None
+    a2d2_root: Optional[str] = None
+    allow_stub: bool = True
+    max_frames: Optional[int] = None
+
 
 class AutoLabelParams(BaseModel):
     sequence_id: str = "seq_001"
@@ -1295,20 +1333,103 @@ class GateParams(BaseModel):
 @app.post("/api/dataset/ingest")
 def ingest_dataset(params: IngestParams):
     from sensorflow.dataset_fusion_engine import DatasetFusionEngine
+    config = load_config()
+    source_path = params.source_path if params.source_path is not None else config.source_path
+    vendors = [v.lower().strip() for v in (params.vendors or []) if v and str(v).strip()]
+    if not vendors:
+        raise HTTPException(status_code=400, detail="Select at least one vendor.")
+    if len(vendors) > 1 and not params.allow_mix:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Multiple vendors selected without allow_mix. "
+                "Ingest one vendor (or Local only), or set allow_mix=true to fuse stubs."
+            ),
+        )
     try:
         engine = DatasetFusionEngine()
-        sequence = engine.ingest(params.vendors, params.sequence_id)
+        sequence = engine.ingest(
+            vendors,
+            params.sequence_id,
+            source_path=source_path,
+            max_frames=params.max_frames,
+        )
         manifest_path = engine.save_manifest(sequence)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ingest failed: {str(e)}")
 
-    config = load_config()
     config.sequence_id = params.sequence_id
-    config.vendors = params.vendors
+    config.vendors = vendors
+    if params.source_path is not None:
+        config.source_path = params.source_path
     with open(CONFIG_PATH, "w") as f:
         json.dump(config.model_dump(), f, indent=2)
 
-    return {"status": "ok", "manifest": str(manifest_path), "sequence_id": params.sequence_id}
+    frame_count = len(sequence.frames)
+    demo_stub = bool(sequence.taxonomy_manifest.get("demo_stub"))
+    return {
+        "status": "ok",
+        "manifest": str(manifest_path),
+        "sequence_id": params.sequence_id,
+        "frames": frame_count,
+        "demo_stub": demo_stub,
+        "vendor": sequence.vendor,
+        "vendors": vendors,
+        "allow_mix": params.allow_mix,
+        "source_path": source_path,
+        "message": (
+            f"demo stub: {frame_count} frames"
+            if demo_stub
+            else f"ingested {frame_count} frames from {source_path}"
+        ),
+    }
+
+
+@app.post("/api/dataset/load-all")
+def load_all_datasets(params: LoadAllDatasetsParams):
+    """
+    Register Local + AV vendors as separate sequences under runs/pipeline/<prefix>_<vendor>/.
+
+    Homogeneous frame IDs per sequence. Missing lakes → demo stub (allow_stub=true) or
+    NOT_EXECUTED with path hints (allow_stub=false). Never claims catalog KPIs are disk loads.
+    """
+    from sensorflow.dataset_load_service import DatasetLoadService
+
+    config = load_config()
+    source_path = params.source_path if params.source_path is not None else config.source_path
+    waymo_root = params.waymo_root if params.waymo_root is not None else config.waymo_root
+    alpamayo_root = params.alpamayo_root if params.alpamayo_root is not None else config.alpamayo_root
+    a2d2_root = params.a2d2_root if params.a2d2_root is not None else config.a2d2_root
+    allow_stub = params.allow_stub if params.allow_stub is not None else config.allow_stub
+
+    service = DatasetLoadService()
+    result = service.load_all(
+        sequence_prefix=params.sequence_prefix,
+        vendors=params.vendors,
+        source_path=source_path,
+        waymo_root=waymo_root,
+        alpamayo_root=alpamayo_root,
+        a2d2_root=a2d2_root,
+        allow_stub=allow_stub,
+        max_frames=params.max_frames,
+    )
+
+    if result.get("active_sequence_id"):
+        config.sequence_id = result["active_sequence_id"]
+    config.source_path = source_path or config.source_path
+    if waymo_root is not None:
+        config.waymo_root = waymo_root
+    if alpamayo_root is not None:
+        config.alpamayo_root = alpamayo_root
+    if a2d2_root is not None:
+        config.a2d2_root = a2d2_root
+    config.allow_stub = allow_stub
+    with open(CONFIG_PATH, "w") as f:
+        json.dump(config.model_dump(), f, indent=2)
+
+    return result
 
 
 @app.get("/api/dataset/ingest/status")
@@ -1323,6 +1444,9 @@ def ingest_status(sequence_id: str = "seq_001"):
         status["manifest_exists"] = True
         status["frames"] = len(manifest_data.get("frames", []))
         status["vendor"] = manifest_data.get("vendor", "unknown")
+        tax = manifest_data.get("taxonomy_manifest") or {}
+        status["demo_stub"] = bool(tax.get("demo_stub", status.get("demo_stub", False)))
+        status["stub_note"] = tax.get("stub_note")
     return {"status": "ok", "sequence_id": sequence_id, **status}
 
 
@@ -1337,6 +1461,7 @@ def auto_label(params: AutoLabelParams):
 
     try:
         sequence = UnifiedSequence.load(manifest)
+        expected_frames = len(sequence.frames)
         output_dir = manifest.parent / "proposals"
         automator = PerceptionAutomator(
             sam_checkpoint=params.sam_checkpoint,
@@ -1349,7 +1474,19 @@ def auto_label(params: AutoLabelParams):
 
     proposals_dir = manifest.parent / "proposals"
     num_frames = len(list(proposals_dir.glob("*.json"))) if proposals_dir.exists() else 0
-    return {"status": "ok", "proposals_dir": str(proposals_dir), "frames_processed": num_frames}
+    demo_stub = bool(sequence.taxonomy_manifest.get("demo_stub"))
+    return {
+        "status": "ok",
+        "proposals_dir": str(proposals_dir),
+        "frames_processed": num_frames,
+        "frames_expected": expected_frames,
+        "demo_stub": demo_stub,
+        "message": (
+            f"demo stub: processed {num_frames}/{expected_frames} frames"
+            if demo_stub
+            else f"processed {num_frames}/{expected_frames} frames"
+        ),
+    }
 
 
 @app.post("/api/perception/track")
@@ -1440,16 +1577,107 @@ def pipeline_status(sequence_id: str = "seq_001"):
 
     seq_state = state.get(sequence_id, {})
     base = Path("runs/pipeline") / sequence_id
+    manifest = base / "manifest.json"
+    proposals_dir = base / "proposals"
+    tracks = base / "tracks.json"
+    benchmark = base / "benchmark" / "metric_card.json"
+    quality_report = base / "benchmark" / "quality_report.json"
+
+    ingest_complete = manifest.exists()
+    perception_complete = proposals_dir.exists() and any(proposals_dir.glob("*.json"))
+    tracking_complete = tracks.exists()
+    benchmark_complete = benchmark.exists()
+
+    frames_ingested = None
+    frames_processed = None
+    demo_stub = None
+    if ingest_complete:
+        try:
+            with open(manifest) as f:
+                manifest_data = json.load(f)
+            frames_ingested = len(manifest_data.get("frames", []))
+            demo_stub = bool((manifest_data.get("taxonomy_manifest") or {}).get("demo_stub"))
+        except Exception:
+            frames_ingested = seq_state.get("frames")
+            demo_stub = seq_state.get("demo_stub")
+    if perception_complete:
+        frames_processed = len(list(proposals_dir.glob("*.json")))
+
+    # Completion stages: True when done, None when not run (UI must not show FAIL).
+    # Launch gate: True/False only after evaluation; None beforehand.
+    launch_gate_passed = seq_state.get("launch_gate_passed")
+    if "launch_gate_passed" not in seq_state:
+        launch_gate_passed = None
+
+    quality_passed = None
+    if quality_report.exists():
+        try:
+            with open(quality_report) as f:
+                quality_passed = bool(json.load(f).get("passed"))
+        except Exception:
+            quality_passed = benchmark_complete
+
     return {
         "status": "ok",
         "sequence_id": sequence_id,
-        "ingest_complete": (base / "manifest.json").exists(),
-        "perception_complete": (base / "proposals").exists() and any((base / "proposals").glob("*.json")),
-        "tracking_complete": (base / "tracks.json").exists(),
-        "benchmark_complete": (base / "benchmark" / "metric_card.json").exists(),
-        "launch_gate_passed": seq_state.get("launch_gate_passed", False),
+        "ingest_complete": True if ingest_complete else None,
+        "perception_complete": True if perception_complete else None,
+        "tracking_complete": True if tracking_complete else None,
+        "benchmark_complete": True if benchmark_complete else None,
+        "quality_gate_passed": quality_passed,
+        "launch_gate_passed": launch_gate_passed,
+        "frames_ingested": frames_ingested,
+        "frames_processed": frames_processed,
+        "demo_stub": demo_stub,
         "state": seq_state,
     }
+
+
+@app.get("/api/pipeline/sequences")
+def pipeline_sequences():
+    from sensorflow import pipeline_artifacts as artifacts
+    return {"status": "ok", "sequences": artifacts.list_sequences()}
+
+
+@app.get("/api/pipeline/artifacts")
+def pipeline_artifacts(sequence_id: str = "seq_001"):
+    from sensorflow import pipeline_artifacts as artifacts
+    return {"status": "ok", **artifacts.artifacts_summary(sequence_id)}
+
+
+@app.get("/api/pipeline/frames")
+def pipeline_frames(sequence_id: str = "seq_001"):
+    from sensorflow import pipeline_artifacts as artifacts
+    return artifacts.list_frames(sequence_id)
+
+
+@app.get("/api/pipeline/frame")
+def pipeline_frame(sequence_id: str, frame_id: str):
+    from sensorflow import pipeline_artifacts as artifacts
+    try:
+        return artifacts.get_frame(sequence_id, frame_id)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.get("/api/pipeline/file")
+def pipeline_file(path: str):
+    """Serve a local run/data artifact with path-traversal protection."""
+    from sensorflow import pipeline_artifacts as artifacts
+    try:
+        file_path, media_type = artifacts.resolve_file(path)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return FileResponse(file_path, media_type=media_type)
+
+
+@app.get("/api/dataset/browse")
+def dataset_browse(source_path: str = "data", limit: int = 48):
+    """Validate Images Path by listing browsable local frames."""
+    from sensorflow import pipeline_artifacts as artifacts
+    return artifacts.scan_source_images(source_path, limit=limit)
 
 
 @app.get("/api/mitl/queue")
@@ -1537,6 +1765,10 @@ app.include_router(rotr_router)
 # In-app help chatbot (FAQ / page-guide matcher; optional Ollama enrichment).
 from sensorflow.help.api import router as help_router
 app.include_router(help_router)
+
+# Product version + About catalog (GET /api/about, GET /api/version).
+from sensorflow.about.api import router as about_router
+app.include_router(about_router)
 
 # Mount static folder
 static_dir = Path(__file__).parent / "static"

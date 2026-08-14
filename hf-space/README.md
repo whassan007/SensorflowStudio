@@ -29,3 +29,9 @@ copilot — are not functional here; the dashboards and analytics APIs are.
 Deployed from the project repository via
 `deploy/huggingface/deploy.py` (uploads files with `huggingface_hub`; the
 frontend is built inside the Docker image).
+
+## Version
+
+Current version is shown in the Studio AppBar (`vX.Y.Z` chip) and Help → About,
+with release notes for each notable version. The same catalog is served at
+`GET /api/about` and `GET /api/version`. See `CHANGELOG.md` in the GitHub repo.

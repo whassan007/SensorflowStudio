@@ -95,6 +95,7 @@ import RotrControlCenterPage from './pages/rotr/RotrControlCenterPage';
 import PageIntro from './components/help/PageIntro';
 import HelpMenu from './components/help/HelpMenu';
 import HelpChatbot from './components/help/HelpChatbot';
+import AboutDialog, { VersionChip } from './components/help/AboutDialog';
 
 const DRAWER_WIDTH = 230;
 
@@ -213,6 +214,7 @@ export default function App() {
   const [entityId, setEntityId] = useState<string | null>(initial.entityId);
   const [activeDatasetId, setActiveDatasetId] = useState<string | null>(null);
   const [helpChatOpen, setHelpChatOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const stream = useStream();
 
   const navigate = useCallback((nextPage: PageId, nextEntityId?: string | null) => {
@@ -316,6 +318,7 @@ export default function App() {
                 sx={{ ml: 1, bgcolor: '#232a31', fontFamily: 'monospace', fontSize: 11 }}
               />
             ) : null}
+            <VersionChip onClick={() => setAboutOpen(true)} />
             <HelpMenu onOpenChat={() => setHelpChatOpen(true)} />
           </Toolbar>
         </AppBar>
@@ -330,11 +333,13 @@ export default function App() {
               boxSizing: 'border-box',
               bgcolor: '#12171d',
               borderRight: '1px solid #232a31',
+              display: 'flex',
+              flexDirection: 'column',
             },
           }}
         >
-          <Toolbar variant="dense" sx={{ minHeight: 52 }} />
-          <Box sx={{ overflowY: 'auto', pb: 2 }}>
+          <Toolbar variant="dense" sx={{ minHeight: 52, flexShrink: 0 }} />
+          <Box sx={{ overflowY: 'auto', pb: 2, flex: 1 }}>
             <List
               dense
               subheader={
@@ -385,6 +390,9 @@ export default function App() {
             >
               {LEGACY_NAV.map(renderNavItem)}
             </List>
+          </Box>
+          <Box sx={{ px: 1.5, py: 1.25, borderTop: '1px solid #232a31', flexShrink: 0 }}>
+            <VersionChip onClick={() => setAboutOpen(true)} />
           </Box>
         </Drawer>
 
@@ -458,6 +466,7 @@ export default function App() {
           )}
         </Box>
         <HelpChatbot open={helpChatOpen} onOpenChange={setHelpChatOpen} />
+        <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
       </Box>
     </LabelEvalContext.Provider>
   );

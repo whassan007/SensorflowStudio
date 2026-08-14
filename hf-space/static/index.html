@@ -139,10 +139,13 @@
                                 <input type="text" id="dataset-source-path" value="data" placeholder="e.g. data, path/to/images">
                                 <span class="help-text">Folder containing raw images for inference/auto-labeling.</span>
                             </div>
-                            <div class="actions-row" style="display: flex; gap: 12px;">
+                            <div class="actions-row" style="display: flex; gap: 12px; flex-wrap: wrap;">
                                 <button class="btn btn-primary" id="btn-save-dataset">Save Config</button>
-                                <button class="btn btn-secondary" id="btn-preprocess-dataset">Load & Preprocess Dataset</button>
+                                <button class="btn btn-secondary" id="btn-preprocess-dataset">Load Catalog Metadata</button>
+                                <button class="btn btn-secondary" id="btn-browse-source" title="List and preview images under Images Path">Validate &amp; Browse Images Path</button>
                             </div>
+                            <div id="source-browse-status" class="status-box" style="margin-top:12px;"></div>
+                            <div id="source-browse-gallery" class="output-browse-gallery" style="margin-top:12px;"></div>
                         </div>
 
                         <div class="card card-glass">
@@ -187,11 +190,11 @@
                                         <span>📊</span> Dataset Row Statistics & Technical Metadata
                                     </h3>
                                     <p id="ds-meta-desc" style="font-size: 12px; color: var(--text-muted); margin: 4px 0 0 0;">
-                                        Comprehensive metrics on raw source rows vs loaded records, sensor modalities, and class breakdown.
+                                        Catalog reference stats for the selected dataset type. This is not proof that frames are on disk or browsable — use Validate &amp; Browse or Pipeline Outputs.
                                     </p>
                                 </div>
-                                <span id="ds-meta-badge" class="badge" style="background: rgba(0, 255, 170, 0.15); color: #00ffaa; border: 1px solid rgba(0, 255, 170, 0.3); padding: 4px 10px; font-weight: 600; font-size: 11px;">
-                                    100.0% Loaded
+                                <span id="ds-meta-badge" class="badge" style="background: rgba(251, 191, 36, 0.15); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.35); padding: 4px 10px; font-weight: 600; font-size: 11px;">
+                                    Catalog estimate — not browsable
                                 </span>
                             </div>
 
@@ -199,26 +202,26 @@
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px;">
                                 <div style="background: rgba(11, 19, 43, 0.7); border: 1px solid var(--border); padding: 14px; border-radius: 8px;">
                                     <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Source Rows in Dataset</div>
-                                    <div id="ds-kpi-total-rows" style="font-size: 24px; font-weight: 800; color: #38bdf8; margin-top: 4px;">128</div>
-                                    <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Total records in raw source</div>
+                                    <div id="ds-kpi-total-rows" style="font-size: 24px; font-weight: 800; color: #38bdf8; margin-top: 4px;">—</div>
+                                    <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Catalog estimate (not disk)</div>
                                 </div>
 
                                 <div style="background: rgba(11, 19, 43, 0.7); border: 1px solid var(--border); padding: 14px; border-radius: 8px;">
                                     <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Rows Ingested / Loaded</div>
-                                    <div id="ds-kpi-loaded-rows" style="font-size: 24px; font-weight: 800; color: #00ffaa; margin-top: 4px;">128</div>
-                                    <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Active frames in memory/cache</div>
+                                    <div id="ds-kpi-loaded-rows" style="font-size: 24px; font-weight: 800; color: #00ffaa; margin-top: 4px;">—</div>
+                                    <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Catalog estimate (not disk)</div>
                                 </div>
 
                                 <div style="background: rgba(11, 19, 43, 0.7); border: 1px solid var(--border); padding: 14px; border-radius: 8px;">
                                     <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Ingestion Sampling Rate</div>
-                                    <div id="ds-kpi-ingest-pct" style="font-size: 24px; font-weight: 800; color: #a855f7; margin-top: 4px;">100.0%</div>
-                                    <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Loaded / Source ratio</div>
+                                    <div id="ds-kpi-ingest-pct" style="font-size: 24px; font-weight: 800; color: #a855f7; margin-top: 4px;">—</div>
+                                    <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Catalog estimate only</div>
                                 </div>
 
                                 <div style="background: rgba(11, 19, 43, 0.7); border: 1px solid var(--border); padding: 14px; border-radius: 8px;">
                                     <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Total Labeled Objects</div>
-                                    <div id="ds-kpi-total-annotations" style="font-size: 24px; font-weight: 800; color: #fbbf24; margin-top: 4px;">432</div>
-                                    <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Bounding boxes / Labels</div>
+                                    <div id="ds-kpi-total-annotations" style="font-size: 24px; font-weight: 800; color: #fbbf24; margin-top: 4px;">—</div>
+                                    <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Catalog estimate only</div>
                                 </div>
                             </div>
 
@@ -260,20 +263,79 @@
                 <section class="stage-panel" id="panel-ingest">
                     <div class="card card-glass">
                         <h3>Exabyte Ingest, Fusion & Stratification</h3>
-                        <p class="text-muted">Fuse Alpamayo and Waymo LiDAR/camera data with six-axis taxonomy stratification.</p>
+                        <p class="text-muted">Ingest one vendor by default (homogeneous frame IDs). Or use Load all datasets to register Local + each AV vendor as separate sequences under runs/pipeline/&lt;prefix&gt;_&lt;vendor&gt;/. Missing lakes become clearly labeled demo stubs (or NOT_EXECUTED if stubs are disabled).</p>
                         <div class="form-group">
                             <label>Vendors</label>
-                            <div style="display:flex;gap:12px;">
-                                <label><input type="checkbox" id="ingest-vendor-alpamayo" checked> Alpamayo</label>
-                                <label><input type="checkbox" id="ingest-vendor-waymo" checked> Waymo</label>
+                            <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                                <label title="Load frames from Dataset Configuration Images Path"><input type="checkbox" id="ingest-vendor-local"> Local frames / video</label>
+                                <label title="NVIDIA Alpamayo (Physical AI AV Dataset)"><input type="checkbox" id="ingest-vendor-alpamayo" checked> Alpamayo (demo stub)</label>
+                                <label title="Waymo Open Dataset"><input type="checkbox" id="ingest-vendor-waymo"> Waymo (demo stub)</label>
+                                <label title="Audi A2D2 (Audi Autonomous Driving Dataset)"><input type="checkbox" id="ingest-vendor-a2d2"> Audi A2D2 (demo stub)</label>
+                            </div>
+                            <label style="display:block;margin-top:8px;" title="When off, selecting a vendor replaces the previous selection so ingest stays single-dataset.">
+                                <input type="checkbox" id="ingest-mix-vendors"> Mix vendors (fuse multiple stubs into one sequence)
+                            </label>
+                            <label style="display:block;margin-top:6px;" title="When off, Load all datasets reports NOT_EXECUTED for vendors without a configured lake path.">
+                                <input type="checkbox" id="ingest-allow-stub" checked> Allow demo stubs when AV lakes are missing
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label for="ingest-source-path">Local source path (images folder or video file)</label>
+                            <input type="text" id="ingest-source-path" value="data" class="input-field" placeholder="e.g. data/seq_001 or path/to/clip.mp4">
+                            <span class="help-text">Uses Dataset Configuration Images Path when left as default. Enable Local above to load all frames (vendor stubs alone are ~3 frames each).</span>
+                        </div>
+                        <div class="grid-2" style="gap:12px;">
+                            <div class="form-group">
+                                <label for="ingest-waymo-root">Waymo root (optional)</label>
+                                <input type="text" id="ingest-waymo-root" class="input-field" placeholder="path/to/waymo frames or lake">
+                            </div>
+                            <div class="form-group">
+                                <label for="ingest-alpamayo-root">Alpamayo root (optional)</label>
+                                <input type="text" id="ingest-alpamayo-root" class="input-field" placeholder="path/to/alpamayo frames">
+                            </div>
+                            <div class="form-group">
+                                <label for="ingest-a2d2-root">A2D2 root (optional)</label>
+                                <input type="text" id="ingest-a2d2-root" class="input-field" placeholder="path/to/a2d2 PNG export">
+                            </div>
+                            <div class="form-group">
+                                <label for="ingest-max-frames">Max frames (local / lake folders)</label>
+                                <input type="number" id="ingest-max-frames" value="10000" min="1" class="input-field" title="Cap for local image/video ingest. Default 10000 — not silently capped at 6.">
                             </div>
                         </div>
                         <div class="form-group">
-                            <label for="ingest-sequence-id">Sequence ID</label>
+                            <label for="ingest-sequence-id">Sequence ID / prefix</label>
                             <input type="text" id="ingest-sequence-id" value="seq_001" class="input-field">
+                            <span class="help-text">Single ingest uses this ID. Load all datasets writes &lt;prefix&gt;_local, &lt;prefix&gt;_waymo, etc.</span>
                         </div>
-                        <button class="btn btn-primary" id="btn-ingest-run">Run Ingest & Fusion</button>
-                        <div id="ingest-status" class="status-box" style="margin-top:16px;"></div>
+                        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                            <button class="btn btn-primary" id="btn-ingest-run">Run Ingest &amp; Fusion</button>
+                            <button class="btn btn-secondary" id="btn-load-all-datasets" title="Register each vendor as its own pipeline sequence">Load all datasets</button>
+                        </div>
+                        <div id="ingest-status" class="status-box" style="margin-top:16px;white-space:pre-wrap;"></div>
+                    </div>
+                    <div class="card card-glass pipeline-output-browser" style="margin-top:16px;" data-browser="ingest">
+                        <h3>Pipeline Outputs — browse &amp; validate</h3>
+                        <p class="text-muted">Inspect ingested frames, proposal JSON, and run artifacts under <code>runs/pipeline/&lt;sequence&gt;/</code>. Catalog “100% loaded” does not mean outputs are browsable here.</p>
+                        <div class="form-group" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+                            <div style="flex:1;min-width:160px;">
+                                <label>Sequence</label>
+                                <select class="input-field out-seq-select"></select>
+                            </div>
+                            <button type="button" class="btn btn-secondary out-refresh-btn">Refresh</button>
+                        </div>
+                        <div class="out-summary status-box" style="margin-top:8px;">Select a sequence or run ingest to browse outputs.</div>
+                        <div style="display:grid;grid-template-columns:minmax(180px,240px) 1fr;gap:16px;margin-top:12px;">
+                            <div>
+                                <div style="font-size:11px;color:var(--text-muted);font-weight:600;letter-spacing:0.4px;">FRAMES</div>
+                                <div class="out-frame-list" style="max-height:320px;overflow:auto;margin-top:6px;border:1px solid var(--border);border-radius:8px;background:rgba(4,6,11,0.5);"></div>
+                            </div>
+                            <div>
+                                <div class="out-preview-meta" style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">No frame selected.</div>
+                                <img class="out-preview-img" alt="Frame preview" style="display:none;max-width:100%;max-height:320px;border-radius:8px;border:1px solid var(--border);background:#04060b;">
+                                <div class="out-camera-empty" style="display:none;padding:24px;border:1px dashed var(--border);border-radius:8px;color:var(--text-muted);font-size:13px;background:rgba(4,6,11,0.35);">No camera image for this frame.</div>
+                                <pre class="out-proposals-json" style="display:none;margin-top:10px;max-height:200px;overflow:auto;background:#04060b;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:11px;color:#00ffaa;"></pre>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
@@ -295,6 +357,30 @@
                         </div>
                         <button class="btn btn-primary" id="btn-perception-run">Run Auto-Label</button>
                         <div id="perception-status" class="status-box" style="margin-top:16px;"></div>
+                    </div>
+                    <div class="card card-glass pipeline-output-browser" style="margin-top:16px;" data-browser="perception">
+                        <h3>Pipeline Outputs — proposals &amp; frames</h3>
+                        <p class="text-muted">After auto-label, open a frame to validate proposal JSON written under <code>runs/pipeline/&lt;sequence&gt;/proposals/</code>.</p>
+                        <div class="form-group" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+                            <div style="flex:1;min-width:160px;">
+                                <label>Sequence</label>
+                                <select class="input-field out-seq-select"></select>
+                            </div>
+                            <button type="button" class="btn btn-secondary out-refresh-btn">Refresh</button>
+                        </div>
+                        <div class="out-summary status-box" style="margin-top:8px;">Run auto-label, then refresh to browse proposals.</div>
+                        <div style="display:grid;grid-template-columns:minmax(180px,240px) 1fr;gap:16px;margin-top:12px;">
+                            <div>
+                                <div style="font-size:11px;color:var(--text-muted);font-weight:600;letter-spacing:0.4px;">FRAMES</div>
+                                <div class="out-frame-list" style="max-height:320px;overflow:auto;margin-top:6px;border:1px solid var(--border);border-radius:8px;background:rgba(4,6,11,0.5);"></div>
+                            </div>
+                            <div>
+                                <div class="out-preview-meta" style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">No frame selected.</div>
+                                <img class="out-preview-img" alt="Frame preview" style="display:none;max-width:100%;max-height:320px;border-radius:8px;border:1px solid var(--border);background:#04060b;">
+                                <div class="out-camera-empty" style="display:none;padding:24px;border:1px dashed var(--border);border-radius:8px;color:var(--text-muted);font-size:13px;background:rgba(4,6,11,0.35);">No camera image for this frame.</div>
+                                <pre class="out-proposals-json" style="display:none;margin-top:10px;max-height:200px;overflow:auto;background:#04060b;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:11px;color:#00ffaa;"></pre>
+                            </div>
+                        </div>
                     </div>
                 </section>
 

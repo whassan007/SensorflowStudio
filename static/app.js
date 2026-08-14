@@ -11,10 +11,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const STAGE_METADATA = {
         dataset: { title: 'Dataset Configuration', desc: 'Prepare and validate your image source path and annotation files.', next: 'ingest', nextLabel: 'Proceed to 3D Ingest' },
-        ingest: { title: '3D Ingest & Fusion', desc: 'Fuse Alpamayo and Waymo LiDAR/camera data with six-axis taxonomy stratification.', next: 'perception', nextLabel: 'Proceed to 3D Perception', gateKey: 'ingest_complete' },
-        perception: { title: '3D Perception', desc: 'SAM-based 2D masks lifted to 3D bounding box proposals.', next: 'tracking', nextLabel: 'Proceed to Tracking', gateKey: 'perception_complete' },
-        tracking: { title: 'Temporal Tracking', desc: 'Kalman + Hungarian association for ID-smooth multi-frame tracks.', next: 'quality-gate', nextLabel: 'Proceed to Quality Gate', gateKey: 'tracking_complete' },
-        'quality-gate': { title: 'Quality Gate', desc: 'Benchmark automated tracks against vendor GT with 3D and temporal metrics.', next: 'launch-gate', nextLabel: 'Proceed to Launch Gate', gateKey: 'benchmark_complete' },
+        ingest: { title: '3D Ingest & Fusion', desc: 'Fuse Alpamayo/Waymo/A2D2 stubs and/or local image/video sequences with six-axis taxonomy stratification.', next: 'perception', nextLabel: 'Proceed to 3D Perception', gateKey: 'ingest_complete', completionOnly: true },
+        perception: { title: '3D Perception', desc: 'SAM-based 2D masks lifted to 3D bounding box proposals.', next: 'tracking', nextLabel: 'Proceed to Tracking', gateKey: 'perception_complete', completionOnly: true },
+        tracking: { title: 'Temporal Tracking', desc: 'Kalman + Hungarian association for ID-smooth multi-frame tracks.', next: 'quality-gate', nextLabel: 'Proceed to Quality Gate', gateKey: 'tracking_complete', completionOnly: true },
+        'quality-gate': { title: 'Quality Gate', desc: 'Benchmark automated tracks against vendor GT with 3D and temporal metrics.', next: 'launch-gate', nextLabel: 'Proceed to Launch Gate', gateKey: 'quality_gate_passed', completionKey: 'benchmark_complete' },
         'launch-gate': { title: 'Launch Gate', desc: 'Validate safety thresholds before export is allowed.', next: 'model', nextLabel: 'Proceed to Model Setup', gateKey: 'launch_gate_passed' },
         model: { title: 'Model Setup', desc: 'Choose a YOLOv8 base model and compute device architecture.', next: 'training', nextLabel: 'Proceed to Training' },
         training: { title: 'Training Execution', desc: 'Fine-tune the selected YOLO model on your configured dataset.', next: 'inference', nextLabel: 'Proceed to Inference' },
@@ -44,7 +44,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const stage = btn.dataset.stage;
             const meta = STAGE_METADATA[stage];
             if (!meta || !meta.gateKey) return;
-            const passed = pipelineState[meta.gateKey];
             let badge = btn.querySelector('.gate-badge');
             if (!badge) {
                 badge = document.createElement('span');
@@ -52,14 +51,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 badge.style.cssText = 'margin-left:6px;font-size:10px;padding:2px 6px;border-radius:4px;';
                 btn.appendChild(badge);
             }
-            if (passed === true) {
+
+            // Completion-only stages: PASS when done, blank when not run (never FAIL).
+            // Pass/fail gates (quality/launch): PASS/FAIL only after evaluation; blank beforehand.
+            const verdict = pipelineState[meta.gateKey];
+            const completed = meta.completionKey ? pipelineState[meta.completionKey] : null;
+
+            if (meta.completionOnly) {
+                if (verdict === true) {
+                    badge.textContent = 'PASS';
+                    badge.style.background = '#00ffaa33';
+                    badge.style.color = '#00ffaa';
+                } else {
+                    badge.textContent = '';
+                }
+                return;
+            }
+
+            if (verdict === true) {
                 badge.textContent = 'PASS';
                 badge.style.background = '#00ffaa33';
                 badge.style.color = '#00ffaa';
-            } else if (passed === false) {
+            } else if (verdict === false) {
                 badge.textContent = 'FAIL';
                 badge.style.background = '#ff444433';
                 badge.style.color = '#ff4444';
+            } else if (completed === true) {
+                // Ran stage artifact exists but no explicit pass/fail yet
+                badge.textContent = 'PASS';
+                badge.style.background = '#00ffaa33';
+                badge.style.color = '#00ffaa';
             } else {
                 badge.textContent = '';
             }
@@ -647,6 +668,7 @@ document.addEventListener('DOMContentLoaded', () => {
     selectDatasetType.addEventListener('change', (e) => {
         const val = e.target.value;
         renderSourceLinks(val);
+        loadCatalogMetadata(val);
         if (val !== 'local') {
             const backendDatasetMap = {
                 waymo: 'physical_ai',
@@ -657,8 +679,66 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    function applyCatalogMetadata(meta, opts = {}) {
+        const badge = document.getElementById('ds-meta-badge');
+        const desc = document.getElementById('ds-meta-desc');
+        const pills = document.getElementById('ds-class-pills');
+        if (!meta) return;
+        const setText = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = val ?? '—';
+        };
+        setText('ds-kpi-total-rows', meta.total_rows_source);
+        setText('ds-kpi-loaded-rows', meta.loaded_rows);
+        setText('ds-kpi-ingest-pct', meta.ingestion_pct);
+        setText('ds-kpi-total-annotations', meta.total_annotations);
+        setText('ds-meta-sensors', meta.sensor_modality);
+        setText('ds-meta-geo', meta.geographic_coverage);
+        setText('ds-meta-weather', meta.weather_conditions);
+        setText('ds-meta-annotator', meta.annotation_tool);
+        setText('ds-meta-footprint', meta.storage_footprint);
+        setText('ds-meta-format', meta.format);
+        setText('ds-meta-license', meta.licensing);
+        setText('ds-meta-type-id', meta.dataset_type);
+        if (pills) {
+            pills.innerHTML = '';
+            const counts = meta.class_counts || {};
+            Object.entries(counts).forEach(([cls, count]) => {
+                const span = document.createElement('span');
+                span.className = 'badge';
+                span.style.cssText = 'background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:4px 8px;font-size:11px;';
+                span.textContent = `${cls}: ${count}`;
+                pills.appendChild(span);
+            });
+        }
+        if (desc && meta.browse_hint) {
+            desc.textContent = meta.browse_hint;
+        }
+        if (badge) {
+            if (opts.browsable) {
+                badge.textContent = opts.badgeText || 'Browsable on disk';
+                badge.style.background = 'rgba(0, 255, 170, 0.15)';
+                badge.style.color = '#00ffaa';
+                badge.style.border = '1px solid rgba(0, 255, 170, 0.3)';
+            } else {
+                badge.textContent = opts.badgeText || `${meta.ingestion_pct || '—'} catalog — not browsable`;
+                badge.style.background = 'rgba(251, 191, 36, 0.15)';
+                badge.style.color = '#fbbf24';
+                badge.style.border = '1px solid rgba(251, 191, 36, 0.35)';
+            }
+        }
+    }
+
+    async function loadCatalogMetadata(datasetType) {
+        try {
+            const res = await fetch(`${API_BASE}/api/dataset/details?type=${encodeURIComponent(datasetType || 'local')}`);
+            const data = await res.json();
+            if (data.status === 'ok') applyCatalogMetadata(data.metadata, { browsable: false });
+        } catch (e) { /* backend offline */ }
+    }
+
     btnPreprocessDataset.addEventListener('click', async () => {
-        btnPreprocessDataset.textContent = 'Preprocessing Dataset...';
+        btnPreprocessDataset.textContent = 'Loading catalog…';
         btnPreprocessDataset.disabled = true;
 
         try {
@@ -669,16 +749,75 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const data = await res.json();
             if (data.status === 'ok') {
+                if (data.metadata) applyCatalogMetadata(data.metadata, { browsable: false });
+                const statusEl = document.getElementById('source-browse-status');
+                if (statusEl) {
+                    statusEl.textContent = data.message || 'Catalog metadata applied (not disk browse).';
+                }
                 pipelineWizardModal.classList.remove('hidden');
             }
         } catch (e) {
             console.error(e);
-            alert('Ingestion & Preprocessing pipeline execution failed.');
+            alert('Catalog metadata load failed.');
         } finally {
-            btnPreprocessDataset.textContent = 'Load & Preprocess Dataset';
+            btnPreprocessDataset.textContent = 'Load Catalog Metadata';
             btnPreprocessDataset.disabled = false;
         }
     });
+
+    const btnBrowseSource = document.getElementById('btn-browse-source');
+    if (btnBrowseSource) {
+        btnBrowseSource.addEventListener('click', async () => {
+            const sourcePath = datasetSourcePath?.value || document.getElementById('input-source')?.value || 'data';
+            const statusEl = document.getElementById('source-browse-status');
+            const gallery = document.getElementById('source-browse-gallery');
+            btnBrowseSource.disabled = true;
+            btnBrowseSource.textContent = 'Scanning…';
+            if (statusEl) statusEl.textContent = `Validating ${sourcePath}…`;
+            try {
+                const res = await fetch(`${API_BASE}/api/dataset/browse?source_path=${encodeURIComponent(sourcePath)}&limit=48`);
+                const data = await res.json();
+                if (gallery) {
+                    gallery.innerHTML = '';
+                    (data.images || []).forEach((img) => {
+                        const el = document.createElement('img');
+                        el.className = 'thumb';
+                        el.src = img.preview_url;
+                        el.title = img.path;
+                        el.alt = img.name;
+                        gallery.appendChild(el);
+                    });
+                }
+                if (statusEl) {
+                    statusEl.textContent = data.browsable
+                        ? `Browsable: ${data.count} image(s) under ${data.source_path}`
+                        : (data.empty_reason || 'Nothing browsable at this path.');
+                }
+                const badge = document.getElementById('ds-meta-badge');
+                if (badge) {
+                    if (data.browsable) {
+                        badge.textContent = `${data.count} images browsable on disk`;
+                        badge.style.background = 'rgba(0, 255, 170, 0.15)';
+                        badge.style.color = '#00ffaa';
+                        badge.style.border = '1px solid rgba(0, 255, 170, 0.3)';
+                        document.getElementById('ds-kpi-loaded-rows').textContent = data.count;
+                    } else {
+                        badge.textContent = 'Not browsable — path empty or missing';
+                        badge.style.background = 'rgba(255, 68, 68, 0.12)';
+                        badge.style.color = '#ff8888';
+                        badge.style.border = '1px solid rgba(255, 68, 68, 0.35)';
+                    }
+                }
+            } catch (e) {
+                if (statusEl) statusEl.textContent = `Browse failed: ${e.message}`;
+            } finally {
+                btnBrowseSource.disabled = false;
+                btnBrowseSource.textContent = 'Validate & Browse Images Path';
+            }
+        });
+    }
+
+    loadCatalogMetadata(selectDatasetType?.value || 'local');
 
     btnWizardSubmit.addEventListener('click', async () => {
         const annotationTool = document.getElementById('wizard-annotation-tool').value;
@@ -1803,24 +1942,130 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnLaunchGateRun = document.getElementById('btn-launch-gate-run');
 
     if (btnIngestRun) {
+        const vendorIds = [
+            'ingest-vendor-local',
+            'ingest-vendor-alpamayo',
+            'ingest-vendor-waymo',
+            'ingest-vendor-a2d2',
+        ];
+        const mixToggle = document.getElementById('ingest-mix-vendors');
+
+        function enforceSingleVendor(changedId) {
+            if (mixToggle?.checked) return;
+            const changed = document.getElementById(changedId);
+            if (!changed?.checked) return;
+            vendorIds.forEach((id) => {
+                if (id === changedId) return;
+                const el = document.getElementById(id);
+                if (el) el.checked = false;
+            });
+        }
+
+        vendorIds.forEach((id) => {
+            document.getElementById(id)?.addEventListener('change', () => enforceSingleVendor(id));
+        });
+
         btnIngestRun.addEventListener('click', async () => {
             const vendors = [];
+            if (document.getElementById('ingest-vendor-local')?.checked) vendors.push('local');
             if (document.getElementById('ingest-vendor-alpamayo')?.checked) vendors.push('alpamayo');
             if (document.getElementById('ingest-vendor-waymo')?.checked) vendors.push('waymo');
+            if (document.getElementById('ingest-vendor-a2d2')?.checked) vendors.push('a2d2');
+            const allowMix = !!mixToggle?.checked;
+            if (!vendors.length) {
+                document.getElementById('ingest-status').textContent =
+                    'Select at least one vendor (Local for real sequences, or one Alpamayo/Waymo/A2D2 demo stub).';
+                return;
+            }
+            if (vendors.length > 1 && !allowMix) {
+                document.getElementById('ingest-status').textContent =
+                    'Multiple vendors selected. Enable “Mix vendors” or keep a single dataset selected.';
+                return;
+            }
             currentSequenceId = document.getElementById('ingest-sequence-id')?.value || 'seq_001';
+            const sourcePath = document.getElementById('ingest-source-path')?.value
+                || document.getElementById('dataset-source-path')?.value || document.getElementById('input-source')?.value
+                || 'data';
+            const maxFramesRaw = document.getElementById('ingest-max-frames')?.value;
+            const maxFrames = maxFramesRaw ? Number(maxFramesRaw) : undefined;
             const statusEl = document.getElementById('ingest-status');
             statusEl.textContent = 'Running ingest & fusion...';
             try {
                 const res = await fetch(`${API_BASE}/api/dataset/ingest`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ vendors, sequence_id: currentSequenceId }),
+                    body: JSON.stringify({
+                        vendors,
+                        allow_mix: allowMix,
+                        sequence_id: currentSequenceId,
+                        source_path: sourcePath,
+                        max_frames: Number.isFinite(maxFrames) ? maxFrames : undefined,
+                    }),
                 });
                 const data = await res.json();
-                statusEl.textContent = data.status === 'ok'
-                    ? `Ingested -> ${data.manifest}`
-                    : `Error: ${data.detail || JSON.stringify(data)}`;
+                if (data.status === 'ok') {
+                    const stubTag = data.demo_stub ? 'demo stub: ' : '';
+                    statusEl.textContent =
+                        `Ingested ${stubTag}${data.frames} frames (${data.vendor || 'mixed'}) -> ${data.manifest}`;
+                } else {
+                    statusEl.textContent = `Error: ${data.detail || JSON.stringify(data)}`;
+                }
                 await refreshPipelineStatus();
+                await refreshAllOutputBrowsers();
+            } catch (e) {
+                statusEl.textContent = `Error: ${e.message}`;
+            }
+        });
+    }
+
+    const btnLoadAllDatasets = document.getElementById('btn-load-all-datasets');
+    if (btnLoadAllDatasets) {
+        btnLoadAllDatasets.addEventListener('click', async () => {
+            const statusEl = document.getElementById('ingest-status');
+            const prefix = document.getElementById('ingest-sequence-id')?.value || 'seq_001';
+            const sourcePath = document.getElementById('ingest-source-path')?.value
+                || document.getElementById('dataset-source-path')?.value || 'data';
+            const maxFramesRaw = document.getElementById('ingest-max-frames')?.value;
+            const maxFrames = maxFramesRaw ? Number(maxFramesRaw) : undefined;
+            const allowStub = !!document.getElementById('ingest-allow-stub')?.checked;
+            const vendors = [];
+            if (document.getElementById('ingest-vendor-local')?.checked) vendors.push('local');
+            if (document.getElementById('ingest-vendor-alpamayo')?.checked) vendors.push('alpamayo');
+            if (document.getElementById('ingest-vendor-waymo')?.checked) vendors.push('waymo');
+            if (document.getElementById('ingest-vendor-a2d2')?.checked) vendors.push('a2d2');
+            // Load-all defaults to all four when nothing selected so "all datasets" means all.
+            const body = {
+                sequence_prefix: prefix,
+                vendors: vendors.length ? vendors : ['local', 'alpamayo', 'waymo', 'a2d2'],
+                source_path: sourcePath,
+                waymo_root: document.getElementById('ingest-waymo-root')?.value || undefined,
+                alpamayo_root: document.getElementById('ingest-alpamayo-root')?.value || undefined,
+                a2d2_root: document.getElementById('ingest-a2d2-root')?.value || undefined,
+                allow_stub: allowStub,
+                max_frames: Number.isFinite(maxFrames) ? maxFrames : undefined,
+            };
+            statusEl.textContent = 'Loading configured datasets into pipeline runs…';
+            try {
+                const res = await fetch(`${API_BASE}/api/dataset/load-all`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    statusEl.textContent = `Error: ${data.detail || JSON.stringify(data)}`;
+                    return;
+                }
+                const lines = (data.results || []).map((r) => {
+                    const tag = r.status === 'ok'
+                        ? (r.demo_stub ? 'STUB' : 'LOADED')
+                        : 'NOT_EXECUTED';
+                    return `${tag} ${r.vendor}: ${r.frames || 0} frames → ${r.sequence_id || '—'} (${r.message || ''})`;
+                });
+                if (data.active_sequence_id) currentSequenceId = data.active_sequence_id;
+                statusEl.textContent = `${data.message || data.status}\n${lines.join('\n')}`;
+                await refreshPipelineStatus();
+                await refreshAllOutputBrowsers();
             } catch (e) {
                 statusEl.textContent = `Error: ${e.message}`;
             }
@@ -1843,14 +2088,176 @@ document.addEventListener('DOMContentLoaded', () => {
                     }),
                 });
                 const data = await res.json();
-                statusEl.textContent = data.status === 'ok'
-                    ? `Processed ${data.frames_processed} frames -> ${data.proposals_dir}`
-                    : `Error: ${data.detail || JSON.stringify(data)}`;
+                if (data.status === 'ok') {
+                    const stubPrefix = data.demo_stub ? 'demo stub: ' : '';
+                    const expected = data.frames_expected != null ? `/${data.frames_expected}` : '';
+                    statusEl.textContent =
+                        `${stubPrefix}Processed ${data.frames_processed}${expected} frames -> ${data.proposals_dir}`;
+                } else {
+                    statusEl.textContent = `Error: ${data.detail || JSON.stringify(data)}`;
+                }
                 await refreshPipelineStatus();
+                await refreshAllOutputBrowsers();
             } catch (e) {
                 statusEl.textContent = `Error: ${e.message}`;
             }
         });
+    }
+
+    // --- PIPELINE OUTPUT BROWSER ---
+    function initOutputBrowser(root) {
+        const seqSelect = root.querySelector('.out-seq-select');
+        const frameList = root.querySelector('.out-frame-list');
+        const summary = root.querySelector('.out-summary');
+        const previewImg = root.querySelector('.out-preview-img');
+        const cameraEmpty = root.querySelector('.out-camera-empty');
+        const previewMeta = root.querySelector('.out-preview-meta');
+        const proposalsPre = root.querySelector('.out-proposals-json');
+        const refreshBtn = root.querySelector('.out-refresh-btn');
+
+        async function loadSequences(preferredId) {
+            try {
+                const res = await fetch(`${API_BASE}/api/pipeline/sequences`);
+                const data = await res.json();
+                const sequences = data.sequences || [];
+                const previous = preferredId || seqSelect.value || currentSequenceId;
+                seqSelect.innerHTML = '';
+                if (!sequences.length) {
+                    const opt = document.createElement('option');
+                    opt.value = currentSequenceId;
+                    opt.textContent = `${currentSequenceId} (empty)`;
+                    seqSelect.appendChild(opt);
+                } else {
+                    sequences.forEach((s) => {
+                        const opt = document.createElement('option');
+                        opt.value = s.sequence_id;
+                        const stub = s.demo_stub ? ' stub' : '';
+                        opt.textContent = `${s.sequence_id} · ${s.frames ?? 0} frames${stub}`;
+                        seqSelect.appendChild(opt);
+                    });
+                }
+                if ([...seqSelect.options].some((o) => o.value === previous)) {
+                    seqSelect.value = previous;
+                }
+            } catch (e) {
+                if (summary) summary.textContent = `Could not list sequences: ${e.message}`;
+            }
+        }
+
+        async function loadFrames() {
+            const seqId = seqSelect.value || currentSequenceId;
+            currentSequenceId = seqId;
+            if (summary) summary.textContent = `Loading ${seqId}…`;
+            frameList.innerHTML = '';
+            previewImg.style.display = 'none';
+            previewImg.removeAttribute('src');
+            if (cameraEmpty) cameraEmpty.style.display = 'none';
+            proposalsPre.style.display = 'none';
+            previewMeta.textContent = 'No frame selected.';
+            try {
+                const res = await fetch(`${API_BASE}/api/pipeline/frames?sequence_id=${encodeURIComponent(seqId)}`);
+                const data = await res.json();
+                if (!data.browsable) {
+                    summary.textContent = data.empty_reason || 'Nothing browsable for this sequence.';
+                    return;
+                }
+                const stub = data.demo_stub ? ' · demo stub' : '';
+                const tracks = data.has_tracks ? ' · tracks.json' : '';
+                summary.textContent =
+                    `${data.frames.length} frame(s) · vendor ${data.vendor || '—'}${stub} · ` +
+                    `${data.proposal_files || 0} proposal file(s)${tracks} · ${data.base_path}`;
+                data.frames.forEach((frame) => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'out-frame-item';
+                    const camCount = frame.available_camera_count ?? frame.cameras?.filter((c) => c.preview_url || c.available)?.length ?? frame.cameras?.length ?? 0;
+                    btn.innerHTML = `<div>${frame.frame_id}</div><div class="muted">${frame.proposal_count} proposals · ${camCount} cam</div>`;
+                    btn.addEventListener('click', () => {
+                        frameList.querySelectorAll('.out-frame-item').forEach((el) => el.classList.remove('active'));
+                        btn.classList.add('active');
+                        void showFrame(seqId, frame);
+                    });
+                    frameList.appendChild(btn);
+                });
+            } catch (e) {
+                summary.textContent = `Failed to load frames: ${e.message}`;
+            }
+        }
+
+        async function showFrame(seqId, frameSummary) {
+            previewMeta.textContent = `Loading ${frameSummary.frame_id}…`;
+            previewImg.style.display = 'none';
+            previewImg.removeAttribute('src');
+            if (cameraEmpty) cameraEmpty.style.display = 'none';
+            try {
+                const res = await fetch(
+                    `${API_BASE}/api/pipeline/frame?sequence_id=${encodeURIComponent(seqId)}&frame_id=${encodeURIComponent(frameSummary.frame_id)}`
+                );
+                const data = await res.json();
+                // Camera image is primary; proposals (or lack thereof) never hide it.
+                const url =
+                    data.preview_url ||
+                    (data.cameras || []).find((c) => c.preview_url)?.preview_url ||
+                    frameSummary.preview_url;
+                if (url) {
+                    previewImg.onload = () => {
+                        previewImg.style.display = 'block';
+                        if (cameraEmpty) cameraEmpty.style.display = 'none';
+                    };
+                    previewImg.onerror = () => {
+                        previewImg.style.display = 'none';
+                        if (cameraEmpty) {
+                            cameraEmpty.textContent = 'Camera path present but image failed to load.';
+                            cameraEmpty.style.display = 'block';
+                        }
+                    };
+                    previewImg.src = url.startsWith('http') || url.startsWith('/')
+                        ? url
+                        : `${API_BASE}${url}`;
+                    // Show immediately; onload still confirms.
+                    previewImg.style.display = 'block';
+                } else if (cameraEmpty) {
+                    cameraEmpty.textContent = 'No camera image for this frame.';
+                    cameraEmpty.style.display = 'block';
+                }
+                previewMeta.textContent =
+                    `${data.frame_id} · ${data.proposal_count} proposals` +
+                    (data.proposals_path ? ` · ${data.proposals_path}` : ' · no proposals yet');
+                // Proposals JSON is secondary — always show status, never replace the camera.
+                proposalsPre.style.display = 'block';
+                if (data.proposals && (Array.isArray(data.proposals) ? data.proposals.length : true)) {
+                    proposalsPre.textContent = JSON.stringify(data.proposals, null, 2);
+                } else {
+                    proposalsPre.textContent = '// No proposals for this frame yet. Run Auto-Label.';
+                }
+            } catch (e) {
+                previewMeta.textContent = `Failed to load frame: ${e.message}`;
+            }
+        }
+
+        seqSelect.addEventListener('change', () => { void loadFrames(); });
+        refreshBtn.addEventListener('click', async () => {
+            await loadSequences(currentSequenceId);
+            await loadFrames();
+        });
+
+        root._refreshOutputs = async () => {
+            await loadSequences(currentSequenceId);
+            await loadFrames();
+        };
+
+        void root._refreshOutputs();
+    }
+
+    const outputBrowsers = [...document.querySelectorAll('.pipeline-output-browser')];
+    outputBrowsers.forEach(initOutputBrowser);
+
+    async function refreshAllOutputBrowsers() {
+        for (const root of outputBrowsers) {
+            if (typeof root._refreshOutputs === 'function') {
+                await root._refreshOutputs();
+            }
+        }
     }
 
     if (btnTrackingRun) {

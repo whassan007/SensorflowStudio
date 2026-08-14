@@ -28,6 +28,8 @@ interface ChatTurn {
 const SUGGESTIONS = [
   'What is Sensorflow Studio?',
   'How do I get started?',
+  "What's new?",
+  'What version is this?',
   'When do humans review labels?',
   'What does the Command Center do?',
   'Does help chat need a GPU?',
