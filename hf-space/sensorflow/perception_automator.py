@@ -33,13 +33,20 @@ class PerceptionAutomator:
             return
         if not self.use_sam:
             return
+        if not Path(self.sam_checkpoint).exists():
+            raise FileNotFoundError(
+                f"SAM checkpoint not found: {self.sam_checkpoint}. "
+                "Download segment-anything ViT-B weights or set use_sam=False."
+            )
         try:
             from segment_anything import SamAutomaticMaskGenerator, sam_model_registry
             self._sam = sam_model_registry["vit_b"](checkpoint=self.sam_checkpoint)
             self._sam.to(self.device)
             self._mask_generator = SamAutomaticMaskGenerator(self._sam)
-        except (ImportError, FileNotFoundError):
-            self.use_sam = False
+        except ImportError as e:
+            raise FileNotFoundError(
+                "segment_anything is not installed; pip install segment-anything or set use_sam=False"
+            ) from e
 
     def run_sequence(self, sequence: UnifiedSequence, output_dir: Path) -> Dict[str, List[Object3D]]:
         output_dir.mkdir(parents=True, exist_ok=True)

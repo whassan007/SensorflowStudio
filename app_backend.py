@@ -70,6 +70,31 @@ def load_config() -> StudioConfig:
             pass
     return StudioConfig()
 
+
+def resolve_active_sequence_id(fallback: str = "seq_001") -> str:
+    """Prefer studio config, then pipeline state from load-all / ingest."""
+    config = load_config()
+    if config.sequence_id:
+        return config.sequence_id
+    state_path = Path("runs/pipeline/state.json")
+    if state_path.exists():
+        try:
+            state = json.loads(state_path.read_text())
+            active = state.get("_active_sequence")
+            if active:
+                return str(active)
+        except Exception:
+            pass
+    return fallback
+
+
+SAM_CHECKPOINT_HINT = (
+    "Download SAM ViT-B: "
+    "mkdir -p models && "
+    "curl -L -o models/sam_vit_b.pth "
+    "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth"
+)
+
 @app.post("/api/config")
 def save_config(cfg: StudioConfig):
     with open(CONFIG_PATH, "w") as f:
@@ -1972,6 +1997,27 @@ def ingest_status(sequence_id: str = "seq_001"):
     return {"status": "ok", "sequence_id": sequence_id, **status}
 
 
+def _auto_label_next_steps(
+    *,
+    expected_frames: int,
+    checkpoint_exists: bool,
+    no_sam: bool,
+    sequence_id: str,
+) -> List[str]:
+    steps: List[str] = []
+    if expected_frames == 0:
+        steps.append(
+            f"Run Step 2 (3D Ingest) or Load all datasets — pick sequence "
+            f"(e.g. {sequence_id}_local) with frames > 0"
+        )
+    if not no_sam and not checkpoint_exists:
+        steps.append(SAM_CHECKPOINT_HINT)
+        steps.append("Or enable “Skip SAM” for GT/synthetic fallback only (not a model success)")
+    if expected_frames > 0 and not steps:
+        steps.append("Proceed to Temporal Tracking when proposals look correct")
+    return steps
+
+
 @app.post("/api/perception/auto-label")
 def auto_label(params: AutoLabelParams):
     from sensorflow.perception_automator import PerceptionAutomator
@@ -1980,50 +2026,124 @@ def auto_label(params: AutoLabelParams):
     from sensorflow.execution_ops import artifact_info
 
     manifest = Path("runs/pipeline") / params.sequence_id / "manifest.json"
+    ckpt = Path(params.sam_checkpoint)
     record = create_execution(
         "auto_label_3d",
-        configuration_snapshot=params.dict(),
+        configuration_snapshot=params.model_dump(),
         input_artifacts=[str(manifest), params.sam_checkpoint],
     )
+    exec_id = record["execution_id"]
 
-    if not manifest.exists():
-        finalize(
-            record["execution_id"],
+    def _fail(
+        message: str,
+        *,
+        errors: Optional[List[str]] = None,
+        http_status: int = 400,
+        expected_frames: int = 0,
+        next_steps: Optional[List[str]] = None,
+    ):
+        steps = next_steps or _auto_label_next_steps(
+            expected_frames=expected_frames,
+            checkpoint_exists=ckpt.exists(),
+            no_sam=params.no_sam,
+            sequence_id=params.sequence_id,
+        )
+        final = finalize(
+            exec_id,
             "FAILED",
-            errors=["Manifest not found. Run ingest first."],
+            records_discovered=expected_frames,
+            records_processed=0,
+            metrics={
+                "model": "none (no_sam)" if params.no_sam else "sam_vit_b",
+                "checkpoint": artifact_info(ckpt),
+                "sam_ran": False,
+                "no_sam": params.no_sam,
+                "frames_expected": expected_frames,
+                "frames_processed": 0,
+                "predictions_generated": 0,
+                "inference_calls": 0,
+            },
+            errors=errors or [message],
+            warnings=[],
             process_invoked=False,
             outputs_valid=False,
         )
-        raise HTTPException(
-            status_code=400,
-            detail={"message": "Manifest not found. Run ingest first.", "execution_id": record["execution_id"]},
+        payload = {
+            "status": "FAILED",
+            "execution_id": exec_id,
+            "verified": final.get("verified"),
+            "duration_ms": final.get("duration_ms"),
+            "message": message,
+            "frames_expected": expected_frames,
+            "frames_processed": 0,
+            "predictions_generated": 0,
+            "checkpoint": artifact_info(ckpt),
+            "sam_ran": False,
+            "demo_stub": None,
+            "next_steps": steps,
+            "events": final.get("events"),
+        }
+        raise HTTPException(status_code=http_status, detail=payload)
+
+    if not manifest.exists():
+        _fail(
+            "Manifest not found. Run 3D Ingest (Step 2) first.",
+            errors=["Manifest not found. Run ingest first."],
         )
 
-    ckpt = Path(params.sam_checkpoint)
+    sequence = UnifiedSequence.load(manifest)
+    expected_frames = len(sequence.frames)
+    manifest_frame_ids = {f.frame_id for f in sequence.frames}
+    demo_stub = bool(sequence.taxonomy_manifest.get("demo_stub"))
+
+    if expected_frames == 0:
+        _fail(
+            f"Sequence '{params.sequence_id}' has 0 ingested frames. "
+            "Run 3D Ingest or Load all datasets before auto-label.",
+            expected_frames=0,
+        )
+
+    if not params.no_sam and not ckpt.exists():
+        _fail(
+            f"SAM checkpoint not found at {params.sam_checkpoint}. "
+            "Download weights or enable “Skip SAM” for demo/GT fallback only.",
+            expected_frames=expected_frames,
+        )
+
     sam_ran = False
     model_name = "sam_vit_b" if not params.no_sam else "none (no_sam)"
+    warnings: List[str] = []
     if params.no_sam:
-        warnings = ["no_sam=true — SAM not invoked; proposals may be GT/synthetic fallback"]
-    elif not ckpt.exists():
-        warnings = [f"SAM checkpoint missing: {params.sam_checkpoint} — model will not run"]
-    else:
-        warnings = []
+        warnings.append("no_sam=true — SAM not invoked; proposals use GT/synthetic fallback only")
 
-    mark_running(record["execution_id"])
+    mark_running(exec_id)
+    output_dir = manifest.parent / "proposals"
+    if output_dir.exists():
+        for stale in output_dir.glob("*.json"):
+            if stale.stem not in manifest_frame_ids:
+                stale.unlink(missing_ok=True)
+
     try:
-        sequence = UnifiedSequence.load(manifest)
-        expected_frames = len(sequence.frames)
-        output_dir = manifest.parent / "proposals"
         automator = PerceptionAutomator(
             sam_checkpoint=params.sam_checkpoint,
             device=params.device,
             use_sam=not params.no_sam,
         )
         automator.run_sequence(sequence, output_dir)
-        sam_ran = bool(getattr(automator, "use_sam", False) and automator._mask_generator is not None)
+        sam_ran = bool(
+            not params.no_sam
+            and getattr(automator, "use_sam", False)
+            and automator._mask_generator is not None
+        )
+    except FileNotFoundError as e:
+        _fail(
+            str(e),
+            errors=[str(e)],
+            expected_frames=expected_frames,
+        )
     except Exception as e:
         finalize(
-            record["execution_id"],
+            exec_id,
             "FAILED",
             errors=[str(e)],
             process_invoked=False,
@@ -2031,30 +2151,37 @@ def auto_label(params: AutoLabelParams):
         )
         raise HTTPException(
             status_code=500,
-            detail={"message": f"Auto-label failed: {str(e)}", "execution_id": record["execution_id"]},
+            detail={
+                "status": "FAILED",
+                "message": f"Auto-label failed: {str(e)}",
+                "execution_id": exec_id,
+            },
         )
 
     proposals_dir = manifest.parent / "proposals"
-    proposal_files = list(proposals_dir.glob("*.json")) if proposals_dir.exists() else []
+    proposal_files = (
+        [pf for pf in proposals_dir.glob("*.json") if pf.stem in manifest_frame_ids]
+        if proposals_dir.exists()
+        else []
+    )
     num_frames = len(proposal_files)
     pred_count = 0
     for pf in proposal_files:
         try:
-            data = json.loads(pf.read_text())
-            if isinstance(data, list):
-                pred_count += len(data)
-            elif isinstance(data, dict):
-                pred_count += len(data.get("proposals") or data.get("objects") or [])
+            pdata = json.loads(pf.read_text())
+            if isinstance(pdata, list):
+                pred_count += len(pdata)
+            elif isinstance(pdata, dict):
+                pred_count += len(pdata.get("proposals") or pdata.get("objects") or [])
         except Exception:
             pass
 
-    demo_stub = bool(sequence.taxonomy_manifest.get("demo_stub"))
-    if params.no_sam or not sam_ran:
-        status = "NOT_EXECUTED" if num_frames == 0 else "PARTIAL_SUCCESS"
-        if params.no_sam:
-            warnings.append("Model not run (no_sam); do not treat as SAM SUCCESS")
-        elif not sam_ran:
-            warnings.append("SAM unavailable — fallback proposals only")
+    if params.no_sam:
+        status = "NOT_EXECUTED" if num_frames > 0 else "FAILED"
+        warnings.append("Model not run (no_sam); do not treat as SAM SUCCESS")
+    elif not sam_ran:
+        status = "FAILED"
+        warnings.append("SAM did not run — no valid proposals produced")
     elif num_frames == 0:
         status = "FAILED"
     elif num_frames < expected_frames:
@@ -2062,8 +2189,35 @@ def auto_label(params: AutoLabelParams):
     else:
         status = "SUCCEEDED"
 
+    next_steps = _auto_label_next_steps(
+        expected_frames=expected_frames,
+        checkpoint_exists=ckpt.exists(),
+        no_sam=params.no_sam,
+        sequence_id=params.sequence_id,
+    )
+    if status == "SUCCEEDED":
+        message = (
+            f"SAM auto-label: processed {num_frames}/{expected_frames} frames, "
+            f"{pred_count} predictions → {proposals_dir}"
+        )
+    elif status == "NOT_EXECUTED":
+        message = (
+            f"GT/synthetic fallback (SAM skipped): {num_frames}/{expected_frames} frames, "
+            f"{pred_count} predictions → {proposals_dir}"
+        )
+    elif status == "PARTIAL_SUCCESS":
+        message = (
+            f"Partial SAM run: {num_frames}/{expected_frames} frames, "
+            f"{pred_count} predictions → {proposals_dir}"
+        )
+    else:
+        message = (
+            f"Auto-label failed: 0/{expected_frames} frames produced. "
+            f"Check ingest, SAM checkpoint, and sequence selection."
+        )
+
     final = finalize(
-        record["execution_id"],
+        exec_id,
         status,
         records_discovered=expected_frames,
         records_processed=num_frames,
@@ -2083,7 +2237,7 @@ def auto_label(params: AutoLabelParams):
         },
         output_artifacts=[{"path": str(proposals_dir), "kind": "proposals_dir", "files": num_frames}],
         warnings=warnings,
-        process_invoked=sam_ran,
+        process_invoked=sam_ran or params.no_sam,
         outputs_valid=num_frames > 0,
     )
 
@@ -2101,10 +2255,8 @@ def auto_label(params: AutoLabelParams):
         "checkpoint": artifact_info(ckpt),
         "sam_ran": sam_ran,
         "demo_stub": demo_stub,
-        "message": (
-            f"{'NOT_EXECUTED / fallback' if not sam_ran else 'SAM'}: "
-            f"processed {num_frames}/{expected_frames} frames, {pred_count} predictions → {proposals_dir}"
-        ),
+        "message": message,
+        "next_steps": next_steps,
         "events": final.get("events"),
     }
 
@@ -2240,6 +2392,7 @@ def pipeline_status(sequence_id: str = "seq_001"):
     return {
         "status": "ok",
         "sequence_id": sequence_id,
+        "active_sequence_id": resolve_active_sequence_id(sequence_id),
         "ingest_complete": True if ingest_complete else None,
         "perception_complete": True if perception_complete else None,
         "tracking_complete": True if tracking_complete else None,

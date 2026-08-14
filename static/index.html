@@ -362,7 +362,11 @@
                         <p class="text-muted">Generate 2D SAM masks and lift to 3D bounding box proposals.</p>
                         <div class="form-group">
                             <label for="perception-sam-checkpoint">SAM Checkpoint</label>
-                            <input type="text" id="perception-sam-checkpoint" value="models/sam_vit_b.pth" class="input-field">
+                            <input type="text" id="perception-sam-checkpoint" value="models/sam_vit_b.pth" class="input-field"
+                                placeholder="models/sam_vit_b.pth — download ViT-B weights locally (not bundled on HF Space CPU)">
+                            <p class="text-muted" style="font-size:12px;margin-top:4px;">
+                                Default path <code>models/sam_vit_b.pth</code>. On Hugging Face Space, upload weights or run locally with GPU.
+                            </p>
                         </div>
                         <div class="form-group">
                             <label for="perception-device">Device</label>

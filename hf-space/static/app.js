@@ -78,11 +78,27 @@ document.addEventListener('DOMContentLoaded', () => {
     let pipelineState = {};
     let currentSequenceId = 'seq_001';
 
+    async function syncActiveSequence() {
+        try {
+            const cfg = await fetch(`${API_BASE}/api/config`).then((r) => r.json());
+            if (cfg?.sequence_id) {
+                currentSequenceId = cfg.sequence_id;
+                return;
+            }
+        } catch (e) { /* ignore */ }
+        try {
+            const st = await fetch(`${API_BASE}/api/pipeline/status?sequence_id=${encodeURIComponent(currentSequenceId)}`).then((r) => r.json());
+            if (st?.active_sequence_id) currentSequenceId = st.active_sequence_id;
+        } catch (e) { /* ignore */ }
+    }
+
     async function refreshPipelineStatus() {
         try {
-            const res = await fetch(`${API_BASE}/api/pipeline/status?sequence_id=${currentSequenceId}`);
+            await syncActiveSequence();
+            const res = await fetch(`${API_BASE}/api/pipeline/status?sequence_id=${encodeURIComponent(currentSequenceId)}`);
             const data = await res.json();
             pipelineState = data;
+            if (data.active_sequence_id) currentSequenceId = data.active_sequence_id;
             updateGateBadges();
         } catch (e) { /* backend offline */ }
     }
@@ -2217,6 +2233,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const statusEl = document.getElementById('perception-status');
             statusEl.textContent = 'Running SAM auto-label...';
             try {
+                await syncActiveSequence();
                 const res = await fetch(`${API_BASE}/api/perception/auto-label`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -2228,34 +2245,57 @@ document.addEventListener('DOMContentLoaded', () => {
                     }),
                 });
                 const data = await res.json();
-                if (!res.ok) {
-                    statusEl.textContent = `Error: ${data.detail?.message || data.detail || JSON.stringify(data)}`;
+                const payload = (data && typeof data.detail === 'object') ? data.detail : data;
+                const status = payload.status || (res.ok ? 'SUCCEEDED' : 'FAILED');
+                const nextSteps = payload.next_steps || [];
+                const stubPrefix = payload.demo_stub ? 'demo stub · ' : '';
+
+                if (!res.ok || status === 'FAILED') {
+                    statusEl.textContent = [
+                        `${status}: ${payload.message || 'Auto-label could not run.'}`,
+                        payload.checkpoint?.exists === false ? 'SAM checkpoint missing.' : '',
+                        payload.frames_expected === 0 ? 'No ingested frames for this sequence.' : '',
+                        nextSteps.length ? `Next: ${nextSteps[0]}` : '',
+                    ].filter(Boolean).join('\n');
                     renderEvidenceCard('evidence-perception', {
                         status: 'FAILED',
-                        execution_id: data.detail?.execution_id || data.execution_id,
-                        message: data.detail?.message || data.detail,
+                        execution_id: payload.execution_id,
+                        duration_ms: payload.duration_ms,
+                        model: payload.model,
+                        checkpoint: payload.checkpoint,
+                        metrics: {
+                            frames_processed: payload.frames_processed,
+                            frames_expected: payload.frames_expected,
+                            predictions_generated: payload.predictions_generated,
+                            sam_ran: payload.sam_ran,
+                        },
+                        message: payload.message,
+                        next_steps: nextSteps,
+                        events: payload.events,
                     });
                 } else {
-                    const stubPrefix = data.demo_stub ? 'demo stub: ' : '';
-                    const expected = data.frames_expected != null ? `/${data.frames_expected}` : '';
-                    statusEl.textContent =
-                        `${data.status}: ${stubPrefix}Processed ${data.frames_processed}${expected} frames → ${data.proposals_dir}`;
+                    statusEl.textContent = [
+                        `${status}: ${stubPrefix}${payload.frames_processed}/${payload.frames_expected} frames`,
+                        payload.message || '',
+                        nextSteps.length && status !== 'SUCCEEDED' ? `Next: ${nextSteps[0]}` : '',
+                    ].filter(Boolean).join('\n');
                     renderEvidenceCard('evidence-perception', {
-                        status: data.status,
-                        execution_id: data.execution_id,
-                        duration_ms: data.duration_ms,
-                        model: data.model,
-                        checkpoint: data.checkpoint,
+                        status,
+                        execution_id: payload.execution_id,
+                        duration_ms: payload.duration_ms,
+                        model: payload.model,
+                        checkpoint: payload.checkpoint,
                         metrics: {
-                            frames_processed: data.frames_processed,
-                            frames_expected: data.frames_expected,
-                            predictions_generated: data.predictions_generated,
-                            inference_calls: data.inference_calls,
-                            sam_ran: data.sam_ran,
-                            output_dir: data.proposals_dir,
+                            frames_processed: payload.frames_processed,
+                            frames_expected: payload.frames_expected,
+                            predictions_generated: payload.predictions_generated,
+                            inference_calls: payload.inference_calls,
+                            sam_ran: payload.sam_ran,
+                            output_dir: payload.proposals_dir,
                         },
-                        message: data.message,
-                        events: data.events,
+                        message: payload.message,
+                        next_steps: nextSteps,
+                        events: payload.events,
                     });
                     refreshExecutionConsole();
                 }
@@ -2512,6 +2552,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const ckpt = evidence.checkpoint
             ? `<div class="ev-row"><span>checkpoint</span><strong>${esc(evidence.checkpoint.path || evidence.checkpoint)} ${evidence.checkpoint.exists === false ? '(missing)' : ''}</strong></div>`
             : '';
+        const nextSteps = (evidence.next_steps || []).map((s) => `<li>${esc(s)}</li>`).join('');
         el.innerHTML = `
             <h4>What actually happened?</h4>
             <div class="ev-status ev-status-${esc(status)}">${esc(status)}</div>
@@ -2524,6 +2565,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ${evidence.command ? `<div class="ev-row"><span>command</span><strong class="font-mono">${esc(Array.isArray(evidence.command) ? evidence.command.join(' ') : evidence.command)}</strong></div>` : ''}
             ${metricRows}
             ${evidence.message ? `<p class="ev-msg">${esc(evidence.message)}</p>` : ''}
+            ${nextSteps ? `<div class="ev-next"><strong>What to do next</strong><ul>${nextSteps}</ul></div>` : ''}
             ${evidence.execution_id ? `<a class="ev-log-link" href="/api/executions/${encodeURIComponent(evidence.execution_id)}/log" target="_blank" rel="noopener">Open execution log</a>` : ''}
             ${events ? `<details class="ev-timeline"><summary>Event timeline</summary><ul>${events}</ul></details>` : ''}
         `;
