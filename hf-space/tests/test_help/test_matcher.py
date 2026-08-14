@@ -86,3 +86,19 @@ def test_chat_whats_new(client):
     body = client.post("/api/help/chat", json={"question": "what's new?"}).json()
     assert body["answer"]
     assert get_about()["version"] in body["answer"] or "release" in body["answer"].lower()
+
+
+def test_chat_load_dataset(client):
+    body = client.post("/api/help/chat", json={"question": "How do I load a dataset?"}).json()
+    assert body["answer"]
+    assert any(k in body["answer"].lower() for k in ("dataset", "ingest", "yaml", "source"))
+
+
+def test_chat_strict_execution_mode(client):
+    body = client.post(
+        "/api/help/chat", json={"question": "What is Strict Execution Mode?"}
+    ).json()
+    assert body["answer"]
+    lower = body["answer"].lower()
+    assert "strict" in lower
+    assert any(k in lower for k in ("evidence", "ledger", "succeeded", "verified"))

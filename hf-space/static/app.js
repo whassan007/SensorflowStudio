@@ -2052,21 +2052,94 @@ document.addEventListener('DOMContentLoaded', () => {
     loadDatasetYaml();
     dataYamlPath.addEventListener('change', loadDatasetYaml);
 
-    // --- ONSCREEN GUIDANCE DRAWER ---
+    // --- HELP CHATBOT DRAWER (❓ FAB) ---
     const floatingHelpBtn = document.getElementById('floating-help-btn');
     const helpDrawer = document.getElementById('help-drawer');
     const closeDrawerBtn = document.getElementById('close-drawer-btn');
+    const helpChatLog = document.getElementById('help-chat-log');
+    const helpChatForm = document.getElementById('help-chat-form');
+    const helpChatInput = document.getElementById('help-chat-input');
+    const helpChatSend = document.getElementById('help-chat-send');
+    let helpChatBusy = false;
 
-    floatingHelpBtn.addEventListener('click', () => {
-        if (helpDrawer.style.right === '0px') {
-            helpDrawer.style.right = '-400px';
-        } else {
-            helpDrawer.style.right = '0px';
+    const isHelpOpen = () => helpDrawer && !helpDrawer.classList.contains('hidden');
+
+    const setHelpOpen = (open) => {
+        if (!helpDrawer || !floatingHelpBtn) return;
+        helpDrawer.classList.toggle('hidden', !open);
+        floatingHelpBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) {
+            helpChatInput?.focus();
         }
-    });
+    };
 
-    closeDrawerBtn.addEventListener('click', () => {
-        helpDrawer.style.right = '-400px';
+    const appendHelpMessage = (role, text, meta) => {
+        if (!helpChatLog) return;
+        const el = document.createElement('div');
+        el.className = `help-chat-msg help-chat-${role === 'user' ? 'user' : 'bot'}`;
+        el.style.cssText = role === 'user'
+            ? 'padding: 10px 12px; border-radius: 8px; background: rgba(0,200,150,0.12); border: 1px solid var(--border); font-size: 13px; color: #e6e9ec; line-height: 1.5; white-space: pre-wrap;'
+            : 'padding: 10px 12px; border-radius: 8px; background: #141a20; border: 1px solid var(--border); font-size: 13px; color: #e6e9ec; line-height: 1.5; white-space: pre-wrap;';
+        el.textContent = text;
+        if (meta) {
+            const cap = document.createElement('div');
+            cap.style.cssText = 'margin-top: 6px; font-size: 11px; color: var(--text-muted);';
+            cap.textContent = meta;
+            el.appendChild(cap);
+        }
+        helpChatLog.appendChild(el);
+        helpChatLog.scrollTop = helpChatLog.scrollHeight;
+    };
+
+    const askHelpChat = async (raw) => {
+        const question = (raw || '').trim();
+        if (!question || helpChatBusy) return;
+        helpChatBusy = true;
+        if (helpChatSend) helpChatSend.disabled = true;
+        appendHelpMessage('user', question);
+        if (helpChatInput) helpChatInput.value = '';
+        try {
+            const res = await fetch(`${API_BASE}/api/help/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(data.detail || data.message || `Help API ${res.status}`);
+            }
+            const provider = data.provider === 'faq_offline' ? 'local FAQ index' : (data.provider || 'help');
+            const sources = Array.isArray(data.sources) && data.sources.length
+                ? `Sources: ${data.sources.map((s) => s.title).filter(Boolean).slice(0, 4).join(' · ')}`
+                : null;
+            appendHelpMessage('assistant', data.answer || 'No answer returned.', `via ${provider}${sources ? ` · ${sources}` : ''}`);
+        } catch (err) {
+            appendHelpMessage(
+                'assistant',
+                'Help API unreachable. Try again when the backend is up.\n\n'
+                + 'Quick tips:\n'
+                + '• Dataset Configuration → set YAML / source path → Save\n'
+                + '• Ingest & Fusion → run ingest → browse pipeline frames\n'
+                + '• Strict Execution Mode → Evidence cards / Execution Console (ledger under runs/executions/)',
+                err instanceof Error ? err.message : String(err),
+            );
+        } finally {
+            helpChatBusy = false;
+            if (helpChatSend) helpChatSend.disabled = false;
+        }
+    };
+
+    floatingHelpBtn?.addEventListener('click', () => setHelpOpen(!isHelpOpen()));
+    closeDrawerBtn?.addEventListener('click', () => setHelpOpen(false));
+    helpChatForm?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        void askHelpChat(helpChatInput?.value || '');
+    });
+    document.querySelectorAll('.help-suggest-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            setHelpOpen(true);
+            void askHelpChat(btn.getAttribute('data-q') || btn.textContent || '');
+        });
     });
 
     // Populate initial default dataset if loaded

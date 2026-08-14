@@ -6,6 +6,7 @@
  */
 import { useMemo, useState } from 'react';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
 import IconButton from '@mui/material/IconButton';
@@ -15,7 +16,7 @@ import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { ArrowRight, CircleHelp, Search, X } from 'lucide-react';
+import { ArrowRight, CircleHelp, MessageCircle, Search, X } from 'lucide-react';
 import { GLOSSARY, GLOSSARY_CATEGORIES, type GlossaryEntry } from '../../content/glossary';
 import { PAGE_HELP } from '../../content/pageHelp';
 import { useLabelEval, type PageId } from '../../context/LabelEvalContext';
@@ -288,7 +289,7 @@ function PageIndex({ goTo }: { goTo: (p: PageId) => void }) {
 
 // ---------------------------------------------------------------- dialog shell
 
-export default function HelpMenu() {
+export default function HelpMenu({ onOpenChat }: { onOpenChat?: () => void }) {
   const { navigate } = useLabelEval();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<'how' | 'glossary' | 'pages'>('how');
@@ -312,10 +313,25 @@ export default function HelpMenu() {
         fullWidth
         PaperProps={{ sx: { bgcolor: '#12171d', border: '1px solid #232a31', height: '82vh' } }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', px: 2, pt: 1.5, gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', px: 2, pt: 1.5, gap: 1 }}>
           <Typography variant="h6" sx={{ fontSize: 15, fontWeight: 700, flex: 1 }}>
             Sensorflow Studio Help
           </Typography>
+          {onOpenChat ? (
+            <Button
+              size="small"
+              startIcon={<MessageCircle size={14} />}
+              onClick={() => {
+                setOpen(false);
+                onOpenChat();
+              }}
+              sx={{ textTransform: 'none', color: '#4fc3f7' }}
+              title="Open the help chatbot"
+              aria-label="Open help chatbot"
+            >
+              Ask chatbot
+            </Button>
+          ) : null}
           <IconButton size="small" onClick={() => setOpen(false)} aria-label="Close help">
             <X size={16} />
           </IconButton>

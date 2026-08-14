@@ -1055,37 +1055,30 @@ ollama run gemma4:26b
             </div>
         </div>
     </div>
-    <!-- Floating Onscreen Help Guide Button -->
-    <button id="floating-help-btn" class="floating-btn" title="Open Interactive Guide" style="position: fixed; bottom: 20px; right: 20px; width: 45px; height: 45px; border-radius: 50%; background: var(--primary); color: #000; border: none; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0, 200, 150, 0.4); z-index: 999; transition: transform 0.2s ease;">❓</button>
+    <!-- Floating help chatbot (opens panel; answers via POST /api/help/chat) -->
+    <button id="floating-help-btn" class="floating-btn" type="button" title="Ask the help chatbot" aria-label="Open help chatbot" aria-controls="help-drawer" aria-expanded="false" style="position: fixed; bottom: 20px; right: 20px; width: 45px; height: 45px; border-radius: 50%; background: var(--primary); color: #000; border: none; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0, 200, 150, 0.4); z-index: 1100; transition: transform 0.2s ease;">❓</button>
 
-    <!-- Onscreen Help Guide Drawer -->
-    <div id="help-drawer" class="drawer-wrapper hidden" style="position: fixed; top: 0; right: -400px; width: 380px; height: 100%; background: rgba(10, 15, 25, 0.95); border-left: 1px solid var(--border); box-shadow: -10px 0 30px rgba(0,0,0,0.5); z-index: 1000; transition: right 0.3s ease; padding: 24px; box-sizing: border-box; overflow-y: auto; backdrop-filter: blur(12px);">
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 20px;">
-            <h3 style="margin: 0; font-size: 18px; color: #fff; display: flex; align-items: center; gap: 8px;">📖 Guidance Panel</h3>
-            <button id="close-drawer-btn" style="background: none; border: none; color: var(--text-muted); font-size: 24px; cursor: pointer; line-height: 1;">&times;</button>
+    <!-- Help chatbot drawer -->
+    <div id="help-drawer" class="drawer-wrapper hidden" role="dialog" aria-label="Help chatbot" style="position: fixed; top: 0; right: 0; width: min(400px, 100vw); height: 100%; background: rgba(10, 15, 25, 0.97); border-left: 1px solid var(--border); box-shadow: -10px 0 30px rgba(0,0,0,0.5); z-index: 1101; box-sizing: border-box; backdrop-filter: blur(12px); display: flex; flex-direction: column;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding: 16px 20px; flex-shrink: 0;">
+            <h3 style="margin: 0; font-size: 16px; color: #fff;">Help chatbot</h3>
+            <button id="close-drawer-btn" type="button" aria-label="Close help chatbot" style="background: none; border: none; color: var(--text-muted); font-size: 24px; cursor: pointer; line-height: 1;">&times;</button>
         </div>
-        <div style="display: flex; flex-direction: column; gap: 20px;">
-            <div>
-                <h4 style="margin: 0 0 6px 0; color: var(--secondary); font-size: 14px;">📂 Dataset Configuration YAML</h4>
-                <p style="margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.5;">Sensorflow Studio uses the standard Ultralytics YOLO configuration format. Specify the root <code>path</code>, <code>train</code> path, <code>val</code> path, and class labels mapping index values to strings.</p>
-            </div>
-            <div>
-                <h4 style="margin: 0 0 6px 0; color: var(--warning); font-size: 14px;">🚦 FHWA SSAM Safety Surrogates</h4>
-                <p style="margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.5;">Conflict assessment monitors vehicle trajectories to calculate metrics:</p>
-                <ul style="margin: 6px 0 0 0; padding-left: 16px; font-size: 12px; color: var(--text-muted); line-height: 1.5;">
-                    <li style="margin-bottom: 4px;"><strong>TTC (Time-to-Collision):</strong> Time until crash if speed remains constant. Hazard threshold is <strong>&lt; 1.5 seconds</strong>.</li>
-                    <li><strong>PET (Post-Encroachment Time):</strong> Passage interval between two vehicles crossing the same interface area. Hazard threshold is <strong>&lt; 5.0 seconds</strong>.</li>
-                </ul>
-            </div>
-            <div>
-                <h4 style="margin: 0 0 6px 0; color: var(--primary); font-size: 14px;">⚡ Remote Cluster Training (DGX Spark)</h4>
-                <p style="margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.5;">Allows routing heavy GPU execution to remote systems. Make sure you activate Tailscale, setup dependencies, and verify host resolution before executing.</p>
-            </div>
-            <div>
-                <h4 style="margin: 0 0 6px 0; color: var(--secondary); font-size: 14px;">🧭 Full Sensorflow Studio (React)</h4>
-                <p style="margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.5;">This legacy panel covers train/infer/SSAM. The primary dashboard (Command Center, label evaluation, safety, ROTR, Help menu + Q&amp;A chatbot) lives in the React Sensorflow Studio app — open it from the Space UI or locally via the Vite frontend. Page guides and the help chatbot work on CPU without a GPU.</p>
+        <div id="help-chat-log" style="flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
+            <div class="help-chat-msg help-chat-bot" style="padding: 10px 12px; border-radius: 8px; background: #141a20; border: 1px solid var(--border); font-size: 13px; color: var(--text-muted); line-height: 1.5;">
+                Ask about Studio stages, datasets, Strict Execution Mode, SSAM, or any page. Answers use the local FAQ / page-guide index (CPU-safe; no GPU required).
             </div>
         </div>
+        <div id="help-chat-suggestions" style="display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 10px;">
+            <button type="button" class="help-suggest-btn" data-q="How do I load a dataset?" style="font-size: 11px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--border); background: #1d242c; color: var(--text-muted); cursor: pointer;">How do I load a dataset?</button>
+            <button type="button" class="help-suggest-btn" data-q="What is Strict Execution Mode?" style="font-size: 11px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--border); background: #1d242c; color: var(--text-muted); cursor: pointer;">What is Strict Execution Mode?</button>
+            <button type="button" class="help-suggest-btn" data-q="How do pipeline stages work?" style="font-size: 11px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--border); background: #1d242c; color: var(--text-muted); cursor: pointer;">Pipeline stages</button>
+            <button type="button" class="help-suggest-btn" data-q="What is Sensorflow Studio?" style="font-size: 11px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--border); background: #1d242c; color: var(--text-muted); cursor: pointer;">What is Sensorflow Studio?</button>
+        </div>
+        <form id="help-chat-form" style="display: flex; gap: 8px; padding: 12px 16px 16px; border-top: 1px solid var(--border); flex-shrink: 0;">
+            <input id="help-chat-input" type="text" maxlength="2000" placeholder="Ask about a page or feature…" aria-label="Help question" style="flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: #0d1218; color: #e6e9ec; font-size: 13px;">
+            <button id="help-chat-send" type="submit" class="btn btn-primary" style="min-width: 72px;">Ask</button>
+        </form>
     </div>
 
     <div id="toast-stack" class="toast-stack" aria-live="polite" aria-relevant="additions"></div>

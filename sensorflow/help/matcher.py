@@ -102,6 +102,14 @@ def score_doc(query_tokens: List[str], doc: KnowledgeDoc, page_hint: Optional[st
         score *= 0.65
     if doc.kind == "faq":
         score += 0.05
+        title_tokens = set(tokenize(doc.title))
+        if title_tokens:
+            title_hits = sum(1 for t in query_tokens if t in title_tokens)
+            # Strong boost when the question echoes an FAQ title (e.g. "How do I load a dataset?")
+            if title_hits >= max(2, len(title_tokens) // 2):
+                score += 0.9
+            elif title_hits >= 2:
+                score += 0.45
     return score
 
 
