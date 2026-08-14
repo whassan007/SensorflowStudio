@@ -107,9 +107,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (meta.completionOnly) {
                 if (verdict === true) {
-                    badge.textContent = 'PASS';
-                    badge.style.background = '#00ffaa33';
-                    badge.style.color = '#00ffaa';
+                    badge.textContent = pipelineState.demo_stub ? 'STUB' : 'DONE';
+                    badge.style.background = pipelineState.demo_stub ? '#fbbf2433' : '#00ffaa33';
+                    badge.style.color = pipelineState.demo_stub ? '#fbbf24' : '#00ffaa';
                 } else {
                     badge.textContent = '';
                 }
@@ -125,10 +125,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 badge.style.background = '#ff444433';
                 badge.style.color = '#ff4444';
             } else if (completed === true) {
-                // Ran stage artifact exists but no explicit pass/fail yet
-                badge.textContent = 'PASS';
-                badge.style.background = '#00ffaa33';
-                badge.style.color = '#00ffaa';
+                badge.textContent = 'RAN';
+                badge.style.background = '#3b82f633';
+                badge.style.color = '#93c5fd';
             } else {
                 badge.textContent = '';
             }
@@ -223,8 +222,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     source_path: datasetSourcePath.value
                 })
             });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
-            notify('Configuration saved & verified successfully.', 'success');
+            notify('Configuration saved (YAML/paths not yet executed).', 'success');
+            const cfgStatus = document.getElementById('config-exec-status');
+            if (cfgStatus) {
+                cfgStatus.textContent = 'CONFIGURATION SAVED / not yet used by an execution — run Load & Preprocess.';
+                cfgStatus.dataset.modified = '1';
+            }
         } catch (e) {
             console.error(e);
             notify('Failed to save dataset configuration.', 'error');
@@ -236,8 +241,9 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch(`${API_BASE}/api/precheck`);
             const data = await res.json();
-            const precheckType = data.status === 'ok' || data.status === 'pass' ? 'success' : 'warning';
-            notify(`Pre-check complete\nStatus: ${data.status}\n${data.message || ''}`, precheckType);
+            const precheckType = data.verified ? 'success' : 'warning';
+            notify(`Pre-check: ${data.status}\n${data.message || ''}`, precheckType);
+            refreshScriptStatus(data.scripts);
         } catch (e) {
             notify('Failed to complete pre-check.', 'error');
         }
@@ -287,8 +293,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
             });
             const data = await res.json();
-            
-            // Start polling logs and status
+            if (!res.ok) {
+                terminalLogs.textContent += `Error: ${JSON.stringify(data)}\n`;
+                resetTrainingUI();
+                notify(data.detail?.message || data.detail || 'Failed to start training', 'error');
+                return;
+            }
+            renderEvidenceCard('evidence-training', {
+                status: 'RUNNING',
+                execution_id: data.execution_id,
+                process_id: data.process_id,
+                command: data.command,
+                message: 'Training process spawned',
+            });
             pollTraining();
             trainInterval = setInterval(pollTraining, 1500);
         } catch (e) {
@@ -338,7 +355,23 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (!status.running) {
-                terminalLogs.textContent += '\n--- Process finished ---\n';
+                const verdict = status.status || (status.exit_code === 0 ? 'SUCCEEDED' : 'FAILED');
+                terminalLogs.textContent += `\n--- Process finished: ${verdict} exit_code=${status.exit_code} ---\n`;
+                renderEvidenceCard('evidence-training', {
+                    status: verdict,
+                    execution_id: status.execution_id,
+                    exit_code: status.exit_code,
+                    process_id: status.process_id,
+                    command: status.command,
+                    metrics: {
+                        epochs_observed: status.epochs_observed,
+                        epochs_requested: status.epochs_requested,
+                        checkpoint: status.checkpoint,
+                        losses_parsed: (status.losses || []).length,
+                    },
+                    message: `Training ${verdict}`,
+                });
+                refreshExecutionConsole();
                 resetTrainingUI();
             }
         } catch (e) {
@@ -447,8 +480,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
             });
             const data = await res.json();
-            
-            // Populate select dropdown
+            if (!res.ok) {
+                const detail = data.detail?.message || data.detail || JSON.stringify(data);
+                notify(`Inference failed: ${detail}`, 'error');
+                renderEvidenceCard('evidence-inference', {
+                    status: 'FAILED',
+                    execution_id: data.detail?.execution_id || data.execution_id,
+                    message: detail,
+                });
+                return;
+            }
+
             selectInferImage.innerHTML = '';
             if (data.images && data.images.length > 0) {
                 data.images.forEach(img => {
@@ -457,12 +499,34 @@ document.addEventListener('DOMContentLoaded', () => {
                     opt.textContent = img;
                     selectInferImage.appendChild(opt);
                 });
-                // Trigger image load
                 loadImage(data.images[0]);
             } else {
                 selectInferImage.innerHTML = '<option value="">No images found</option>';
             }
-            notify('Inference finished successfully.', 'success');
+            renderEvidenceCard('evidence-inference', {
+                status: data.status,
+                execution_id: data.execution_id,
+                duration_ms: data.duration_ms,
+                model: data.model,
+                checkpoint: data.checkpoint,
+                metrics: {
+                    discovered: data.records_discovered,
+                    processed: data.records_processed,
+                    succeeded: data.records_succeeded,
+                    failed: data.records_failed,
+                    inference_calls: data.inference_calls,
+                    predictions: data.predictions_generated,
+                    output_dir: data.output_dir,
+                    exit_code: data.exit_code,
+                },
+                message: data.message,
+            });
+            refreshExecutionConsole();
+            if (data.status === 'SUCCEEDED' || data.status === 'PARTIAL_SUCCESS') {
+                notify(`Inference ${data.status}: ${data.records_succeeded}/${data.records_discovered} images`, 'success');
+            } else {
+                notify(`Inference ${data.status}: ${data.message || 'see evidence'}`, 'warning');
+            }
         } catch (e) {
             console.error(e);
             notify('Inference execution failed.', 'error');
@@ -496,14 +560,24 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch(`${API_BASE}/api/grade`);
             const data = await res.json();
+            if (!res.ok) {
+                notify(data.detail?.message || data.detail || 'Grader failed', 'error');
+                renderEvidenceCard('evidence-grader', {
+                    status: 'FAILED',
+                    execution_id: data.detail?.execution_id || data.execution_id,
+                    message: data.detail?.message || data.detail,
+                });
+                return;
+            }
 
-            graderScore.textContent = data.quality_score.toFixed(1);
-            statTotalImgs.textContent = data.total_images;
-            statTotalPreds.textContent = data.total_predictions;
+            graderScore.textContent = data.quality_score != null ? Number(data.quality_score).toFixed(1) : '—';
+            statTotalImgs.textContent = data.total_images ?? '—';
+            statTotalPreds.textContent = data.total_predictions ?? '—';
 
-            // Render issues list
             graderIssuesList.innerHTML = '';
-            if (data.issues && data.issues.length > 0) {
+            if (data.status === 'NOT_EXECUTED') {
+                graderIssuesList.innerHTML = '<div class="empty-state">NOT_EXECUTED — no predictions artifact. This is not a perfect score.</div>';
+            } else if (data.issues && data.issues.length > 0) {
                 data.issues.forEach(issue => {
                     const el = document.createElement('div');
                     el.className = `issue-card ${issue.severity.toLowerCase()}`;
@@ -515,8 +589,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     graderIssuesList.appendChild(el);
                 });
             } else {
-                graderIssuesList.innerHTML = '<div class="empty-state">✅ Perfect score! No quality anomalies detected.</div>';
+                graderIssuesList.innerHTML = '<div class="empty-state">No quality anomalies reported by grader output (not a claim of ground-truth perfection).</div>';
             }
+            renderEvidenceCard('evidence-grader', {
+                status: data.status,
+                execution_id: data.execution_id,
+                duration_ms: data.duration_ms,
+                metrics: data.metrics || {
+                    total_images: data.total_images,
+                    total_predictions: data.total_predictions,
+                    quality_score: data.quality_score,
+                },
+                message: data.message,
+            });
+            refreshExecutionConsole();
         } catch (e) {
             console.error(e);
             notify('Failed to run quality diagnostics.', 'error');
@@ -2054,17 +2140,40 @@ document.addEventListener('DOMContentLoaded', () => {
                         sequence_id: currentSequenceId,
                         sam_checkpoint: document.getElementById('perception-sam-checkpoint')?.value || 'models/sam_vit_b.pth',
                         device: document.getElementById('perception-device')?.value || 'cpu',
-                        no_sam: true,
+                        no_sam: !!document.getElementById('perception-no-sam')?.checked,
                     }),
                 });
                 const data = await res.json();
-                if (data.status === 'ok') {
+                if (!res.ok) {
+                    statusEl.textContent = `Error: ${data.detail?.message || data.detail || JSON.stringify(data)}`;
+                    renderEvidenceCard('evidence-perception', {
+                        status: 'FAILED',
+                        execution_id: data.detail?.execution_id || data.execution_id,
+                        message: data.detail?.message || data.detail,
+                    });
+                } else {
                     const stubPrefix = data.demo_stub ? 'demo stub: ' : '';
                     const expected = data.frames_expected != null ? `/${data.frames_expected}` : '';
                     statusEl.textContent =
-                        `${stubPrefix}Processed ${data.frames_processed}${expected} frames -> ${data.proposals_dir}`;
-                } else {
-                    statusEl.textContent = `Error: ${data.detail || JSON.stringify(data)}`;
+                        `${data.status}: ${stubPrefix}Processed ${data.frames_processed}${expected} frames → ${data.proposals_dir}`;
+                    renderEvidenceCard('evidence-perception', {
+                        status: data.status,
+                        execution_id: data.execution_id,
+                        duration_ms: data.duration_ms,
+                        model: data.model,
+                        checkpoint: data.checkpoint,
+                        metrics: {
+                            frames_processed: data.frames_processed,
+                            frames_expected: data.frames_expected,
+                            predictions_generated: data.predictions_generated,
+                            inference_calls: data.inference_calls,
+                            sam_ran: data.sam_ran,
+                            output_dir: data.proposals_dir,
+                        },
+                        message: data.message,
+                        events: data.events,
+                    });
+                    refreshExecutionConsole();
                 }
                 await refreshPipelineStatus();
                 await refreshAllOutputBrowsers();
@@ -2272,4 +2381,245 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // --- Execution integrity: evidence cards, console, strict mode, load ---
+    function esc(s) {
+        return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function renderEvidenceCard(elementId, evidence) {
+        const el = document.getElementById(elementId);
+        if (!el || !evidence) return;
+        const status = evidence.status || 'NOT_EXECUTED';
+        const metrics = evidence.metrics || {};
+        const metricRows = Object.entries(metrics).map(([k, v]) => {
+            const val = typeof v === 'object' ? JSON.stringify(v) : v;
+            return `<div class="ev-row"><span>${esc(k)}</span><strong>${esc(val)}</strong></div>`;
+        }).join('');
+        const events = (evidence.events || []).slice(-8).map(ev =>
+            `<li><code>${esc(ev.ts || '')}</code> ${esc(ev.kind || '')}: ${esc(ev.message || '')}</li>`
+        ).join('');
+        const ckpt = evidence.checkpoint
+            ? `<div class="ev-row"><span>checkpoint</span><strong>${esc(evidence.checkpoint.path || evidence.checkpoint)} ${evidence.checkpoint.exists === false ? '(missing)' : ''}</strong></div>`
+            : '';
+        el.innerHTML = `
+            <h4>What actually happened?</h4>
+            <div class="ev-status ev-status-${esc(status)}">${esc(status)}</div>
+            <div class="ev-row"><span>execution_id</span><strong class="font-mono">${esc(evidence.execution_id || '—')}</strong></div>
+            ${evidence.duration_ms != null ? `<div class="ev-row"><span>duration_ms</span><strong>${esc(evidence.duration_ms)}</strong></div>` : ''}
+            ${evidence.model ? `<div class="ev-row"><span>model</span><strong>${esc(evidence.model)}</strong></div>` : ''}
+            ${ckpt}
+            ${evidence.process_id != null ? `<div class="ev-row"><span>process_id</span><strong>${esc(evidence.process_id)}</strong></div>` : ''}
+            ${evidence.exit_code != null ? `<div class="ev-row"><span>exit_code</span><strong>${esc(evidence.exit_code)}</strong></div>` : ''}
+            ${evidence.command ? `<div class="ev-row"><span>command</span><strong class="font-mono">${esc(Array.isArray(evidence.command) ? evidence.command.join(' ') : evidence.command)}</strong></div>` : ''}
+            ${metricRows}
+            ${evidence.message ? `<p class="ev-msg">${esc(evidence.message)}</p>` : ''}
+            ${evidence.execution_id ? `<a class="ev-log-link" href="/api/executions/${encodeURIComponent(evidence.execution_id)}/log" target="_blank" rel="noopener">Open execution log</a>` : ''}
+            ${events ? `<details class="ev-timeline"><summary>Event timeline</summary><ul>${events}</ul></details>` : ''}
+        `;
+    }
+
+    function refreshScriptStatus(scripts) {
+        const map = {
+            'train.py': 'script-status-train',
+            'infer.py': 'script-status-infer',
+            'autograder.py': 'script-status-grader',
+        };
+        Object.entries(map).forEach(([name, id]) => {
+            const el = document.getElementById(id);
+            const r = scripts?.[name];
+            if (!el || !r) return;
+            if (!r.exists) {
+                el.textContent = `Missing (${name})`;
+                el.className = 'val font-mono';
+                el.style.color = '#ff8888';
+            } else if (r.syntax_valid && r.dry_run_ok) {
+                el.textContent = `Verified (${name})${r.last_status ? ' · last ' + r.last_status : ''}`;
+                el.className = 'val font-mono green';
+                el.style.color = '';
+            } else {
+                el.textContent = `Found but unverified (${name})`;
+                el.className = 'val font-mono';
+                el.style.color = '#fbbf24';
+            }
+        });
+    }
+
+    async function refreshHealth() {
+        try {
+            const res = await fetch(`${API_BASE}/api/health`);
+            const data = await res.json();
+            const chip = document.getElementById('health-status-chip');
+            if (chip) {
+                chip.textContent = [
+                    data.filesystem_writable ? 'FS writable' : 'FS FAIL',
+                    data.torch_installed ? 'torch' : 'no-torch',
+                    data.ultralytics_installed ? 'yolo' : 'no-yolo',
+                    data.gpu?.available ? `GPU:${data.gpu.name}` : 'CPU',
+                    data.last_successful_execution_id ? `last:${data.last_successful_execution_id}` : 'no-success-yet',
+                ].join(' · ');
+            }
+            if (data.scripts) refreshScriptStatus(data.scripts);
+            const tog = document.getElementById('toggle-strict-mode');
+            if (tog) tog.checked = !!data.strict_mode;
+        } catch (e) {
+            const chip = document.getElementById('health-status-chip');
+            if (chip) chip.textContent = 'Backend unreachable';
+        }
+    }
+
+    async function refreshExecutionConsole() {
+        const list = document.getElementById('exec-console-list');
+        if (!list) return;
+        try {
+            const res = await fetch(`${API_BASE}/api/executions?limit=40`);
+            const data = await res.json();
+            const rows = data.executions || [];
+            if (!rows.length) {
+                list.innerHTML = '<p class="evidence-empty">No executions recorded yet.</p>';
+                return;
+            }
+            list.innerHTML = rows.map(e => `
+                <button type="button" class="exec-row" data-id="${esc(e.execution_id)}">
+                    <span class="ev-status ev-status-${esc(e.status)}">${esc(e.status)}</span>
+                    <span class="font-mono">${esc(e.execution_id)}</span>
+                    <span>${esc(e.operation)}</span>
+                    <span>${esc(e.duration_ms != null ? e.duration_ms + 'ms' : '—')}</span>
+                    <span>${e.verified ? 'verified' : 'unverified'}</span>
+                </button>
+            `).join('');
+            list.querySelectorAll('.exec-row').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const detail = document.getElementById('exec-console-detail');
+                    const r = await fetch(`${API_BASE}/api/executions/${encodeURIComponent(btn.dataset.id)}`);
+                    const full = await r.json();
+                    detail.classList.remove('hidden');
+                    detail.innerHTML = `<pre>${esc(JSON.stringify(full, null, 2))}</pre>`;
+                });
+            });
+        } catch (e) {
+            list.innerHTML = `<p class="evidence-empty">Failed to load executions: ${esc(e.message)}</p>`;
+        }
+    }
+
+    const btnLoadPreprocess = document.getElementById('btn-load-preprocess');
+    if (btnLoadPreprocess) {
+        btnLoadPreprocess.addEventListener('click', async () => {
+            btnLoadPreprocess.disabled = true;
+            btnLoadPreprocess.textContent = 'Loading…';
+            const statusEl = document.getElementById('source-browse-status');
+            try {
+                const res = await fetch(`${API_BASE}/api/dataset/load`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        source_path: datasetSourcePath?.value || 'data',
+                        yaml_path: dataYamlPath?.value || 'coco8.yaml',
+                        dataset_type: selectDatasetType?.value || 'local',
+                    }),
+                });
+                const data = await res.json();
+                const m = data.metrics || {};
+                if (statusEl) {
+                    statusEl.textContent = `${data.status}: discovered=${m.images_discovered ?? 0} readable=${m.images_readable ?? 0} corrupt=${m.images_corrupt ?? 0} → ${data.manifest_path || ''}`;
+                }
+                renderEvidenceCard('evidence-dataset', {
+                    status: data.status,
+                    execution_id: data.execution_id,
+                    duration_ms: data.duration_ms,
+                    metrics: {
+                        ...m,
+                        reconciliation: data.reconciliation?.state,
+                        manifest: data.manifest_path,
+                    },
+                    message: data.message,
+                    events: data.events,
+                });
+                const badge = document.getElementById('ds-meta-badge');
+                const loadedEl = document.getElementById('ds-kpi-loaded-rows');
+                const pctEl = document.getElementById('ds-kpi-ingest-pct');
+                if (loadedEl) loadedEl.textContent = m.images_readable ?? 0;
+                if (pctEl) pctEl.textContent = m.loaded_pct_of_discovered != null ? `${m.loaded_pct_of_discovered}% of discovered` : '—';
+                if (badge) {
+                    if (data.status === 'FAILED' || (m.images_readable ?? 0) === 0) {
+                        badge.textContent = 'FAILED — 0 loaded';
+                        badge.style.background = 'rgba(255, 68, 68, 0.12)';
+                        badge.style.color = '#ff8888';
+                    } else {
+                        badge.textContent = `${m.images_readable} loaded (evidence)`;
+                        badge.style.background = 'rgba(0, 255, 170, 0.15)';
+                        badge.style.color = '#00ffaa';
+                    }
+                }
+                const cfgStatus = document.getElementById('config-exec-status');
+                if (cfgStatus) {
+                    cfgStatus.textContent = `used_by_execution YES · last execution_id ${data.execution_id}`;
+                    cfgStatus.dataset.modified = '0';
+                }
+                refreshExecutionConsole();
+                if (data.status === 'FAILED' || data.status === 'VALIDATION_FAILED') {
+                    notify(data.message || 'Load failed', 'error');
+                } else if (data.status === 'PARTIAL_SUCCESS') {
+                    notify(data.message || 'Partial load', 'warning');
+                } else {
+                    notify(data.message || 'Load complete', 'success');
+                }
+            } catch (e) {
+                if (statusEl) statusEl.textContent = `Load failed: ${e.message}`;
+                notify('Load & Preprocess failed.', 'error');
+            } finally {
+                btnLoadPreprocess.disabled = false;
+                btnLoadPreprocess.textContent = 'Load & Preprocess';
+            }
+        });
+    }
+
+    const btnYamlValidate = document.getElementById('btn-yaml-validate');
+    if (btnYamlValidate) {
+        btnYamlValidate.addEventListener('click', async () => {
+            try {
+                const res = await fetch(`${API_BASE}/api/yaml/validate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: dataYamlPath?.value || 'coco8.yaml' }),
+                });
+                const data = await res.json();
+                notify(`${data.status}: classes=${data.class_count} images=${JSON.stringify(data.image_counts)}`, data.status === 'SUCCEEDED' ? 'success' : 'warning');
+                const cfgStatus = document.getElementById('config-exec-status');
+                if (cfgStatus) {
+                    cfgStatus.textContent = `YAML hash ${data.content_hash || '—'} · ${data.status} · execution ${data.execution_id || '—'}`;
+                }
+                refreshExecutionConsole();
+            } catch (e) {
+                notify(`YAML validate failed: ${e.message}`, 'error');
+            }
+        });
+    }
+
+    document.getElementById('btn-open-exec-console')?.addEventListener('click', () => {
+        document.getElementById('exec-console-modal')?.classList.remove('hidden');
+        refreshExecutionConsole();
+    });
+    document.getElementById('btn-close-exec-console')?.addEventListener('click', () => {
+        document.getElementById('exec-console-modal')?.classList.add('hidden');
+    });
+    document.getElementById('btn-refresh-executions')?.addEventListener('click', refreshExecutionConsole);
+    document.getElementById('btn-health-check')?.addEventListener('click', async () => {
+        await refreshHealth();
+        notify('Health refreshed — see Workspace Status chip.', 'info');
+    });
+    document.getElementById('toggle-strict-mode')?.addEventListener('change', async (e) => {
+        try {
+            await fetch(`${API_BASE}/api/strict-mode`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: e.target.checked }),
+            });
+            notify(e.target.checked ? 'Strict Execution Mode ON' : 'Strict Execution Mode OFF', 'info');
+        } catch (err) {
+            notify('Failed to toggle strict mode', 'error');
+        }
+    });
+
+    refreshHealth();
 });

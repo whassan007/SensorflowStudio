@@ -1553,3 +1553,97 @@ body {
     color: var(--text-muted);
     font-size: 10px;
 }
+
+/* Execution integrity */
+.strict-mode-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+}
+.evidence-card {
+    margin-top: 16px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: rgba(4, 6, 11, 0.55);
+}
+.evidence-card h4 {
+    margin: 0 0 10px 0;
+    font-size: 13px;
+    color: var(--secondary);
+}
+.evidence-empty {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 0;
+}
+.ev-status {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    font-family: var(--font-mono);
+}
+.ev-status-SUCCEEDED { background: #00ffaa22; color: #00ffaa; }
+.ev-status-PARTIAL_SUCCESS { background: #fbbf2422; color: #fbbf24; }
+.ev-status-FAILED, .ev-status-VALIDATION_FAILED { background: #ff444422; color: #ff8888; }
+.ev-status-RUNNING, .ev-status-QUEUED { background: #3b82f622; color: #93c5fd; }
+.ev-status-NOT_EXECUTED, .ev-status-UNVERIFIED, .ev-status-CANCELLED { background: #64748b33; color: #94a3b8; }
+.ev-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 12px;
+    padding: 3px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.ev-row span { color: var(--text-muted); }
+.ev-row strong { color: var(--text); text-align: right; word-break: break-all; }
+.ev-msg { font-size: 12px; color: var(--text-muted); margin: 10px 0 0; }
+.ev-log-link { display: inline-block; margin-top: 10px; font-size: 12px; color: #38bdf8; }
+.ev-timeline { margin-top: 10px; font-size: 11px; color: var(--text-muted); }
+.ev-timeline ul { margin: 6px 0 0 16px; padding: 0; }
+.exec-console-card {
+    width: min(920px, 94vw);
+    max-height: 85vh;
+    overflow: auto;
+    background: var(--bg-sidebar);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+}
+.exec-console-list { display: flex; flex-direction: column; gap: 6px; }
+.exec-row {
+    display: grid;
+    grid-template-columns: 140px 160px 1fr 80px 90px;
+    gap: 8px;
+    align-items: center;
+    text-align: left;
+    padding: 8px 10px;
+    background: rgba(4,6,11,0.5);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 12px;
+}
+.exec-row:hover { border-color: var(--border-active); }
+.exec-console-detail pre {
+    margin-top: 12px;
+    max-height: 320px;
+    overflow: auto;
+    background: #04060b;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 11px;
+    color: #00ffaa;
+}
+.config-exec-status { font-family: var(--font-mono); }
