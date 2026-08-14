@@ -9,6 +9,7 @@ from typing import Any, Dict, List
 import numpy as np
 
 from sensorflow.adapters.base import VendorAdapter
+from sensorflow.adapters.stub_images import stub_camera_path, write_stub_camera_png
 from sensorflow.schemas.taxonomy_axes import assign_taxonomy_axes
 from sensorflow.schemas.unified_frame import (
     CameraView,
@@ -120,6 +121,33 @@ class A2D2Adapter(VendorAdapter):
     """Audi A2D2 adapter — stub frames when HDF5/PNG lake is unavailable."""
 
     def load(self, source: Dict[str, Any], sequence_id: str) -> UnifiedSequence:
+        from sensorflow.adapters.vendor_media import (
+            frames_from_media_root,
+            media_available,
+            resolve_vendor_root,
+        )
+
+        source = source or {}
+        root = resolve_vendor_root(source, "source_path", "root", "path")
+        if root is not None and media_available(root):
+            frames = frames_from_media_root(
+                sequence_id=sequence_id,
+                vendor="a2d2",
+                root=root,
+                max_frames=source.get("max_frames"),
+            )
+            return UnifiedSequence(
+                sequence_id=sequence_id,
+                vendor="a2d2",
+                frames=frames,
+                taxonomy_manifest={
+                    "source_dataset": source.get("dataset", "audi/a2d2"),
+                    "source_path": str(root.resolve()),
+                    "demo_stub": False,
+                    "total_frames": len(frames),
+                },
+            )
+
         shard_dir = Path("runs/pipeline/a2d2_shards")
         shard_path = shard_dir / f"{source.get('shard_id', 'default')}.json"
 
@@ -162,11 +190,21 @@ class A2D2Adapter(VendorAdapter):
                     taxonomy_axes=axes,
                 ))
 
+            image_path = shard.get("image_path") or ""
+            if not image_path or str(image_path).startswith("http"):
+                cam_file = stub_camera_path(sequence_id, frame_id, "front")
+                write_stub_camera_png(
+                    cam_file,
+                    seed=sum(ord(c) for c in frame_id) % 991,
+                    label=f"a2d2:{frame_id}",
+                )
+                image_path = str(cam_file)
+
             frames.append(FusedFrame(
                 frame_id=frame_id,
                 timestamp_us=shard.get("timestamp_us", 0),
                 lidar=LidarData(path=str(lidar_path), num_points=num_points),
-                cameras={"front": CameraView(image_path=shard.get("image_path", ""))},
+                cameras={"front": CameraView(image_path=image_path)},
                 ego_pose=EgoPose(speed_kmh=speed),
                 ground_truth=gt,
             ))
@@ -187,7 +225,7 @@ class A2D2Adapter(VendorAdapter):
                 "demo_stub": demo_stub,
                 "stub_note": (
                     "Built-in Audi A2D2 sample (~3 frames), not a full AV video lake. "
-                    "Point Dataset Configuration at a real A2D2 HDF5/PNG export when available."
+                    "Set a2d2_root to a real A2D2 PNG/HDF5 export folder when available."
                 ) if demo_stub else None,
                 "total_frames": len(frames),
             },

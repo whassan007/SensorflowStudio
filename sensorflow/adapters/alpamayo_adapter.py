@@ -9,6 +9,7 @@ from typing import Any, Dict, List
 import numpy as np
 
 from sensorflow.adapters.base import VendorAdapter
+from sensorflow.adapters.stub_images import stub_camera_path, write_stub_camera_png
 from sensorflow.schemas.taxonomy_axes import assign_taxonomy_axes
 from sensorflow.schemas.unified_frame import (
     CameraView,
@@ -87,20 +88,53 @@ DEFAULT_ALPAMAYO_SAMPLES = {
 
 class AlpamayoAdapter(VendorAdapter):
     def load(self, source: Dict[str, Any], sequence_id: str) -> UnifiedSequence:
+        from sensorflow.adapters.vendor_media import (
+            frames_from_media_root,
+            media_available,
+            resolve_vendor_root,
+        )
+
         data = source if source else DEFAULT_ALPAMAYO_SAMPLES["physical_ai"]
+        root = resolve_vendor_root(data, "source_path", "root", "path")
+        if root is not None and media_available(root):
+            max_frames = data.get("max_frames")
+            frames = frames_from_media_root(
+                sequence_id=sequence_id,
+                vendor="alpamayo",
+                root=root,
+                max_frames=max_frames,
+            )
+            return UnifiedSequence(
+                sequence_id=sequence_id,
+                vendor="alpamayo",
+                frames=frames,
+                taxonomy_manifest={
+                    "source_dataset": data.get("dataset", "alpamayo"),
+                    "source_path": str(root.resolve()),
+                    "demo_stub": False,
+                    "total_frames": len(frames),
+                },
+            )
+
         output_dir = Path("runs/pipeline") / sequence_id / "lidar"
         speed = data.get("telemetry", {}).get("speed_kmh", 35.0)
         annotations = data.get("annotations", [])
 
         frames: List[FusedFrame] = []
         num_frames = max(3, len(annotations))
+        view_names = list(data.get("views", {"front": ""}).keys()) or ["front"]
         for i in range(num_frames):
-            frame_id = f"frame_{i:04d}"
+            frame_id = f"alpamayo_{i:04d}"
             lidar_path, num_points = _synthetic_lidar_path(output_dir, frame_id, annotations)
-            cameras = {
-                name: CameraView(image_path=url)
-                for name, url in data.get("views", {}).items()
-            }
+            cameras = {}
+            for cam_i, name in enumerate(view_names):
+                img_path = stub_camera_path(sequence_id, frame_id, name)
+                write_stub_camera_png(
+                    img_path,
+                    seed=i * 10 + cam_i + 7,
+                    label=f"alpamayo:{frame_id}:{name}",
+                )
+                cameras[name] = CameraView(image_path=str(img_path))
             gt = []
             for ann in annotations:
                 axes = assign_taxonomy_axes(ann["label"], speed_kmh=speed)
@@ -129,7 +163,8 @@ class AlpamayoAdapter(VendorAdapter):
                 "demo_stub": True,
                 "stub_note": (
                     "Built-in Alpamayo sample (~3 frames), not a full AV video lake. "
-                    "Enable Local frames/video on Ingest and set Images Path to load a real sequence."
+                    "Set alpamayo_root / Images Path to a real sequence folder, or use "
+                    "Load all datasets with allow_stub disabled to get NOT_EXECUTED instead."
                 ),
                 "total_frames": len(frames),
             },
