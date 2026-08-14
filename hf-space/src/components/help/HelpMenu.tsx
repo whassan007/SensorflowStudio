@@ -5,6 +5,7 @@
  *   Pages         — what each page does (from pageGuides)
  *   Tips          — keyboard / nav tips
  *   Docs          — links into hf-space/docs/
+ *   About         — current version and release notes
  */
 import { useMemo, useState } from 'react';
 import Box from '@mui/material/Box';
@@ -23,6 +24,8 @@ import { ArrowRight, CircleHelp, MessageCircle, Search, X } from 'lucide-react';
 import { GLOSSARY, GLOSSARY_CATEGORIES, type GlossaryEntry } from '../../content/glossary';
 import { PAGE_GUIDE_LIST } from '../../help/pageGuides';
 import { useLabelEval, type PageId } from '../../context/LabelEvalContext';
+import { AboutPanel } from './AboutDialog';
+import { APP_VERSION } from '../../content/releases';
 
 // ---------------------------------------------------------------- how it works
 
@@ -232,6 +235,10 @@ const NAV_TIPS = [
     title: 'Active dataset chip',
     text: 'The AppBar chip shows the dataset other pages follow. Change it on Datasets.',
   },
+  {
+    title: 'Version & About',
+    text: 'The AppBar vX.Y.Z chip (and the matching chip at the bottom of the nav drawer) opens About: current version, links, and release notes. Help → About shows the same catalog.',
+  },
 ];
 
 function TipsPanel() {
@@ -297,7 +304,7 @@ function DocsPanel() {
 
 // ---------------------------------------------------------------- dialog shell
 
-type HelpTab = 'how' | 'glossary' | 'pages' | 'tips' | 'docs';
+type HelpTab = 'how' | 'glossary' | 'pages' | 'tips' | 'docs' | 'about';
 
 export default function HelpMenu({ onOpenChat }: { onOpenChat?: () => void }) {
   const { navigate } = useLabelEval();
@@ -311,7 +318,7 @@ export default function HelpMenu({ onOpenChat }: { onOpenChat?: () => void }) {
 
   return (
     <>
-      <Tooltip title="Help: overview, glossary, page guides, tips, docs">
+      <Tooltip title="Help: overview, glossary, page guides, tips, docs, about">
         <IconButton size="small" onClick={() => setOpen(true)} sx={{ ml: 1, color: '#8a949e' }} aria-label="Open help">
           <CircleHelp size={19} />
         </IconButton>
@@ -326,6 +333,9 @@ export default function HelpMenu({ onOpenChat }: { onOpenChat?: () => void }) {
         <Box sx={{ display: 'flex', alignItems: 'center', px: 2, pt: 1.5, gap: 1 }}>
           <Typography variant="h6" sx={{ fontSize: 15, fontWeight: 700, flex: 1 }}>
             Sensorflow Studio Help
+            <Typography component="span" sx={{ ml: 1, color: '#5c6873', fontSize: 12, fontFamily: 'monospace', fontWeight: 500 }}>
+              v{APP_VERSION}
+            </Typography>
           </Typography>
           {onOpenChat ? (
             <Button
@@ -358,6 +368,7 @@ export default function HelpMenu({ onOpenChat }: { onOpenChat?: () => void }) {
           <Tab value="pages" label="Pages" />
           <Tab value="tips" label="Tips" />
           <Tab value="docs" label="Docs" />
+          <Tab value="about" label="About" />
         </Tabs>
         <DialogContent sx={{ pt: 2 }}>
           {tab === 'how' ? <HowItWorks goTo={goTo} /> : null}
@@ -365,6 +376,7 @@ export default function HelpMenu({ onOpenChat }: { onOpenChat?: () => void }) {
           {tab === 'pages' ? <PageIndex goTo={goTo} /> : null}
           {tab === 'tips' ? <TipsPanel /> : null}
           {tab === 'docs' ? <DocsPanel /> : null}
+          {tab === 'about' ? <AboutPanel /> : null}
         </DialogContent>
       </Dialog>
     </>

@@ -10,6 +10,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from sensorflow.about.catalog import get_about
+
 # ---------------------------------------------------------------------------
 # Compact page guides (mirrors hf-space/src/help/pageGuides.ts summaries)
 # ---------------------------------------------------------------------------
@@ -300,6 +302,59 @@ STATIC_FAQS: List[Dict[str, str]] = [
         ),
     },
 ]
+
+
+def _version_faqs() -> List[Dict[str, str]]:
+    """FAQs derived from the About catalog so version numbers stay in sync."""
+    about = get_about()
+    version = about["version"]
+    name = about["name"]
+    links = about["links"]
+    releases = about["releases"] or []
+    latest = releases[0] if releases else {"version": version, "date": "", "title": "", "highlights": []}
+    highlights = "; ".join(str(h) for h in (latest.get("highlights") or [])[:6])
+    history = "; ".join(f"{r.get('version')} ({r.get('date')}) {r.get('title')}" for r in releases[:8])
+    return [
+        {
+            "id": "faq-version",
+            "title": "What version is Sensorflow Studio?",
+            "question": "what version current app version about release number v0",
+            "answer": (
+                f"{name} is version {version}. Click the AppBar v{version} chip or open Help → About. "
+                f"GitHub: {links['github']}. Hugging Face Space: {links['hf_space']}."
+            ),
+        },
+        {
+            "id": "faq-whats-new",
+            "title": "What's new?",
+            "question": "what's new whats new recent changes updates latest release changelog",
+            "answer": (
+                f"Latest release {latest.get('version')} ({latest.get('date')}): {latest.get('title')}. "
+                f"{highlights} Open Help → About or the version chip for the full list."
+            ),
+        },
+        {
+            "id": "faq-release-notes",
+            "title": "Where are the release notes?",
+            "question": "release notes changelog versions history each version about page",
+            "answer": (
+                f"Release notes are listed newest-first on About (Help → About, or the v{version} chip). "
+                f"Notable versions: {history}."
+            ),
+        },
+        {
+            "id": "faq-about",
+            "title": "About Sensorflow Studio",
+            "question": "about sensorflow studio product github huggingface space links",
+            "answer": (
+                f"{about['description']} Current version {version}. "
+                f"GitHub: {links['github']}. Hugging Face Space: {links['hf_space']}."
+            ),
+        },
+    ]
+
+
+STATIC_FAQS.extend(_version_faqs())
 
 
 @dataclass(frozen=True)

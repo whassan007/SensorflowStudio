@@ -67,3 +67,22 @@ def test_guides_endpoint(client):
 def test_empty_question_rejected(client):
     resp = client.post("/api/help/chat", json={"question": ""})
     assert resp.status_code == 422
+
+
+def test_match_faq_version():
+    from sensorflow.about.catalog import get_about
+    from sensorflow.help.matcher import match_faq
+
+    version = get_about()["version"]
+    hits = match_faq("what version is Sensorflow Studio?", top_k=3)
+    assert hits
+    blob = " ".join(d.text for d, _ in hits)
+    assert version in blob
+
+
+def test_chat_whats_new(client):
+    from sensorflow.about.catalog import get_about
+
+    body = client.post("/api/help/chat", json={"question": "what's new?"}).json()
+    assert body["answer"]
+    assert get_about()["version"] in body["answer"] or "release" in body["answer"].lower()

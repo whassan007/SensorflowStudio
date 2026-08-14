@@ -1538,6 +1538,10 @@ app.include_router(rotr_router)
 from sensorflow.help.api import router as help_router
 app.include_router(help_router)
 
+# Product version + About catalog (GET /api/about, GET /api/version).
+from sensorflow.about.api import router as about_router
+app.include_router(about_router)
+
 # Mount static folder
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
