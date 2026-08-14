@@ -1350,6 +1350,9 @@ def ingest_status(sequence_id: str = "seq_001"):
         status["manifest_exists"] = True
         status["frames"] = len(manifest_data.get("frames", []))
         status["vendor"] = manifest_data.get("vendor", "unknown")
+        tax = manifest_data.get("taxonomy_manifest") or {}
+        status["demo_stub"] = bool(tax.get("demo_stub", status.get("demo_stub", False)))
+        status["stub_note"] = tax.get("stub_note")
     return {"status": "ok", "sequence_id": sequence_id, **status}
 
 
@@ -1364,6 +1367,7 @@ def auto_label(params: AutoLabelParams):
 
     try:
         sequence = UnifiedSequence.load(manifest)
+        expected_frames = len(sequence.frames)
         output_dir = manifest.parent / "proposals"
         automator = PerceptionAutomator(
             sam_checkpoint=params.sam_checkpoint,
@@ -1376,7 +1380,19 @@ def auto_label(params: AutoLabelParams):
 
     proposals_dir = manifest.parent / "proposals"
     num_frames = len(list(proposals_dir.glob("*.json"))) if proposals_dir.exists() else 0
-    return {"status": "ok", "proposals_dir": str(proposals_dir), "frames_processed": num_frames}
+    demo_stub = bool(sequence.taxonomy_manifest.get("demo_stub"))
+    return {
+        "status": "ok",
+        "proposals_dir": str(proposals_dir),
+        "frames_processed": num_frames,
+        "frames_expected": expected_frames,
+        "demo_stub": demo_stub,
+        "message": (
+            f"demo stub: processed {num_frames}/{expected_frames} frames"
+            if demo_stub
+            else f"processed {num_frames}/{expected_frames} frames"
+        ),
+    }
 
 
 @app.post("/api/perception/track")
@@ -1467,14 +1483,58 @@ def pipeline_status(sequence_id: str = "seq_001"):
 
     seq_state = state.get(sequence_id, {})
     base = Path("runs/pipeline") / sequence_id
+    manifest = base / "manifest.json"
+    proposals_dir = base / "proposals"
+    tracks = base / "tracks.json"
+    benchmark = base / "benchmark" / "metric_card.json"
+    quality_report = base / "benchmark" / "quality_report.json"
+
+    ingest_complete = manifest.exists()
+    perception_complete = proposals_dir.exists() and any(proposals_dir.glob("*.json"))
+    tracking_complete = tracks.exists()
+    benchmark_complete = benchmark.exists()
+
+    frames_ingested = None
+    frames_processed = None
+    demo_stub = None
+    if ingest_complete:
+        try:
+            with open(manifest) as f:
+                manifest_data = json.load(f)
+            frames_ingested = len(manifest_data.get("frames", []))
+            demo_stub = bool((manifest_data.get("taxonomy_manifest") or {}).get("demo_stub"))
+        except Exception:
+            frames_ingested = seq_state.get("frames")
+            demo_stub = seq_state.get("demo_stub")
+    if perception_complete:
+        frames_processed = len(list(proposals_dir.glob("*.json")))
+
+    # Completion stages: True when done, None when not run (UI must not show FAIL).
+    # Launch gate: True/False only after evaluation; None beforehand.
+    launch_gate_passed = seq_state.get("launch_gate_passed")
+    if "launch_gate_passed" not in seq_state:
+        launch_gate_passed = None
+
+    quality_passed = None
+    if quality_report.exists():
+        try:
+            with open(quality_report) as f:
+                quality_passed = bool(json.load(f).get("passed"))
+        except Exception:
+            quality_passed = benchmark_complete
+
     return {
         "status": "ok",
         "sequence_id": sequence_id,
-        "ingest_complete": (base / "manifest.json").exists(),
-        "perception_complete": (base / "proposals").exists() and any((base / "proposals").glob("*.json")),
-        "tracking_complete": (base / "tracks.json").exists(),
-        "benchmark_complete": (base / "benchmark" / "metric_card.json").exists(),
-        "launch_gate_passed": seq_state.get("launch_gate_passed", False),
+        "ingest_complete": True if ingest_complete else None,
+        "perception_complete": True if perception_complete else None,
+        "tracking_complete": True if tracking_complete else None,
+        "benchmark_complete": True if benchmark_complete else None,
+        "quality_gate_passed": quality_passed,
+        "launch_gate_passed": launch_gate_passed,
+        "frames_ingested": frames_ingested,
+        "frames_processed": frames_processed,
+        "demo_stub": demo_stub,
         "state": seq_state,
     }
 
@@ -1560,6 +1620,14 @@ app.include_router(studio2_router)
 # counterfactual consequence, taxonomy mining, governed flywheel + stop-ship.
 from sensorflow.rotr.api import router as rotr_router
 app.include_router(rotr_router)
+
+# In-app help chatbot (FAQ / page-guide matcher; optional Ollama enrichment).
+from sensorflow.help.api import router as help_router
+app.include_router(help_router)
+
+# Product version + About catalog (GET /api/about, GET /api/version).
+from sensorflow.about.api import router as about_router
+app.include_router(about_router)
 
 # Mount static folder
 static_dir = Path(__file__).parent / "static"
