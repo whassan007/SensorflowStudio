@@ -629,14 +629,14 @@ export default function ScenarioComposerPage() {
                     {result.aggregate.max_drac_mps2 !== null ? (
                       <Chip size="small" label={`max DRAC ${fmtNum(result.aggregate.max_drac_mps2, 2)} m/s²`} sx={{ fontFamily: 'monospace' }} />
                     ) : null}
-                    <Chip size="small" label={`aggregate CSI ${fmtNum(result.aggregate.aggregate_csi, 3)}`} sx={{ fontFamily: 'monospace' }} />
+                    <Chip size="small" label={`aggregate CSI ${fmtNum(result.aggregate.aggregate_csi)}`} sx={{ fontFamily: 'monospace' }} />
                   </Box>
                   {result.conflicts.slice(0, 6).map((c, i) => (
                     <Box key={i} sx={{ display: 'flex', gap: 1, alignItems: 'center', p: 0.75, border: `1px solid ${tokens.color.border}`, borderRadius: 1, bgcolor: tokens.color.surfaceSunken }}>
                       <Chip size="small" label={c.conflict_type} sx={{ height: 20, fontSize: 10.5, bgcolor: `${verdictColor('WARN')}22`, color: verdictColor('WARN') }} />
                       <Typography variant="caption" sx={{ fontFamily: 'monospace', color: tokens.color.textDim }}>
-                        {c.vehicle_a} × {c.vehicle_b} · t {c.t_start_s.toFixed(1)}–{c.t_end_s.toFixed(1)} s
-                        {c.min_ttc_s !== null ? ` · TTC ${c.min_ttc_s.toFixed(2)} s` : ''} · CSI {c.csi.toFixed(3)}
+                        {c.vehicle_a} × {c.vehicle_b} · t {fmtNum(c.t_start_s)}–{fmtNum(c.t_end_s)} s
+                        {c.min_ttc_s !== null ? ` · TTC ${fmtNum(c.min_ttc_s)} s` : ''} · CSI {fmtNum(c.csi)}
                       </Typography>
                     </Box>
                   ))}

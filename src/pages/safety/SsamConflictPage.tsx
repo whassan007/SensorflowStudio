@@ -259,7 +259,7 @@ export default function SsamConflictPage() {
                   value={c.csi}
                   max={Math.max(...analysis.conflicts.map((x) => x.csi), 0.001)}
                   color={selected === i ? tokens.color.info : severityColor(c)}
-                  valueLabel={c.csi.toFixed(3)}
+                  valueLabel={c.csi.toFixed(2)}
                 />
               ))}
             </SectionCard>

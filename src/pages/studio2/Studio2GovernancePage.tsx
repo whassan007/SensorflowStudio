@@ -31,6 +31,7 @@ import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import Markdown from '../../components/nextgen/Markdown';
+import { fmtNum, fmtPct } from '../../components/labeleval/shared';
 import * as api from '../../services/studio2';
 import type {
   DemoResult,
@@ -151,7 +152,7 @@ function DecisionDetail({
           <Chip size="small" label={`confidence ${decision.confidence}`} sx={{ bgcolor: 'rgba(0,0,0,0.25)', color: 'inherit' }} />
           <Chip
             size="small"
-            label={`evidence completeness ${(decision.evidence_completeness * 100).toFixed(0)}%`}
+            label={`evidence completeness ${fmtPct(decision.evidence_completeness)}`}
             sx={{ bgcolor: 'rgba(0,0,0,0.25)', color: 'inherit' }}
           />
           <Chip size="small" label={`policy ${decision.policy_version}`} sx={{ bgcolor: 'rgba(0,0,0,0.25)', color: 'inherit', fontFamily: 'monospace' }} />
@@ -351,7 +352,7 @@ function ReleaseBoard() {
                   <Mono>{d.entity_id}</Mono>
                 </Stack>
                 <Typography variant="caption" sx={{ color: '#8a949e' }}>
-                  {d.evaluated_at} · completeness {(d.evidence_completeness * 100).toFixed(0)}%
+                  {d.evaluated_at} · completeness {fmtPct(d.evidence_completeness)}
                 </Typography>
               </Box>
             ))}
@@ -569,7 +570,7 @@ function HardwareGates() {
       {matrix.global_vs_matrix_note && <Alert severity="error">{matrix.global_vs_matrix_note}</Alert>}
       {matrix.global_metrics && (
         <Typography variant="caption" sx={{ color: '#8a949e' }}>
-          Global aggregate: {Object.entries(matrix.global_metrics).map(([k, v]) => `${k}=${typeof v === 'number' ? v.toFixed(3) : v}`).join(' · ')} — a
+          Global aggregate: {Object.entries(matrix.global_metrics).map(([k, v]) => `${k}=${typeof v === 'number' ? fmtNum(v) : v}`).join(' · ')} — a
           global pass never overrides a failing critical combination.
         </Typography>
       )}
@@ -602,7 +603,7 @@ function HardwareGates() {
                   <TableCell sx={{ fontSize: 11 }}>{r.n.toLocaleString()}</TableCell>
                   {metricNames.map((m) => (
                     <TableCell key={m} sx={{ fontSize: 11, bgcolor: c.bg, color: c.fg, fontFamily: 'monospace' }}>
-                      {r.metrics?.[m] !== undefined && r.metrics?.[m] !== null ? (r.metrics[m] as number).toFixed(3) : '—'}
+                      {r.metrics?.[m] !== undefined && r.metrics?.[m] !== null ? fmtNum(r.metrics[m] as number) : '—'}
                     </TableCell>
                   ))}
                   <TableCell>

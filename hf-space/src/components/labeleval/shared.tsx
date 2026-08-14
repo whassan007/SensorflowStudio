@@ -23,20 +23,27 @@ export function fmtInt(n: number | null | undefined): string {
   return Math.round(n).toLocaleString();
 }
 
-export function fmtNum(n: number | null | undefined, digits = 3): string {
+/** Continuous metrics: integers stay whole; otherwise up to `digits` (default 2). */
+export function fmtNum(n: number | null | undefined, digits = 2): string {
   if (n === null || n === undefined || Number.isNaN(n)) return '—';
-  return n.toLocaleString(undefined, { maximumFractionDigits: digits });
+  if (Number.isInteger(n)) return n.toLocaleString();
+  const d = Math.min(2, Math.max(0, digits));
+  return n.toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: 0 });
 }
 
 /**
- * Formats a rate as a percentage with 1 decimal. Values <= 1 are treated as
- * fractions (0..1); values > 1 are assumed to already be percentages.
+ * Formats a rate as a percentage (prefer 1 decimal like 10.0%; max 2).
+ * Values <= 1 are treated as fractions (0..1); values > 1 are already percentages.
  */
-export function fmtPct(v: number | null | undefined): string {
+export function fmtPct(v: number | null | undefined, digits = 1): string {
   if (v === null || v === undefined || Number.isNaN(v)) return '—';
   const pct = v <= 1 ? v * 100 : v;
-  return `${pct.toFixed(1)}%`;
+  const d = Math.min(2, Math.max(0, digits));
+  return `${pct.toFixed(d)}%`;
 }
+
+export const formatNumber = fmtNum;
+export const formatPercent = fmtPct;
 
 export function pctFraction(v: number | null | undefined): number {
   if (v === null || v === undefined || Number.isNaN(v)) return 0;
