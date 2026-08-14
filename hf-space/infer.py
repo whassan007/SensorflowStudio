@@ -55,7 +55,7 @@ def main():
         
     if not image_files:
         print(f"No images found at source: {args.source}")
-        return
+        raise SystemExit(2)
 
     print(f"Running inference on {len(image_files)} image(s)...")
     
