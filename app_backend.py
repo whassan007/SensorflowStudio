@@ -5,21 +5,24 @@ import json
 import subprocess
 import signal
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 from pydantic import BaseModel
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 
 app = FastAPI(title="Sensorflow Studio Backend")
 
 # State tracking
 ACTIVE_TRAIN_PROC: Optional[subprocess.Popen] = None
+ACTIVE_TRAIN_EXECUTION_ID: Optional[str] = None
 TRAINING_LOGS_ACCUMULATED = ""
 TRAINING_LOSSES: List[float] = []
 TOTAL_EPOCHS = 10
 CURRENT_EPOCH = 0
+LAST_TRAIN_EXIT_CODE: Optional[int] = None
+LAST_TRAIN_COMMAND: Optional[List[str]] = None
 
 # Configuration
 CONFIG_PATH = Path("runs/studio_config.json")
@@ -67,6 +70,31 @@ def load_config() -> StudioConfig:
             pass
     return StudioConfig()
 
+
+def resolve_active_sequence_id(fallback: str = "seq_001") -> str:
+    """Prefer studio config, then pipeline state from load-all / ingest."""
+    config = load_config()
+    if config.sequence_id:
+        return config.sequence_id
+    state_path = Path("runs/pipeline/state.json")
+    if state_path.exists():
+        try:
+            state = json.loads(state_path.read_text())
+            active = state.get("_active_sequence")
+            if active:
+                return str(active)
+        except Exception:
+            pass
+    return fallback
+
+
+SAM_CHECKPOINT_HINT = (
+    "Download SAM ViT-B: "
+    "mkdir -p models && "
+    "curl -L -o models/sam_vit_b.pth "
+    "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth"
+)
+
 @app.post("/api/config")
 def save_config(cfg: StudioConfig):
     with open(CONFIG_PATH, "w") as f:
@@ -109,32 +137,236 @@ def save_yaml_content(req: SaveYamlRequest):
 
 @app.get("/api/precheck")
 def precheck():
-    # Verify scripts are present
-    train_exists = Path("train.py").exists()
-    infer_exists = Path("infer.py").exists()
-    grader_exists = Path("autograder.py").exists()
+    """Script verification — existence alone is NOT success."""
+    from sensorflow.execution_ops import verify_script
 
-    if not (train_exists and infer_exists and grader_exists):
-        return {
-            "status": "warning",
-            "message": "Some scripts are missing in the current folder. Please verify train.py, infer.py, and autograder.py exist."
-        }
-    return {
-        "status": "success",
-        "message": "All workspace training and inference scripts are verified."
+    reports = {
+        "train.py": verify_script("train.py"),
+        "infer.py": verify_script("infer.py"),
+        "autograder.py": verify_script("autograder.py"),
     }
+    all_ok = all(
+        r.get("exists") and r.get("syntax_valid") and r.get("dry_run_ok")
+        for r in reports.values()
+    )
+    any_missing = any(not r.get("exists") for r in reports.values())
+    return {
+        "status": "ok" if all_ok else ("warning" if not any_missing else "failed"),
+        "message": (
+            "Scripts exist, syntax-valid, and --help dry-run succeeded."
+            if all_ok
+            else "Script verification incomplete — see reports (file Found alone is not enough)."
+        ),
+        "scripts": reports,
+        "verified": all_ok,
+    }
+
+
+@app.get("/api/health")
+def health():
+    from sensorflow.execution_ops import backend_health
+    from sensorflow.execution_ledger import get_strict_mode
+
+    payload = backend_health()
+    payload["strict_mode"] = get_strict_mode()
+    payload["backend_connected"] = True
+    return payload
+
+
+@app.get("/api/strict-mode")
+def get_strict_mode_api():
+    from sensorflow.execution_ledger import get_strict_mode
+
+    return {"enabled": get_strict_mode()}
+
+
+@app.post("/api/strict-mode")
+def set_strict_mode_api(params: dict):
+    from sensorflow.execution_ledger import set_strict_mode
+
+    enabled = bool(params.get("enabled", False))
+    return set_strict_mode(enabled)
+
+
+@app.get("/api/executions")
+def list_executions_api(
+    operation: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = Query(50, ge=1, le=500),
+):
+    from sensorflow.execution_ledger import list_executions
+
+    return {"status": "ok", "executions": list_executions(operation=operation, status=status, limit=limit)}
+
+
+@app.get("/api/executions/{execution_id}")
+def get_execution_api(execution_id: str):
+    from sensorflow.execution_ledger import load_execution
+
+    try:
+        return load_execution(execution_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Execution not found: {execution_id}")
+
+
+@app.get("/api/executions/{execution_id}/log")
+def get_execution_log_api(execution_id: str):
+    from sensorflow.execution_ledger import get_log_text, load_execution
+
+    try:
+        load_execution(execution_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Execution not found: {execution_id}")
+    return PlainTextResponse(get_log_text(execution_id) or "(no log lines)")
+
+
+@app.post("/api/yaml/validate")
+def validate_yaml_api(params: dict):
+    from sensorflow.execution_ops import validate_yaml_semantics
+    from sensorflow.execution_ledger import create_execution, mark_running, finalize
+
+    path = params.get("path") or params.get("yaml_path") or "coco8.yaml"
+    record = create_execution(
+        "yaml_validate",
+        configuration_snapshot={"yaml_path": path},
+        input_artifacts=[path],
+    )
+    mark_running(record["execution_id"])
+    report = validate_yaml_semantics(path)
+    final = finalize(
+        record["execution_id"],
+        report.get("status") or "FAILED",
+        metrics={
+            "class_count": report.get("class_count"),
+            "image_counts": report.get("image_counts"),
+            "label_counts": report.get("label_counts"),
+        },
+        errors=report.get("errors"),
+        warnings=report.get("warnings"),
+        output_artifacts=[{"path": path, "hash": report.get("content_hash")}],
+        process_invoked=False,
+        outputs_valid=report.get("status") == "SUCCEEDED",
+    )
+    report["execution_id"] = final["execution_id"]
+    report["execution"] = {
+        "execution_id": final["execution_id"],
+        "status": final["status"],
+        "verified": final.get("verified"),
+        "duration_ms": final.get("duration_ms"),
+    }
+    return report
+
+
+@app.get("/api/scripts/verify")
+def scripts_verify_api():
+    from sensorflow.execution_ops import verify_script
+
+    return {
+        "status": "ok",
+        "scripts": {
+            "train.py": verify_script("train.py"),
+            "infer.py": verify_script("infer.py"),
+            "autograder.py": verify_script("autograder.py"),
+        },
+    }
+
+
+@app.post("/api/dataset/load")
+def dataset_load(params: dict):
+    """Real Load & Preprocess with discovery evidence (not catalog KPIs)."""
+    from sensorflow.execution_ops import load_and_preprocess
+    from sensorflow.execution_ledger import create_execution, mark_running, finalize
+
+    source_path = params.get("source_path") or load_config().source_path
+    yaml_path = params.get("yaml_path") or load_config().yaml_path
+    dataset_type = params.get("dataset_type") or load_config().dataset_type
+
+    record = create_execution(
+        "dataset_load",
+        configuration_snapshot={
+            "source_path": source_path,
+            "yaml_path": yaml_path,
+            "dataset_type": dataset_type,
+        },
+        input_artifacts=[source_path, yaml_path],
+    )
+    mark_running(record["execution_id"])
+    result = load_and_preprocess(source_path, yaml_path=yaml_path, dataset_type=dataset_type)
+    disc = result["discovery"]
+    final = finalize(
+        record["execution_id"],
+        result["status"],
+        records_discovered=disc.get("images_discovered", 0),
+        records_processed=disc.get("images_discovered", 0),
+        records_succeeded=disc.get("images_readable", 0),
+        records_failed=disc.get("images_corrupt", 0),
+        metrics=result["metrics"],
+        errors=disc.get("errors"),
+        warnings=disc.get("warnings"),
+        output_artifacts=[{"path": result["manifest_path"], "kind": "load_manifest"}],
+        process_invoked=False,
+        outputs_valid=disc.get("images_readable", 0) > 0 and result["status"] in (
+            "SUCCEEDED",
+            "PARTIAL_SUCCESS",
+        ),
+    )
+    return {
+        "status": final["status"],
+        "execution_id": final["execution_id"],
+        "verified": final.get("verified"),
+        "duration_ms": final.get("duration_ms"),
+        "message": (
+            f"Loaded {disc.get('images_readable', 0)}/{disc.get('images_discovered', 0)} images "
+            f"from {source_path}"
+            if disc.get("images_readable")
+            else f"FAILED: 0 images loaded from {source_path}"
+        ),
+        "discovery": disc,
+        "metrics": result["metrics"],
+        "yaml_validation": result.get("yaml_validation"),
+        "reconciliation": result.get("reconciliation"),
+        "manifest_path": result.get("manifest_path"),
+        "catalog_only": False,
+        "browsable": bool(result["metrics"].get("browsable")),
+        "events": final.get("events"),
+    }
+
 
 @app.post("/api/train/start")
 def start_train(params: TrainParams):
-    global ACTIVE_TRAIN_PROC, TRAINING_LOGS_ACCUMULATED, TRAINING_LOSSES, TOTAL_EPOCHS, CURRENT_EPOCH
+    global ACTIVE_TRAIN_PROC, ACTIVE_TRAIN_EXECUTION_ID, TRAINING_LOGS_ACCUMULATED
+    global TRAINING_LOSSES, TOTAL_EPOCHS, CURRENT_EPOCH, LAST_TRAIN_EXIT_CODE, LAST_TRAIN_COMMAND
+    from sensorflow.execution_ledger import create_execution, mark_running, finalize
+
     if ACTIVE_TRAIN_PROC and ACTIVE_TRAIN_PROC.poll() is None:
         raise HTTPException(status_code=400, detail="Training is already running.")
 
-    # Reset logs & stats
+    weights_path = Path(params.model)
+    # Allow ultralytics named weights (e.g. yolov8n.pt) that may download; still record path
+    yaml_path = Path(params.data)
+    if not yaml_path.exists():
+        record = create_execution(
+            "training",
+            configuration_snapshot=params.dict(),
+            input_artifacts=[params.data, params.model],
+        )
+        finalize(
+            record["execution_id"],
+            "FAILED",
+            errors=[f"Dataset YAML not found: {params.data}"],
+            process_invoked=False,
+            outputs_valid=False,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail={"message": f"Dataset YAML not found: {params.data}", "execution_id": record["execution_id"]},
+        )
+
     TRAINING_LOGS_ACCUMULATED = f"Starting YOLO training with base model {params.model}...\n"
     TRAINING_LOSSES = []
     TOTAL_EPOCHS = params.epochs
     CURRENT_EPOCH = 0
+    LAST_TRAIN_EXIT_CODE = None
 
     cmd = [
         sys.executable, "train.py",
@@ -142,8 +374,17 @@ def start_train(params: TrainParams):
         "--batch", str(params.batch),
         "--device", params.device,
         "--model", params.model,
-        "--data", params.data
+        "--data", params.data,
     ]
+    LAST_TRAIN_COMMAND = cmd
+
+    record = create_execution(
+        "training",
+        configuration_snapshot=params.dict(),
+        input_artifacts=[params.data, params.model],
+        command=cmd,
+    )
+    ACTIVE_TRAIN_EXECUTION_ID = record["execution_id"]
 
     try:
         ACTIVE_TRAIN_PROC = subprocess.Popen(
@@ -152,47 +393,80 @@ def start_train(params: TrainParams):
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
-            preexec_fn=os.setsid if os.name != 'nt' else None
+            preexec_fn=os.setsid if os.name != "nt" else None,
         )
     except Exception as e:
+        finalize(
+            record["execution_id"],
+            "FAILED",
+            errors=[f"Failed to spawn training process: {e}"],
+            process_invoked=False,
+            outputs_valid=False,
+        )
+        ACTIVE_TRAIN_EXECUTION_ID = None
         raise HTTPException(status_code=500, detail=f"Failed to spawn training process: {str(e)}")
 
-    return {"status": "started"}
+    mark_running(record["execution_id"], process_id=ACTIVE_TRAIN_PROC.pid)
+    return {
+        "status": "started",
+        "execution_id": record["execution_id"],
+        "process_id": ACTIVE_TRAIN_PROC.pid,
+        "command": cmd,
+    }
+
 
 @app.post("/api/train/stop")
 def stop_train():
-    global ACTIVE_TRAIN_PROC
-    if not ACTIVE_TRAIN_PROC or ACTIVE_TRAIN_PROC.poll() is not None:
-        return {"status": "not_running"}
+    global ACTIVE_TRAIN_PROC, ACTIVE_TRAIN_EXECUTION_ID, LAST_TRAIN_EXIT_CODE
+    from sensorflow.execution_ledger import finalize, append_log
 
+    if not ACTIVE_TRAIN_PROC or ACTIVE_TRAIN_PROC.poll() is not None:
+        return {"status": "not_running", "execution_id": ACTIVE_TRAIN_EXECUTION_ID}
+
+    exec_id = ACTIVE_TRAIN_EXECUTION_ID
     try:
-        if os.name != 'nt':
+        if os.name != "nt":
             os.killpg(os.getpgid(ACTIVE_TRAIN_PROC.pid), signal.SIGTERM)
         else:
             ACTIVE_TRAIN_PROC.terminate()
         ACTIVE_TRAIN_PROC.wait(timeout=3)
-    except Exception as e:
-        # Fallback to simple kill
+    except Exception:
         try:
             ACTIVE_TRAIN_PROC.kill()
         except Exception:
             pass
 
-    return {"status": "stopped"}
+    LAST_TRAIN_EXIT_CODE = ACTIVE_TRAIN_PROC.poll()
+    if exec_id:
+        append_log(exec_id, "Training terminated by user")
+        finalize(
+            exec_id,
+            "CANCELLED",
+            exit_code=LAST_TRAIN_EXIT_CODE,
+            process_invoked=True,
+            outputs_valid=False,
+            errors=["Cancelled by user"],
+        )
+    ACTIVE_TRAIN_PROC = None
+    return {"status": "stopped", "execution_id": exec_id, "exit_code": LAST_TRAIN_EXIT_CODE}
+
 
 @app.get("/api/train/status")
 def get_train_status():
-    global ACTIVE_TRAIN_PROC, TRAINING_LOGS_ACCUMULATED, TRAINING_LOSSES, CURRENT_EPOCH, TOTAL_EPOCHS
+    global ACTIVE_TRAIN_PROC, ACTIVE_TRAIN_EXECUTION_ID, TRAINING_LOGS_ACCUMULATED
+    global TRAINING_LOSSES, CURRENT_EPOCH, TOTAL_EPOCHS, LAST_TRAIN_EXIT_CODE, LAST_TRAIN_COMMAND
+    from sensorflow.execution_ledger import append_log, finalize, sha256_file
+    from sensorflow.execution_ops import artifact_info
+
     running = False
-    
+    just_finished = False
+    exit_code = LAST_TRAIN_EXIT_CODE
+
     if ACTIVE_TRAIN_PROC:
-        # Read new output line by line (non-blocking)
-        # Use select or set standard output stream non-blocking if needed, or read from stdout.
-        # To avoid blocking, we read line-by-line if there is data.
         import select
+
         if ACTIVE_TRAIN_PROC.poll() is None:
             running = True
-            # Read available outputs
             while True:
                 r, _, _ = select.select([ACTIVE_TRAIN_PROC.stdout], [], [], 0.02)
                 if ACTIVE_TRAIN_PROC.stdout in r:
@@ -200,23 +474,22 @@ def get_train_status():
                     if not line:
                         break
                     TRAINING_LOGS_ACCUMULATED += line
-                    # Parse epoch loss from Ultralytics logs if visible
-                    # e.g., "1/10      3.5G      1.234"
-                    # Ultralytics log format standard contains epoch index and training loss
+                    if ACTIVE_TRAIN_EXECUTION_ID:
+                        try:
+                            append_log(ACTIVE_TRAIN_EXECUTION_ID, line.rstrip())
+                        except Exception:
+                            pass
                     if "epoch" in line.lower() or "/" in line:
                         try:
-                            # Try to extract numbers
                             parts = line.split()
                             if len(parts) >= 3 and "/" in parts[0]:
                                 ep_part = parts[0].split("/")
                                 epoch_num = int(ep_part[0])
                                 CURRENT_EPOCH = epoch_num
-                                # Try to grab a float that might be loss
                                 for p in parts[2:]:
                                     try:
                                         val = float(p)
                                         if 0.0 < val < 10.0:
-                                            # Found a candidate loss value
                                             if len(TRAINING_LOSSES) < epoch_num:
                                                 TRAINING_LOSSES.append(val)
                                             else:
@@ -229,54 +502,237 @@ def get_train_status():
                 else:
                     break
         else:
-            # Done running, read all remaining output
             remaining = ACTIVE_TRAIN_PROC.stdout.read()
             if remaining:
                 TRAINING_LOGS_ACCUMULATED += remaining
+            exit_code = ACTIVE_TRAIN_PROC.poll()
+            LAST_TRAIN_EXIT_CODE = exit_code
+            just_finished = True
             ACTIVE_TRAIN_PROC = None
 
-    # Calculate mock losses if empty to display curves in frontend
-    if not running and not TRAINING_LOSSES and TRAINING_LOGS_ACCUMULATED:
-        # Finished but no parsed losses, generate dummy decreasing loss
-        TRAINING_LOSSES = [2.5 - (2.0 / TOTAL_EPOCHS) * i for i in range(TOTAL_EPOCHS)]
-
     progress = 0.0
-    if TOTAL_EPOCHS > 0:
-        progress = float(CURRENT_EPOCH) / float(TOTAL_EPOCHS)
-        if not running and progress == 0.0:
-            progress = 1.0
+    if TOTAL_EPOCHS > 0 and CURRENT_EPOCH > 0:
+        progress = min(1.0, float(CURRENT_EPOCH) / float(TOTAL_EPOCHS))
+    elif not running and exit_code == 0 and CURRENT_EPOCH > 0:
+        progress = 1.0
+    # Never invent progress=1.0 on failure or empty parse
+
+    checkpoint = Path("runs/detect/coco_finetuned/weights/best.pt")
+    ckpt_info = artifact_info(checkpoint) if checkpoint.exists() else {"path": str(checkpoint), "exists": False}
+
+    if just_finished and ACTIVE_TRAIN_EXECUTION_ID:
+        status = "SUCCEEDED" if exit_code == 0 else "FAILED"
+        if exit_code is None:
+            status = "FAILED"
+        finalize(
+            ACTIVE_TRAIN_EXECUTION_ID,
+            status,
+            exit_code=exit_code,
+            metrics={
+                "epochs_requested": TOTAL_EPOCHS,
+                "epochs_observed": CURRENT_EPOCH,
+                "losses_parsed": len(TRAINING_LOSSES),
+                "losses": TRAINING_LOSSES,
+                "checkpoint": ckpt_info,
+            },
+            output_artifacts=[ckpt_info] if ckpt_info.get("exists") else [],
+            process_invoked=True,
+            outputs_valid=bool(ckpt_info.get("exists")) and exit_code == 0,
+            errors=[] if exit_code == 0 else [f"Training exit_code={exit_code}"],
+        )
 
     return {
         "running": running,
         "progress": progress,
-        "logs": TRAINING_LOGS_ACCUMULATED[-20000:],  # Limit log size sent to browser
-        "losses": TRAINING_LOSSES
+        "logs": TRAINING_LOGS_ACCUMULATED[-20000:],
+        "losses": TRAINING_LOSSES,  # only real parsed losses — never fabricated
+        "losses_fabricated": False,
+        "exit_code": exit_code,
+        "process_id": None if not running else (ACTIVE_TRAIN_PROC.pid if ACTIVE_TRAIN_PROC else None),
+        "command": LAST_TRAIN_COMMAND,
+        "execution_id": ACTIVE_TRAIN_EXECUTION_ID,
+        "epochs_observed": CURRENT_EPOCH,
+        "epochs_requested": TOTAL_EPOCHS,
+        "checkpoint": ckpt_info,
+        "status": (
+            "RUNNING" if running else (
+                "SUCCEEDED" if exit_code == 0 else (
+                    "FAILED" if exit_code not in (None, 0) else "NOT_EXECUTED"
+                )
+            )
+        ),
     }
+
 
 @app.post("/api/infer/run")
 def run_infer(params: InferParams):
-    # Run the infer.py script using subprocess
-    cmd = [
-        sys.executable, "infer.py",
-        "--source", params.source,
-        "--weights", params.weights,
-        "--conf", str(params.conf),
-        "--iou", str(params.iou),
-        "--output", "runs/infer"
-    ]
+    from sensorflow.execution_ledger import create_execution, mark_running, finalize, append_log
+    from sensorflow.execution_ops import discover_images, artifact_info
 
-    try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    except subprocess.CalledProcessError as e:
-        raise HTTPException(status_code=500, detail=f"Inference script failed: {e.stdout}\n{e.stderr}")
-
-    # Gather list of output annotated images
+    weights = Path(params.weights)
+    source = Path(params.source)
     out_dir = Path("runs/infer")
+
+    record = create_execution(
+        "inference",
+        configuration_snapshot=params.dict(),
+        input_artifacts=[params.source, params.weights],
+        command=[
+            sys.executable, "infer.py",
+            "--source", params.source,
+            "--weights", params.weights,
+            "--conf", str(params.conf),
+            "--iou", str(params.iou),
+            "--output", "runs/infer",
+        ],
+    )
+
+    if not weights.exists() and not str(params.weights).endswith(".pt"):
+        finalize(
+            record["execution_id"],
+            "FAILED",
+            errors=[f"Model checkpoint not found: {params.weights}"],
+            process_invoked=False,
+            outputs_valid=False,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail={"message": f"Model checkpoint not found: {params.weights}", "execution_id": record["execution_id"]},
+        )
+    if not weights.exists():
+        # Named ultralytics weight may auto-download; still warn if missing before run
+        pass
+
+    discovery = discover_images(params.source)
+    if discovery["images_discovered"] == 0:
+        finalize(
+            record["execution_id"],
+            "FAILED",
+            records_discovered=0,
+            records_processed=0,
+            records_succeeded=0,
+            records_failed=0,
+            errors=[f"No images found at source: {params.source}"],
+            metrics={"images_discovered": 0},
+            process_invoked=False,
+            outputs_valid=False,
+        )
+        return {
+            "status": "FAILED",
+            "execution_id": record["execution_id"],
+            "images": [],
+            "records_discovered": 0,
+            "records_succeeded": 0,
+            "records_failed": 0,
+            "message": f"No images found at source: {params.source}",
+            "model": params.weights,
+            "checkpoint": artifact_info(weights),
+        }
+
+    if not weights.exists():
+        finalize(
+            record["execution_id"],
+            "FAILED",
+            errors=[f"Missing model checkpoint: {params.weights}"],
+            records_discovered=discovery["images_discovered"],
+            process_invoked=False,
+            outputs_valid=False,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": f"Missing model checkpoint: {params.weights}",
+                "execution_id": record["execution_id"],
+            },
+        )
+
+    cmd = record["command"]
+    mark_running(record["execution_id"])
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True)
+    except Exception as e:
+        finalize(
+            record["execution_id"],
+            "FAILED",
+            errors=[str(e)],
+            process_invoked=True,
+            outputs_valid=False,
+        )
+        raise HTTPException(status_code=500, detail=f"Inference failed to start: {e}")
+
+    if res.stdout:
+        append_log(record["execution_id"], res.stdout[-4000:])
+    if res.stderr:
+        append_log(record["execution_id"], res.stderr[-2000:])
+
     images = []
     if out_dir.exists():
         images = [f.name for f in out_dir.glob("annotated_*") if f.is_file()]
+    preds_path = out_dir / "predictions.json"
+    pred_count = 0
+    if preds_path.exists():
+        try:
+            pred_count = len(json.loads(preds_path.read_text()))
+        except Exception:
+            pred_count = 0
 
-    return {"status": "ok", "images": sorted(images)}
+    succeeded = len(images)
+    failed = max(0, discovery["images_discovered"] - succeeded)
+    if res.returncode != 0:
+        status = "FAILED"
+    elif succeeded == 0:
+        status = "FAILED"
+    elif failed > 0:
+        status = "PARTIAL_SUCCESS"
+    else:
+        status = "SUCCEEDED"
+
+    final = finalize(
+        record["execution_id"],
+        status,
+        exit_code=res.returncode,
+        records_discovered=discovery["images_discovered"],
+        records_processed=discovery["images_discovered"],
+        records_succeeded=succeeded,
+        records_failed=failed,
+        metrics={
+            "model": params.weights,
+            "checkpoint": artifact_info(weights),
+            "inference_calls": discovery["images_discovered"],
+            "predictions_generated": pred_count,
+            "annotated_images": succeeded,
+            "conf": params.conf,
+            "iou": params.iou,
+            "output_dir": str(out_dir),
+        },
+        output_artifacts=[
+            {"path": str(out_dir), "kind": "infer_dir"},
+            artifact_info(preds_path),
+        ],
+        errors=[] if res.returncode == 0 else [res.stderr or res.stdout or "infer non-zero exit"],
+        process_invoked=True,
+        outputs_valid=succeeded > 0 and res.returncode == 0,
+    )
+
+    return {
+        "status": final["status"],
+        "execution_id": final["execution_id"],
+        "verified": final.get("verified"),
+        "duration_ms": final.get("duration_ms"),
+        "images": sorted(images),
+        "model": params.weights,
+        "checkpoint": artifact_info(weights),
+        "records_discovered": discovery["images_discovered"],
+        "records_processed": discovery["images_discovered"],
+        "records_succeeded": succeeded,
+        "records_failed": failed,
+        "inference_calls": discovery["images_discovered"],
+        "predictions_generated": pred_count,
+        "output_dir": str(out_dir),
+        "exit_code": res.returncode,
+        "process_id": None,
+        "command": cmd,
+    }
 
 @app.get("/api/images/{filename}")
 def serve_image(filename: str):
@@ -287,76 +743,146 @@ def serve_image(filename: str):
 
 @app.get("/api/grade")
 def grade_predictions():
-    # Runs the autograder.py script
+    from sensorflow.execution_ledger import create_execution, mark_running, finalize
+    from sensorflow.execution_ops import artifact_info
+
     predictions_file = Path("runs/infer/predictions.json")
+    record = create_execution(
+        "auto_grader",
+        configuration_snapshot={"predictions": str(predictions_file)},
+        input_artifacts=[str(predictions_file)],
+        command=[sys.executable, "autograder.py", "--predictions", str(predictions_file)],
+    )
+
     if not predictions_file.exists():
-        # Let's run a fallback report if no predictions exist
+        final = finalize(
+            record["execution_id"],
+            "NOT_EXECUTED",
+            errors=["predictions.json missing — run Auto-Labeler Inference first"],
+            process_invoked=False,
+            outputs_valid=False,
+            warnings=["Grader not executed: no predictions artifact"],
+        )
         return {
+            "status": "NOT_EXECUTED",
+            "execution_id": final["execution_id"],
             "total_predictions": 0,
             "total_images": 0,
-            "quality_score": 0.0,
+            "quality_score": None,
+            "metrics": {},
             "issues": [
                 {
                     "severity": "WARNING",
                     "type": "Missing predictions",
-                    "description": "Please run the Auto-Labeler Inference step first to generate prediction files.",
-                    "recommendation": "Go back to Step 4 and run Auto-Labeler."
+                    "description": "No predictions.json — grader was NOT executed.",
+                    "recommendation": "Run Auto-Labeler Inference first.",
                 }
-            ]
+            ],
+            "message": "NOT_EXECUTED: missing predictions artifact",
         }
 
-    cmd = [
-        sys.executable, "autograder.py",
-        "--predictions", str(predictions_file)
-    ]
-
+    mark_running(record["execution_id"])
+    cmd = record["command"]
     try:
-        subprocess.run(cmd, capture_output=True, text=True, check=True)
-    except subprocess.CalledProcessError as e:
-        raise HTTPException(status_code=500, detail=f"Autograder failed: {e.stderr}")
+        res = subprocess.run(cmd, capture_output=True, text=True)
+    except Exception as e:
+        finalize(
+            record["execution_id"],
+            "FAILED",
+            errors=[str(e)],
+            process_invoked=True,
+            outputs_valid=False,
+        )
+        raise HTTPException(status_code=500, detail=f"Autograder failed to start: {e}")
 
-    # Read generated quality report
     report_file = Path("runs/infer/quality_report.json")
-    if report_file.exists():
-        with open(report_file, "r") as f:
-            report_data = json.load(f)
-            
-            # Map standard report issues to list
-            issues = []
-            for issue_type, count in report_data.get("issue_summary", {}).items():
-                if count > 0:
-                    severity = "WARNING" if issue_type in ["low_confidence", "overlapping_different_class"] else "INFO"
-                    desc = f"Found {count} occurrences of {issue_type.replace('_', ' ')}."
-                    rec = "Retrain model with more samples or tune confidence threshold."
-                    if issue_type == "small_detection":
-                        rec = "Verify that extremely small bounding boxes are correct."
-                    elif issue_type == "class_imbalance":
-                        rec = "Balance class frequency in dataset to prevent bias."
-                    
-                    issues.append({
-                        "severity": severity,
-                        "type": issue_type.upper().replace("_", " "),
-                        "description": desc,
-                        "recommendation": rec
-                    })
+    if res.returncode != 0 or not report_file.exists():
+        finalize(
+            record["execution_id"],
+            "FAILED",
+            exit_code=res.returncode,
+            errors=[res.stderr or res.stdout or "grader produced no report"],
+            process_invoked=True,
+            outputs_valid=False,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": f"Autograder failed: {res.stderr}",
+                "execution_id": record["execution_id"],
+            },
+        )
 
-            # Append recommendations
-            for rec in report_data.get("recommendations", []):
-                issues.append({
-                    "severity": "INFO",
-                    "type": "RECOMMENDATION",
-                    "description": rec,
-                    "recommendation": "Review annotation guidelines."
-                })
+    with open(report_file, "r") as f:
+        report_data = json.load(f)
 
-            return {
-                "total_predictions": report_data.get("total_predictions", 0),
-                "total_images": report_data.get("total_images", 0),
-                "quality_score": report_data.get("quality_score", 0.0),
-                "issues": issues
-            }
+    issues = []
+    for issue_type, count in report_data.get("issue_summary", {}).items():
+        if count > 0:
+            severity = "WARNING" if issue_type in ["low_confidence", "overlapping_different_class"] else "INFO"
+            desc = f"Found {count} occurrences of {issue_type.replace('_', ' ')}."
+            rec = "Retrain model with more samples or tune confidence threshold."
+            if issue_type == "small_detection":
+                rec = "Verify that extremely small bounding boxes are correct."
+            elif issue_type == "class_imbalance":
+                rec = "Balance class frequency in dataset to prevent bias."
+            issues.append({
+                "severity": severity,
+                "type": issue_type.upper().replace("_", " "),
+                "description": desc,
+                "recommendation": rec,
+            })
 
-    return {"status": "error", "message": "Failed to read grader output"}
+    for rec in report_data.get("recommendations", []):
+        issues.append({
+            "severity": "INFO",
+            "type": "RECOMMENDATION",
+            "description": rec,
+            "recommendation": "Review annotation guidelines.",
+        })
+
+    metrics = {
+        "total_predictions": report_data.get("total_predictions", 0),
+        "total_images": report_data.get("total_images", 0),
+        "quality_score": report_data.get("quality_score"),
+        "issue_summary": report_data.get("issue_summary", {}),
+        "precision": report_data.get("precision"),
+        "recall": report_data.get("recall"),
+        "f1": report_data.get("f1"),
+        "mAP": report_data.get("mAP"),
+        "tp": report_data.get("tp"),
+        "fp": report_data.get("fp"),
+        "fn": report_data.get("fn"),
+        "per_class": report_data.get("per_class"),
+    }
+    # Strip Nones so UI only shows grader-provided metrics
+    metrics = {k: v for k, v in metrics.items() if v is not None}
+
+    final = finalize(
+        record["execution_id"],
+        "SUCCEEDED",
+        exit_code=res.returncode,
+        records_discovered=metrics.get("total_images", 0),
+        records_processed=metrics.get("total_images", 0),
+        records_succeeded=metrics.get("total_images", 0),
+        metrics=metrics,
+        output_artifacts=[artifact_info(report_file), artifact_info(predictions_file)],
+        process_invoked=True,
+        outputs_valid=True,
+    )
+
+    return {
+        "status": final["status"],
+        "execution_id": final["execution_id"],
+        "verified": final.get("verified"),
+        "duration_ms": final.get("duration_ms"),
+        "total_predictions": metrics.get("total_predictions", 0),
+        "total_images": metrics.get("total_images", 0),
+        "quality_score": metrics.get("quality_score"),
+        "metrics": metrics,
+        "issues": issues,
+        "message": "Grader completed from predictions.json",
+    }
 
 @app.post("/api/export")
 def export_weights(params: ExportParams):
@@ -840,28 +1366,49 @@ def get_dataset_details(type: str = "local"):
 
 @app.post("/api/dataset/preprocess")
 def preprocess_dataset(params: dict):
+    """Catalog-only path kept for backward compatibility.
+
+    Prefer POST /api/dataset/load for real discovery evidence.
+    If source_path is provided, delegates to real load.
+    """
+    if params.get("source_path") or params.get("real_load"):
+        return dataset_load(params)
+
     dataset_type = params.get("dataset_type", "local")
-    import time
-    time.sleep(0.3)
-    
     meta = dict(DATASET_METADATA_STORE.get(dataset_type, DATASET_METADATA_STORE["local"]))
     meta["browsable"] = False
     meta["catalog_only"] = True
     meta["browse_hint"] = (
-        "Preprocess updates catalog metadata only. Browse real frames via "
-        "Validate & Browse Images Path or Pipeline Outputs after ingest."
+        "Catalog metadata only — NOT disk load. Use Load & Preprocess or "
+        "Validate & Browse Images Path for verifiable counts."
     )
-    
+    from sensorflow.execution_ledger import create_execution, finalize
+
+    record = create_execution(
+        "dataset_catalog_metadata",
+        configuration_snapshot={"dataset_type": dataset_type},
+        status="QUEUED",
+    )
+    finalize(
+        record["execution_id"],
+        "NOT_EXECUTED",
+        warnings=["Catalog metadata echo only — no discovery/decode ran"],
+        metrics={"catalog_only": True, "ingestion_pct_is_catalog": True},
+        process_invoked=False,
+        outputs_valid=False,
+    )
     return {
-        "status": "ok",
+        "status": "NOT_EXECUTED",
+        "execution_id": record["execution_id"],
         "message": (
-            f"Catalog metadata for {meta['name']} applied — not the same as loading "
-            f"browsable frames onto disk."
+            f"Catalog metadata for {meta['name']} — not the same as loading "
+            f"browsable frames. Use Load & Preprocess for real evidence."
         ),
         "dataset_type": dataset_type,
-        "total_frames": meta["loaded_rows"],
+        "total_frames": None,
         "browsable": False,
-        "metadata": meta
+        "catalog_only": True,
+        "metadata": meta,
     }
 
 @app.post("/api/dataset/save-pipeline-tools")
@@ -1450,42 +1997,267 @@ def ingest_status(sequence_id: str = "seq_001"):
     return {"status": "ok", "sequence_id": sequence_id, **status}
 
 
+def _auto_label_next_steps(
+    *,
+    expected_frames: int,
+    checkpoint_exists: bool,
+    no_sam: bool,
+    sequence_id: str,
+) -> List[str]:
+    steps: List[str] = []
+    if expected_frames == 0:
+        steps.append(
+            f"Run Step 2 (3D Ingest) or Load all datasets — pick sequence "
+            f"(e.g. {sequence_id}_local) with frames > 0"
+        )
+    if not no_sam and not checkpoint_exists:
+        steps.append(SAM_CHECKPOINT_HINT)
+        steps.append("Or enable “Skip SAM” for GT/synthetic fallback only (not a model success)")
+    if expected_frames > 0 and not steps:
+        steps.append("Proceed to Temporal Tracking when proposals look correct")
+    return steps
+
+
 @app.post("/api/perception/auto-label")
 def auto_label(params: AutoLabelParams):
     from sensorflow.perception_automator import PerceptionAutomator
     from sensorflow.schemas.unified_frame import UnifiedSequence
+    from sensorflow.execution_ledger import create_execution, mark_running, finalize
+    from sensorflow.execution_ops import artifact_info
 
     manifest = Path("runs/pipeline") / params.sequence_id / "manifest.json"
+    ckpt = Path(params.sam_checkpoint)
+    record = create_execution(
+        "auto_label_3d",
+        configuration_snapshot=params.model_dump(),
+        input_artifacts=[str(manifest), params.sam_checkpoint],
+    )
+    exec_id = record["execution_id"]
+
+    def _fail(
+        message: str,
+        *,
+        errors: Optional[List[str]] = None,
+        http_status: int = 400,
+        expected_frames: int = 0,
+        next_steps: Optional[List[str]] = None,
+    ):
+        steps = next_steps or _auto_label_next_steps(
+            expected_frames=expected_frames,
+            checkpoint_exists=ckpt.exists(),
+            no_sam=params.no_sam,
+            sequence_id=params.sequence_id,
+        )
+        final = finalize(
+            exec_id,
+            "FAILED",
+            records_discovered=expected_frames,
+            records_processed=0,
+            metrics={
+                "model": "none (no_sam)" if params.no_sam else "sam_vit_b",
+                "checkpoint": artifact_info(ckpt),
+                "sam_ran": False,
+                "no_sam": params.no_sam,
+                "frames_expected": expected_frames,
+                "frames_processed": 0,
+                "predictions_generated": 0,
+                "inference_calls": 0,
+            },
+            errors=errors or [message],
+            warnings=[],
+            process_invoked=False,
+            outputs_valid=False,
+        )
+        payload = {
+            "status": "FAILED",
+            "execution_id": exec_id,
+            "verified": final.get("verified"),
+            "duration_ms": final.get("duration_ms"),
+            "message": message,
+            "frames_expected": expected_frames,
+            "frames_processed": 0,
+            "predictions_generated": 0,
+            "checkpoint": artifact_info(ckpt),
+            "sam_ran": False,
+            "demo_stub": None,
+            "next_steps": steps,
+            "events": final.get("events"),
+        }
+        raise HTTPException(status_code=http_status, detail=payload)
+
     if not manifest.exists():
-        raise HTTPException(status_code=400, detail="Manifest not found. Run ingest first.")
+        _fail(
+            "Manifest not found. Run 3D Ingest (Step 2) first.",
+            errors=["Manifest not found. Run ingest first."],
+        )
+
+    sequence = UnifiedSequence.load(manifest)
+    expected_frames = len(sequence.frames)
+    manifest_frame_ids = {f.frame_id for f in sequence.frames}
+    demo_stub = bool(sequence.taxonomy_manifest.get("demo_stub"))
+
+    if expected_frames == 0:
+        _fail(
+            f"Sequence '{params.sequence_id}' has 0 ingested frames. "
+            "Run 3D Ingest or Load all datasets before auto-label.",
+            expected_frames=0,
+        )
+
+    if not params.no_sam and not ckpt.exists():
+        _fail(
+            f"SAM checkpoint not found at {params.sam_checkpoint}. "
+            "Download weights or enable “Skip SAM” for demo/GT fallback only.",
+            expected_frames=expected_frames,
+        )
+
+    sam_ran = False
+    model_name = "sam_vit_b" if not params.no_sam else "none (no_sam)"
+    warnings: List[str] = []
+    if params.no_sam:
+        warnings.append("no_sam=true — SAM not invoked; proposals use GT/synthetic fallback only")
+
+    mark_running(exec_id)
+    output_dir = manifest.parent / "proposals"
+    if output_dir.exists():
+        for stale in output_dir.glob("*.json"):
+            if stale.stem not in manifest_frame_ids:
+                stale.unlink(missing_ok=True)
 
     try:
-        sequence = UnifiedSequence.load(manifest)
-        expected_frames = len(sequence.frames)
-        output_dir = manifest.parent / "proposals"
         automator = PerceptionAutomator(
             sam_checkpoint=params.sam_checkpoint,
             device=params.device,
             use_sam=not params.no_sam,
         )
         automator.run_sequence(sequence, output_dir)
+        sam_ran = bool(
+            not params.no_sam
+            and getattr(automator, "use_sam", False)
+            and automator._mask_generator is not None
+        )
+    except FileNotFoundError as e:
+        _fail(
+            str(e),
+            errors=[str(e)],
+            expected_frames=expected_frames,
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Auto-label failed: {str(e)}")
+        finalize(
+            exec_id,
+            "FAILED",
+            errors=[str(e)],
+            process_invoked=False,
+            outputs_valid=False,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "FAILED",
+                "message": f"Auto-label failed: {str(e)}",
+                "execution_id": exec_id,
+            },
+        )
 
     proposals_dir = manifest.parent / "proposals"
-    num_frames = len(list(proposals_dir.glob("*.json"))) if proposals_dir.exists() else 0
-    demo_stub = bool(sequence.taxonomy_manifest.get("demo_stub"))
+    proposal_files = (
+        [pf for pf in proposals_dir.glob("*.json") if pf.stem in manifest_frame_ids]
+        if proposals_dir.exists()
+        else []
+    )
+    num_frames = len(proposal_files)
+    pred_count = 0
+    for pf in proposal_files:
+        try:
+            pdata = json.loads(pf.read_text())
+            if isinstance(pdata, list):
+                pred_count += len(pdata)
+            elif isinstance(pdata, dict):
+                pred_count += len(pdata.get("proposals") or pdata.get("objects") or [])
+        except Exception:
+            pass
+
+    if params.no_sam:
+        status = "NOT_EXECUTED" if num_frames > 0 else "FAILED"
+        warnings.append("Model not run (no_sam); do not treat as SAM SUCCESS")
+    elif not sam_ran:
+        status = "FAILED"
+        warnings.append("SAM did not run — no valid proposals produced")
+    elif num_frames == 0:
+        status = "FAILED"
+    elif num_frames < expected_frames:
+        status = "PARTIAL_SUCCESS"
+    else:
+        status = "SUCCEEDED"
+
+    next_steps = _auto_label_next_steps(
+        expected_frames=expected_frames,
+        checkpoint_exists=ckpt.exists(),
+        no_sam=params.no_sam,
+        sequence_id=params.sequence_id,
+    )
+    if status == "SUCCEEDED":
+        message = (
+            f"SAM auto-label: processed {num_frames}/{expected_frames} frames, "
+            f"{pred_count} predictions → {proposals_dir}"
+        )
+    elif status == "NOT_EXECUTED":
+        message = (
+            f"GT/synthetic fallback (SAM skipped): {num_frames}/{expected_frames} frames, "
+            f"{pred_count} predictions → {proposals_dir}"
+        )
+    elif status == "PARTIAL_SUCCESS":
+        message = (
+            f"Partial SAM run: {num_frames}/{expected_frames} frames, "
+            f"{pred_count} predictions → {proposals_dir}"
+        )
+    else:
+        message = (
+            f"Auto-label failed: 0/{expected_frames} frames produced. "
+            f"Check ingest, SAM checkpoint, and sequence selection."
+        )
+
+    final = finalize(
+        exec_id,
+        status,
+        records_discovered=expected_frames,
+        records_processed=num_frames,
+        records_succeeded=num_frames,
+        records_failed=max(0, expected_frames - num_frames),
+        metrics={
+            "model": model_name,
+            "checkpoint": artifact_info(ckpt),
+            "sam_ran": sam_ran,
+            "no_sam": params.no_sam,
+            "frames_expected": expected_frames,
+            "frames_processed": num_frames,
+            "predictions_generated": pred_count,
+            "inference_calls": num_frames if sam_ran else 0,
+            "output_dir": str(proposals_dir),
+            "demo_stub": demo_stub,
+        },
+        output_artifacts=[{"path": str(proposals_dir), "kind": "proposals_dir", "files": num_frames}],
+        warnings=warnings,
+        process_invoked=sam_ran or params.no_sam,
+        outputs_valid=num_frames > 0,
+    )
+
     return {
-        "status": "ok",
+        "status": final["status"],
+        "execution_id": final["execution_id"],
+        "verified": final.get("verified"),
+        "duration_ms": final.get("duration_ms"),
         "proposals_dir": str(proposals_dir),
         "frames_processed": num_frames,
         "frames_expected": expected_frames,
+        "predictions_generated": pred_count,
+        "inference_calls": num_frames if sam_ran else 0,
+        "model": model_name,
+        "checkpoint": artifact_info(ckpt),
+        "sam_ran": sam_ran,
         "demo_stub": demo_stub,
-        "message": (
-            f"demo stub: processed {num_frames}/{expected_frames} frames"
-            if demo_stub
-            else f"processed {num_frames}/{expected_frames} frames"
-        ),
+        "message": message,
+        "next_steps": next_steps,
+        "events": final.get("events"),
     }
 
 
@@ -1620,6 +2392,7 @@ def pipeline_status(sequence_id: str = "seq_001"):
     return {
         "status": "ok",
         "sequence_id": sequence_id,
+        "active_sequence_id": resolve_active_sequence_id(sequence_id),
         "ingest_complete": True if ingest_complete else None,
         "perception_complete": True if perception_complete else None,
         "tracking_complete": True if tracking_complete else None,

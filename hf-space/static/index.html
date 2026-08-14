@@ -102,7 +102,12 @@
                     <h2 id="stage-title">Dataset Configuration</h2>
                     <p id="stage-desc">Prepare and validate your image source path and annotation files.</p>
                 </div>
-                <div class="controls-area">
+                <div class="controls-area" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <label class="strict-mode-toggle" title="Refuse SUCCEEDED unless process, exit, outputs, metrics, and execution_id are verified">
+                        <input type="checkbox" id="toggle-strict-mode"> Strict Execution
+                    </label>
+                    <button class="btn btn-secondary" id="btn-open-exec-console" title="Global execution history">Execution Console</button>
+                    <button class="btn btn-secondary" id="btn-health-check" title="Meaningful backend health">Health</button>
                     <button class="btn btn-secondary" id="btn-validate">Run Pre-Check</button>
                     <button class="btn btn-primary" id="btn-global-action">Proceed to Model</button>
                 </div>
@@ -141,11 +146,18 @@
                             </div>
                             <div class="actions-row" style="display: flex; gap: 12px; flex-wrap: wrap;">
                                 <button class="btn btn-primary" id="btn-save-dataset">Save Config</button>
+                                <button class="btn btn-primary" id="btn-load-preprocess" title="Real discovery/decode/validation with ledger evidence">Load &amp; Preprocess</button>
                                 <button class="btn btn-secondary" id="btn-preprocess-dataset">Load Catalog Metadata</button>
                                 <button class="btn btn-secondary" id="btn-browse-source" title="List and preview images under Images Path">Validate &amp; Browse Images Path</button>
+                                <button class="btn btn-secondary" id="btn-yaml-validate" title="Semantic YAML path/class validation">Validate YAML</button>
                             </div>
+                            <div id="config-exec-status" class="config-exec-status" style="margin-top:10px;font-size:12px;color:var(--text-muted);"></div>
                             <div id="source-browse-status" class="status-box" style="margin-top:12px;"></div>
                             <div id="source-browse-gallery" class="output-browse-gallery" style="margin-top:12px;"></div>
+                            <div class="evidence-card" id="evidence-dataset" data-stage="dataset">
+                                <h4>What actually happened?</h4>
+                                <p class="evidence-empty">No execution yet — Load &amp; Preprocess to generate verifiable evidence.</p>
+                            </div>
                         </div>
 
                         <div class="card card-glass">
@@ -157,15 +169,19 @@
                                 </div>
                                 <div class="info-row">
                                     <span class="lbl">Train script:</span>
-                                    <span class="val font-mono green">Found (train.py)</span>
+                                    <span class="val font-mono" id="script-status-train">Verifying…</span>
                                 </div>
                                 <div class="info-row">
                                     <span class="lbl">Infer script:</span>
-                                    <span class="val font-mono green">Found (infer.py)</span>
+                                    <span class="val font-mono" id="script-status-infer">Verifying…</span>
                                 </div>
                                 <div class="info-row">
                                     <span class="lbl">Auto-Grader script:</span>
-                                    <span class="val font-mono green">Found (autograder.py)</span>
+                                    <span class="val font-mono" id="script-status-grader">Verifying…</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="lbl">Backend health:</span>
+                                    <span class="val font-mono" id="health-status-chip">—</span>
                                 </div>
                             </div>
                         </div>
@@ -346,7 +362,11 @@
                         <p class="text-muted">Generate 2D SAM masks and lift to 3D bounding box proposals.</p>
                         <div class="form-group">
                             <label for="perception-sam-checkpoint">SAM Checkpoint</label>
-                            <input type="text" id="perception-sam-checkpoint" value="models/sam_vit_b.pth" class="input-field">
+                            <input type="text" id="perception-sam-checkpoint" value="models/sam_vit_b.pth" class="input-field"
+                                placeholder="models/sam_vit_b.pth — download ViT-B weights locally (not bundled on HF Space CPU)">
+                            <p class="text-muted" style="font-size:12px;margin-top:4px;">
+                                Default path <code>models/sam_vit_b.pth</code>. On Hugging Face Space, upload weights or run locally with GPU.
+                            </p>
                         </div>
                         <div class="form-group">
                             <label for="perception-device">Device</label>
@@ -355,8 +375,15 @@
                                 <option value="cuda">CUDA</option>
                             </select>
                         </div>
+                        <div class="form-group">
+                            <label><input type="checkbox" id="perception-no-sam"> Skip SAM (fallback / NOT a model SUCCESS)</label>
+                        </div>
                         <button class="btn btn-primary" id="btn-perception-run">Run Auto-Label</button>
                         <div id="perception-status" class="status-box" style="margin-top:16px;"></div>
+                        <div class="evidence-card" id="evidence-perception" data-stage="perception">
+                            <h4>What actually happened?</h4>
+                            <p class="evidence-empty">No auto-label execution yet.</p>
+                        </div>
                     </div>
                     <div class="card card-glass pipeline-output-browser" style="margin-top:16px;" data-browser="perception">
                         <h3>Pipeline Outputs — proposals &amp; frames</h3>
@@ -392,6 +419,10 @@
                         <button class="btn btn-primary" id="btn-tracking-run">Run Temporal Tracker</button>
                         <div id="tracking-status" class="status-box" style="margin-top:16px;"></div>
                         <div id="tracking-tracks-table" style="margin-top:16px;"></div>
+                        <div class="evidence-card evidence-stub" id="evidence-tracking" data-stage="tracking">
+                            <h4>What actually happened?</h4>
+                            <p class="evidence-empty">Ledger wiring pending — status will show NOT_EXECUTED until this stage records evidence.</p>
+                        </div>
                     </div>
                 </section>
 
@@ -403,6 +434,10 @@
                         <button class="btn btn-primary" id="btn-quality-gate-run">Run Quality Gate</button>
                         <div id="quality-gate-status" class="status-box" style="margin-top:16px;"></div>
                         <div id="quality-gate-metrics" style="margin-top:16px;"></div>
+                        <div class="evidence-card evidence-stub" id="evidence-quality-gate" data-stage="quality-gate">
+                            <h4>What actually happened?</h4>
+                            <p class="evidence-empty">Evidence panel stub — gate results are live, full ledger wiring deferred.</p>
+                        </div>
                     </div>
                 </section>
 
@@ -522,6 +557,10 @@ ollama run gemma4:26b
                                     <div class="progress-bar-fill" id="train-progress-bar" style="width: 0%"></div>
                                 </div>
                             </div>
+                            <div class="evidence-card" id="evidence-training" data-stage="training">
+                                <h4>What actually happened?</h4>
+                                <p class="evidence-empty">No training execution yet.</p>
+                            </div>
                         </div>
 
                         <div class="card card-glass">
@@ -562,6 +601,10 @@ ollama run gemma4:26b
                                 <span class="range-val" id="val-infer-iou">0.45</span>
                             </div>
                             <button class="btn btn-primary btn-large" id="btn-run-infer">⚡ Run Auto-Labeler</button>
+                            <div class="evidence-card" id="evidence-inference" data-stage="inference">
+                                <h4>What actually happened?</h4>
+                                <p class="evidence-empty">No inference execution yet.</p>
+                            </div>
                         </div>
 
                         <div class="card card-glass">
@@ -603,6 +646,10 @@ ollama run gemma4:26b
                                 </div>
                             </div>
                             <button class="btn btn-primary width-full" id="btn-run-grader" style="margin-top: 15px;">Run Quality Diagnostics</button>
+                            <div class="evidence-card" id="evidence-grader" data-stage="grader">
+                                <h4>What actually happened?</h4>
+                                <p class="evidence-empty">No grader execution yet.</p>
+                            </div>
                         </div>
 
                         <div class="card card-glass">
@@ -1068,6 +1115,23 @@ ollama run gemma4:26b
                 <h4 style="margin: 0 0 6px 0; color: var(--secondary); font-size: 14px;">🧭 Full Sensorflow Studio (React)</h4>
                 <p style="margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.5;">This legacy panel covers train/infer/SSAM. The primary dashboard (Command Center, label evaluation, safety, ROTR, Help menu + Q&amp;A chatbot) lives in the React Sensorflow Studio app — open it from the Space UI or locally via the Vite frontend. Page guides and the help chatbot work on CPU without a GPU.</p>
             </div>
+        </div>
+    </div>
+
+    <div id="toast-stack" class="toast-stack" aria-live="polite" aria-relevant="additions"></div>
+
+    <div id="exec-console-modal" class="modal-overlay hidden" role="dialog" aria-label="Execution Console">
+        <div class="modal-card exec-console-card">
+            <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+                <h3 style="margin:0;">Global Execution Console</h3>
+                <div style="display:flex;gap:8px;">
+                    <button type="button" class="btn btn-secondary" id="btn-refresh-executions">Refresh</button>
+                    <button type="button" class="btn btn-secondary" id="btn-close-exec-console">Close</button>
+                </div>
+            </div>
+            <p style="font-size:12px;color:var(--text-muted);margin:8px 0 12px;">Persistent ledger under <code>runs/executions/</code>. UI PASS badges are not evidence.</p>
+            <div id="exec-console-list" class="exec-console-list"></div>
+            <div id="exec-console-detail" class="exec-console-detail hidden"></div>
         </div>
     </div>
 
