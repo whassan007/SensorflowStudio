@@ -2,6 +2,54 @@ document.addEventListener('DOMContentLoaded', () => {
     // API base URL
     const API_BASE = '';
 
+    // Non-blocking status signaling (replaces window.alert for routine feedback)
+    const toastStack = document.getElementById('toast-stack');
+    const TOAST_ICONS = { success: '✓', error: '✕', warning: '!', info: 'ℹ' };
+    const TOAST_DEFAULT_MS = { success: 3800, info: 4200, warning: 5200, error: 6500 };
+
+    function notify(message, type = 'info', options = {}) {
+        if (!toastStack || message == null || message === '') return;
+        const kind = ['success', 'error', 'warning', 'info'].includes(type) ? type : 'info';
+        const duration = options.duration ?? TOAST_DEFAULT_MS[kind];
+
+        const el = document.createElement('div');
+        el.className = `toast toast-${kind}`;
+        el.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+
+        const icon = document.createElement('span');
+        icon.className = 'toast-icon';
+        icon.textContent = TOAST_ICONS[kind];
+        icon.setAttribute('aria-hidden', 'true');
+
+        const body = document.createElement('div');
+        body.className = 'toast-body';
+        body.textContent = String(message);
+
+        const close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'toast-close';
+        close.setAttribute('aria-label', 'Dismiss');
+        close.textContent = '×';
+
+        let hideTimer = null;
+        const dismiss = () => {
+            if (hideTimer) clearTimeout(hideTimer);
+            el.classList.add('toast-out');
+            setTimeout(() => el.remove(), 180);
+        };
+        close.addEventListener('click', dismiss);
+
+        el.appendChild(icon);
+        el.appendChild(body);
+        el.appendChild(close);
+        toastStack.appendChild(el);
+
+        if (duration > 0) {
+            hideTimer = setTimeout(dismiss, duration);
+        }
+        return dismiss;
+    }
+
     // Stage Navigation
     const navButtons = document.querySelectorAll('.nav-btn');
     const panels = document.querySelectorAll('.stage-panel');
@@ -126,7 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const currentStage = document.querySelector('.nav-btn.active')?.dataset.stage;
         const meta = STAGE_METADATA[currentStage];
         if (meta && meta.gateKey && pipelineState[meta.gateKey] === false) {
-            alert('Launch gate not passed. Complete the quality gate first.');
+            notify('Launch gate not passed. Complete the quality gate first.', 'warning');
             return;
         }
         switchStage(nextBtn.dataset.next);
@@ -176,10 +224,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
             });
             const data = await res.json();
-            alert('Configuration saved & verified successfully!');
+            notify('Configuration saved & verified successfully.', 'success');
         } catch (e) {
             console.error(e);
-            alert('Failed to save dataset configuration.');
+            notify('Failed to save dataset configuration.', 'error');
         }
     });
 
@@ -188,9 +236,10 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch(`${API_BASE}/api/precheck`);
             const data = await res.json();
-            alert(`Pre-Check Complete!\n\nStatus: ${data.status}\nDetails: ${data.message}`);
+            const precheckType = data.status === 'ok' || data.status === 'pass' ? 'success' : 'warning';
+            notify(`Pre-check complete\nStatus: ${data.status}\n${data.message || ''}`, precheckType);
         } catch (e) {
-            alert('Failed to complete pre-check.');
+            notify('Failed to complete pre-check.', 'error');
         }
     });
 
@@ -413,10 +462,10 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 selectInferImage.innerHTML = '<option value="">No images found</option>';
             }
-            alert('Inference finished successfully!');
+            notify('Inference finished successfully.', 'success');
         } catch (e) {
             console.error(e);
-            alert('Inference execution failed.');
+            notify('Inference execution failed.', 'error');
         } finally {
             btnRunInfer.textContent = '⚡ Run Auto-Labeler';
             btnRunInfer.disabled = false;
@@ -470,7 +519,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (e) {
             console.error(e);
-            alert('Failed to run quality diagnostics.');
+            notify('Failed to run quality diagnostics.', 'error');
         } finally {
             btnRunGrader.textContent = 'Run Quality Diagnostics';
             btnRunGrader.disabled = false;
@@ -617,11 +666,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentMitlData = data.data;
                 originalCocText = currentMitlData.coc_trace;
                 renderMitlData();
-                alert(`Dataset loaded successfully: ${currentMitlData.dataset}`);
+                notify(`Dataset loaded: ${currentMitlData.dataset}`, 'success');
             }
         } catch (e) {
             console.error(e);
-            alert('Failed to load NVIDIA dataset.');
+            notify('Failed to load NVIDIA dataset.', 'error');
         }
     }
 
@@ -758,7 +807,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (e) {
             console.error(e);
-            alert('Catalog metadata load failed.');
+            const statusEl = document.getElementById('source-browse-status');
+            if (statusEl) statusEl.textContent = 'Catalog metadata load failed.';
+            notify('Catalog metadata load failed.', 'error');
         } finally {
             btnPreprocessDataset.textContent = 'Load Catalog Metadata';
             btnPreprocessDataset.disabled = false;
@@ -839,12 +890,15 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const data = await res.json();
             if (data.status === 'ok') {
-                alert(`Pipeline configuration saved!\n\n- Annotation: ${annotationTool}\n- Training: ${trainingFramework}\n- Validation: ${validationMethod}`);
+                notify(
+                    `Pipeline configuration saved\nAnnotation: ${annotationTool}\nTraining: ${trainingFramework}\nValidation: ${validationMethod}`,
+                    'success'
+                );
                 pipelineWizardModal.classList.add('hidden');
             }
         } catch (e) {
             console.error(e);
-            alert('Failed to save pipeline configuration settings.');
+            notify('Failed to save pipeline configuration settings.', 'error');
         } finally {
             btnWizardSubmit.textContent = 'Save Pipeline Configuration';
             btnWizardSubmit.disabled = false;
@@ -947,7 +1001,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Add Box Handler
     btnMitlAddBox.addEventListener('click', () => {
         if (!currentMitlData) {
-            alert('Please load a dataset first.');
+            notify('Please load a dataset first.', 'warning');
             return;
         }
         const nextId = currentMitlData.annotations.length > 0 
@@ -966,7 +1020,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Save Human Edits
     btnMitlSave.addEventListener('click', async () => {
         if (!currentMitlData) {
-            alert('No dataset currently loaded to save.');
+            notify('No dataset currently loaded to save.', 'warning');
             return;
         }
 
@@ -994,7 +1048,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (parseError) {
-            alert('Invalid bounding box format. Please enter coordinates in format [x, y, w, h].');
+            notify('Invalid bounding box format. Use coordinates [x, y, w, h].', 'error');
             return;
         }
 
@@ -1014,18 +1068,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Update local memory
                 currentMitlData.annotations = updatedAnns;
                 currentMitlData.coc_trace = mitlCocTrace.value;
-                alert('Triage results successfully saved to runs/mitl_annotations.json!');
+                notify('Triage results saved to runs/mitl_annotations.json.', 'success');
             }
         } catch (e) {
             console.error(e);
-            alert('Failed to save human edits.');
+            notify('Failed to save human edits.', 'error');
         }
     });
 
     // Ask Gemma 4 critique
     btnMitlAudit.addEventListener('click', async () => {
         if (!currentMitlData) {
-            alert('No dataset currently loaded to audit.');
+            notify('No dataset currently loaded to audit.', 'warning');
             return;
         }
 
@@ -1312,7 +1366,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 } catch (e) {
                     console.error(e);
-                    alert("Failed to toggle MCP server state.");
+                    notify('Failed to toggle MCP server state.', 'error');
                     checkbox.checked = !checkbox.checked;
                     bullet.style.transform = checkbox.checked ? 'translateX(22px)' : 'none';
                     updateSliderStyle();
@@ -1827,9 +1881,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }),
             });
             ssamState.selectedRow.manual_annotation = ssamDrawerAnnotation.value;
-            alert(`Annotation saved for ${ssamState.selectedRow.street_name}`);
+            notify(`Annotation saved for ${ssamState.selectedRow.street_name}`, 'success');
         } catch (e) {
-            alert('Failed to save annotation.');
+            notify('Failed to save annotation.', 'error');
         } finally {
             ssamDrawerSave.textContent = 'Save Annotation';
             ssamDrawerSave.disabled = false;
