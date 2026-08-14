@@ -6,6 +6,9 @@ colorTo: blue
 sdk: docker
 app_port: 7860
 pinned: false
+license: other
+license_name: PolyForm-Noncommercial-1.0.0
+license_link: https://polyformproject.org/licenses/noncommercial/1.0.0
 ---
 
 # Sensorflow Studio
@@ -29,3 +32,12 @@ copilot — are not functional here; the dashboards and analytics APIs are.
 Deployed from the project repository via
 `deploy/huggingface/deploy.py` (uploads files with `huggingface_hub`; the
 frontend is built inside the Docker image).
+
+## License
+
+**PolyForm Noncommercial License 1.0.0** — see [`LICENSE`](LICENSE).
+
+- Source may be viewed and used for **non-commercial** purposes only.
+- **Commercial use** requires a separate paid/commercial license from the copyright holder.
+- This is a **source-available / non-commercial** license, **not** an OSI Open Source license.
+

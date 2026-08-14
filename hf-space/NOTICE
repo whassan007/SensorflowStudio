@@ -1,0 +1,15 @@
+Sensorflow Studio (DrivingRepo)
+
+Copyright (c) 2026 Dr. Waël Hassan (https://github.com/whassan007)
+
+This software is licensed under the PolyForm Noncommercial License 1.0.0.
+See the LICENSE file for the full legal terms:
+https://polyformproject.org/licenses/noncommercial/1.0.0
+
+Plain-language summary:
+- Source may be viewed and used for non-commercial purposes only.
+- Commercial use requires a separate paid/commercial license from the copyright holder.
+- This is a source-available / non-commercial license. It is not an OSI Open Source license.
+
+Third-party datasets and dependencies (for example Alpamayo, Waymo, Audi A2D2,
+Ultralytics YOLO) remain subject to their own licenses and terms.

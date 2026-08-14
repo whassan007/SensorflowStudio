@@ -29,5 +29,6 @@
     "@vitejs/plugin-react": "^4.5.0",
     "typescript": "^7.0.2",
     "vite": "^5.4.0"
-  }
+  },
+  "license": "PolyForm-Noncommercial-1.0.0"
 }

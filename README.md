@@ -225,3 +225,18 @@ To execute intensive model training or inference workloads on the **NVIDIA DGX S
     ```
 3.  Execute training by selecting `dgx-spark` from the **Compute Device** dropdown in the visual panel. The backend automatically forwards instructions and streams Tailscale connection handshakes.
 
+---
+
+## License
+
+**PolyForm Noncommercial License 1.0.0** — see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
+
+- Source may be viewed and used for **non-commercial** purposes only.
+- **Commercial use** requires a separate paid/commercial license from the copyright holder (Dr. Waël Hassan).
+- This is a **source-available / non-commercial** license, **not** an OSI Open Source license.
+
+Previously this repository used a short CC BY-NC-SA 4.0 summary; that has been replaced by PolyForm Noncommercial, which is designed for software source and states the non-commercial restriction clearly.
+
+Third-party datasets remain under their own terms.
+
+
