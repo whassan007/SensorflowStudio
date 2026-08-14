@@ -85,14 +85,17 @@ class WaymoAdapter(VendorAdapter):
     def load(self, source: Dict[str, Any], sequence_id: str) -> UnifiedSequence:
         shard_dir = Path("runs/pipeline/waymo_shards")
         shard_path = shard_dir / f"{source.get('shard_id', 'default')}.json"
+        used_builtin_stub = False
 
-        if shard_path.exists():
+        if source.get("frames"):
+            shards = source["frames"]
+        elif shard_path.exists():
             with open(shard_path) as f:
                 shards = json.load(f)
-        elif source.get("frames"):
-            shards = source["frames"]
+            used_builtin_stub = len(shards) <= 3 and not source.get("tfrecord")
         else:
             shards = _default_waymo_shard()
+            used_builtin_stub = True
             shard_dir.mkdir(parents=True, exist_ok=True)
             with open(shard_path, "w") as f:
                 json.dump(shards, f, indent=2)
@@ -132,11 +135,23 @@ class WaymoAdapter(VendorAdapter):
                 ground_truth=gt,
             ))
 
+        demo_stub = bool(source.get("demo_stub", used_builtin_stub))
+        manifest: Dict[str, Any] = {
+            "shard": str(shard_path),
+            "demo_stub": demo_stub,
+            "total_frames": len(frames),
+        }
+        if demo_stub:
+            manifest["stub_note"] = (
+                "Built-in Waymo sample (~3 frames), not a full AV video lake. "
+                "Enable Local frames/video on Ingest and set Images Path to load a real sequence."
+            )
+
         return UnifiedSequence(
             sequence_id=sequence_id,
             vendor="waymo",
             frames=frames,
-            taxonomy_manifest={"shard": str(shard_path)},
+            taxonomy_manifest=manifest,
         )
 
     def load_tfrecord(self, tfrecord_path: Path, sequence_id: str) -> UnifiedSequence:

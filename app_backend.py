@@ -32,7 +32,7 @@ class StudioConfig(BaseModel):
     model_type: str = "yolov8"
     pipeline_mode: str = "3d"
     sam_checkpoint: str = "models/sam_vit_b.pth"
-    vendors: List[str] = ["alpamayo", "waymo"]
+    vendors: List[str] = ["alpamayo", "waymo", "a2d2"]
     gate_thresholds_path: str = "runs/pipeline/gate_thresholds.json"
     sequence_id: str = "seq_001"
 
@@ -1273,8 +1273,10 @@ def annotate_street(req: AnnotateStreetRequest):
 # -----------------------------------------------------------------------
 
 class IngestParams(BaseModel):
-    vendors: List[str] = ["alpamayo", "waymo"]
+    vendors: List[str] = ["alpamayo", "waymo", "a2d2"]
     sequence_id: str = "seq_001"
+    source_path: Optional[str] = None
+    max_frames: Optional[int] = None
 
 class AutoLabelParams(BaseModel):
     sequence_id: str = "seq_001"
@@ -1295,20 +1297,45 @@ class GateParams(BaseModel):
 @app.post("/api/dataset/ingest")
 def ingest_dataset(params: IngestParams):
     from sensorflow.dataset_fusion_engine import DatasetFusionEngine
+    config = load_config()
+    source_path = params.source_path if params.source_path is not None else config.source_path
     try:
         engine = DatasetFusionEngine()
-        sequence = engine.ingest(params.vendors, params.sequence_id)
+        sequence = engine.ingest(
+            params.vendors,
+            params.sequence_id,
+            source_path=source_path,
+            max_frames=params.max_frames,
+        )
         manifest_path = engine.save_manifest(sequence)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ingest failed: {str(e)}")
 
-    config = load_config()
     config.sequence_id = params.sequence_id
     config.vendors = params.vendors
+    if params.source_path is not None:
+        config.source_path = params.source_path
     with open(CONFIG_PATH, "w") as f:
         json.dump(config.model_dump(), f, indent=2)
 
-    return {"status": "ok", "manifest": str(manifest_path), "sequence_id": params.sequence_id}
+    frame_count = len(sequence.frames)
+    demo_stub = bool(sequence.taxonomy_manifest.get("demo_stub"))
+    return {
+        "status": "ok",
+        "manifest": str(manifest_path),
+        "sequence_id": params.sequence_id,
+        "frames": frame_count,
+        "demo_stub": demo_stub,
+        "vendor": sequence.vendor,
+        "source_path": source_path,
+        "message": (
+            f"demo stub: {frame_count} frames"
+            if demo_stub
+            else f"ingested {frame_count} frames from {source_path}"
+        ),
+    }
 
 
 @app.get("/api/dataset/ingest/status")

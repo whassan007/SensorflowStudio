@@ -62,7 +62,7 @@ class FusedFrame(BaseModel):
 
 class UnifiedSequence(BaseModel):
     sequence_id: str
-    vendor: Literal["alpamayo", "waymo", "mixed"] = "mixed"
+    vendor: Literal["alpamayo", "waymo", "a2d2", "local", "mixed"] = "mixed"
     frames: List[FusedFrame] = Field(default_factory=list)
     calibration: Calibration = Field(default_factory=Calibration)
     taxonomy_manifest: Dict[str, Any] = Field(default_factory=dict)

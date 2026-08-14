@@ -124,7 +124,15 @@ class AlpamayoAdapter(VendorAdapter):
             sequence_id=sequence_id,
             vendor="alpamayo",
             frames=frames,
-            taxonomy_manifest={"source_dataset": data.get("dataset", "alpamayo")},
+            taxonomy_manifest={
+                "source_dataset": data.get("dataset", "alpamayo"),
+                "demo_stub": True,
+                "stub_note": (
+                    "Built-in Alpamayo sample (~3 frames), not a full AV video lake. "
+                    "Enable Local frames/video on Ingest and set Images Path to load a real sequence."
+                ),
+                "total_frames": len(frames),
+            },
         )
 
     @classmethod

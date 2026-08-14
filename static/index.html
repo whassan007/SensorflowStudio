@@ -260,13 +260,24 @@
                 <section class="stage-panel" id="panel-ingest">
                     <div class="card card-glass">
                         <h3>Exabyte Ingest, Fusion & Stratification</h3>
-                        <p class="text-muted">Fuse Alpamayo and Waymo LiDAR/camera data with six-axis taxonomy stratification.</p>
+                        <p class="text-muted">Fuse Alpamayo, Waymo, and Audi A2D2 (and/or local frames/video) into a UnifiedSequence. Vendor checkboxes without a full lake use demo stubs (~3 frames each), not full AV lakes.</p>
                         <div class="form-group">
                             <label>Vendors</label>
-                            <div style="display:flex;gap:12px;">
-                                <label><input type="checkbox" id="ingest-vendor-alpamayo" checked> Alpamayo</label>
-                                <label><input type="checkbox" id="ingest-vendor-waymo" checked> Waymo</label>
+                            <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                                <label title="Load frames from Dataset Configuration Images Path"><input type="checkbox" id="ingest-vendor-local"> Local frames / video</label>
+                                <label title="NVIDIA Alpamayo (Physical AI AV Dataset)"><input type="checkbox" id="ingest-vendor-alpamayo" checked> Alpamayo (demo stub)</label>
+                                <label title="Waymo Open Dataset"><input type="checkbox" id="ingest-vendor-waymo" checked> Waymo (demo stub)</label>
+                                <label title="Audi A2D2 (Audi Autonomous Driving Dataset)"><input type="checkbox" id="ingest-vendor-a2d2" checked> Audi A2D2 (demo stub)</label>
                             </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="ingest-source-path">Local source path (images folder or video file)</label>
+                            <input type="text" id="ingest-source-path" value="data" class="input-field" placeholder="e.g. data/seq_001 or path/to/clip.mp4">
+                            <span class="help-text">Uses Dataset Configuration Images Path when left as default. Enable Local above to load all frames (vendor stubs alone are ~3 frames each).</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="ingest-max-frames">Max frames (local)</label>
+                            <input type="number" id="ingest-max-frames" value="10000" min="1" class="input-field" title="Cap for local image/video ingest. Default 10000 — not silently capped at 6.">
                         </div>
                         <div class="form-group">
                             <label for="ingest-sequence-id">Sequence ID</label>
@@ -977,6 +988,10 @@ ollama run gemma4:26b
             <div>
                 <h4 style="margin: 0 0 6px 0; color: var(--primary); font-size: 14px;">⚡ Remote Cluster Training (DGX Spark)</h4>
                 <p style="margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.5;">Allows routing heavy GPU execution to remote systems. Make sure you activate Tailscale, setup dependencies, and verify host resolution before executing.</p>
+            </div>
+            <div>
+                <h4 style="margin: 0 0 6px 0; color: var(--secondary); font-size: 14px;">🧭 Full Sensorflow Studio (React)</h4>
+                <p style="margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.5;">This legacy panel covers train/infer/SSAM. The primary dashboard (Command Center, label evaluation, safety, ROTR, Help menu + Q&amp;A chatbot) lives in the React Sensorflow Studio app — open it from the Space UI or locally via the Vite frontend. Page guides and the help chatbot work on CPU without a GPU.</p>
             </div>
         </div>
     </div>

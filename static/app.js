@@ -11,10 +11,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const STAGE_METADATA = {
         dataset: { title: 'Dataset Configuration', desc: 'Prepare and validate your image source path and annotation files.', next: 'ingest', nextLabel: 'Proceed to 3D Ingest' },
-        ingest: { title: '3D Ingest & Fusion', desc: 'Fuse Alpamayo and Waymo LiDAR/camera data with six-axis taxonomy stratification.', next: 'perception', nextLabel: 'Proceed to 3D Perception', gateKey: 'ingest_complete' },
-        perception: { title: '3D Perception', desc: 'SAM-based 2D masks lifted to 3D bounding box proposals.', next: 'tracking', nextLabel: 'Proceed to Tracking', gateKey: 'perception_complete' },
-        tracking: { title: 'Temporal Tracking', desc: 'Kalman + Hungarian association for ID-smooth multi-frame tracks.', next: 'quality-gate', nextLabel: 'Proceed to Quality Gate', gateKey: 'tracking_complete' },
-        'quality-gate': { title: 'Quality Gate', desc: 'Benchmark automated tracks against vendor GT with 3D and temporal metrics.', next: 'launch-gate', nextLabel: 'Proceed to Launch Gate', gateKey: 'benchmark_complete' },
+        ingest: { title: '3D Ingest & Fusion', desc: 'Fuse Alpamayo/Waymo/A2D2 stubs and/or local image/video sequences with six-axis taxonomy stratification.', next: 'perception', nextLabel: 'Proceed to 3D Perception', gateKey: 'ingest_complete', completionOnly: true },
+        perception: { title: '3D Perception', desc: 'SAM-based 2D masks lifted to 3D bounding box proposals.', next: 'tracking', nextLabel: 'Proceed to Tracking', gateKey: 'perception_complete', completionOnly: true },
+        tracking: { title: 'Temporal Tracking', desc: 'Kalman + Hungarian association for ID-smooth multi-frame tracks.', next: 'quality-gate', nextLabel: 'Proceed to Quality Gate', gateKey: 'tracking_complete', completionOnly: true },
+        'quality-gate': { title: 'Quality Gate', desc: 'Benchmark automated tracks against vendor GT with 3D and temporal metrics.', next: 'launch-gate', nextLabel: 'Proceed to Launch Gate', gateKey: 'quality_gate_passed', completionKey: 'benchmark_complete' },
         'launch-gate': { title: 'Launch Gate', desc: 'Validate safety thresholds before export is allowed.', next: 'model', nextLabel: 'Proceed to Model Setup', gateKey: 'launch_gate_passed' },
         model: { title: 'Model Setup', desc: 'Choose a YOLOv8 base model and compute device architecture.', next: 'training', nextLabel: 'Proceed to Training' },
         training: { title: 'Training Execution', desc: 'Fine-tune the selected YOLO model on your configured dataset.', next: 'inference', nextLabel: 'Proceed to Inference' },
@@ -44,7 +44,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const stage = btn.dataset.stage;
             const meta = STAGE_METADATA[stage];
             if (!meta || !meta.gateKey) return;
-            const passed = pipelineState[meta.gateKey];
             let badge = btn.querySelector('.gate-badge');
             if (!badge) {
                 badge = document.createElement('span');
@@ -52,14 +51,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 badge.style.cssText = 'margin-left:6px;font-size:10px;padding:2px 6px;border-radius:4px;';
                 btn.appendChild(badge);
             }
-            if (passed === true) {
+
+            // Completion-only stages: PASS when done, blank when not run (never FAIL).
+            // Pass/fail gates (quality/launch): PASS/FAIL only after evaluation; blank beforehand.
+            const verdict = pipelineState[meta.gateKey];
+            const completed = meta.completionKey ? pipelineState[meta.completionKey] : null;
+
+            if (meta.completionOnly) {
+                if (verdict === true) {
+                    badge.textContent = 'PASS';
+                    badge.style.background = '#00ffaa33';
+                    badge.style.color = '#00ffaa';
+                } else {
+                    badge.textContent = '';
+                }
+                return;
+            }
+
+            if (verdict === true) {
                 badge.textContent = 'PASS';
                 badge.style.background = '#00ffaa33';
                 badge.style.color = '#00ffaa';
-            } else if (passed === false) {
+            } else if (verdict === false) {
                 badge.textContent = 'FAIL';
                 badge.style.background = '#ff444433';
                 badge.style.color = '#ff4444';
+            } else if (completed === true) {
+                // Ran stage artifact exists but no explicit pass/fail yet
+                badge.textContent = 'PASS';
+                badge.style.background = '#00ffaa33';
+                badge.style.color = '#00ffaa';
             } else {
                 badge.textContent = '';
             }
@@ -1805,21 +1826,42 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnIngestRun) {
         btnIngestRun.addEventListener('click', async () => {
             const vendors = [];
+            if (document.getElementById('ingest-vendor-local')?.checked) vendors.push('local');
             if (document.getElementById('ingest-vendor-alpamayo')?.checked) vendors.push('alpamayo');
             if (document.getElementById('ingest-vendor-waymo')?.checked) vendors.push('waymo');
+            if (document.getElementById('ingest-vendor-a2d2')?.checked) vendors.push('a2d2');
+            if (!vendors.length) {
+                document.getElementById('ingest-status').textContent =
+                    'Select at least one vendor (Local for real sequences, or Alpamayo/Waymo/A2D2 demo stubs).';
+                return;
+            }
             currentSequenceId = document.getElementById('ingest-sequence-id')?.value || 'seq_001';
+            const sourcePath = document.getElementById('ingest-source-path')?.value
+                || document.getElementById('dataset-source-path')?.value || document.getElementById('input-source')?.value
+                || 'data';
+            const maxFramesRaw = document.getElementById('ingest-max-frames')?.value;
+            const maxFrames = maxFramesRaw ? Number(maxFramesRaw) : undefined;
             const statusEl = document.getElementById('ingest-status');
             statusEl.textContent = 'Running ingest & fusion...';
             try {
                 const res = await fetch(`${API_BASE}/api/dataset/ingest`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ vendors, sequence_id: currentSequenceId }),
+                    body: JSON.stringify({
+                        vendors,
+                        sequence_id: currentSequenceId,
+                        source_path: sourcePath,
+                        max_frames: Number.isFinite(maxFrames) ? maxFrames : undefined,
+                    }),
                 });
                 const data = await res.json();
-                statusEl.textContent = data.status === 'ok'
-                    ? `Ingested -> ${data.manifest}`
-                    : `Error: ${data.detail || JSON.stringify(data)}`;
+                if (data.status === 'ok') {
+                    const stubTag = data.demo_stub ? 'demo stub: ' : '';
+                    statusEl.textContent =
+                        `Ingested ${stubTag}${data.frames} frames (${data.vendor || 'mixed'}) -> ${data.manifest}`;
+                } else {
+                    statusEl.textContent = `Error: ${data.detail || JSON.stringify(data)}`;
+                }
                 await refreshPipelineStatus();
             } catch (e) {
                 statusEl.textContent = `Error: ${e.message}`;
@@ -1843,9 +1885,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     }),
                 });
                 const data = await res.json();
-                statusEl.textContent = data.status === 'ok'
-                    ? `Processed ${data.frames_processed} frames -> ${data.proposals_dir}`
-                    : `Error: ${data.detail || JSON.stringify(data)}`;
+                if (data.status === 'ok') {
+                    const stubPrefix = data.demo_stub ? 'demo stub: ' : '';
+                    const expected = data.frames_expected != null ? `/${data.frames_expected}` : '';
+                    statusEl.textContent =
+                        `${stubPrefix}Processed ${data.frames_processed}${expected} frames -> ${data.proposals_dir}`;
+                } else {
+                    statusEl.textContent = `Error: ${data.detail || JSON.stringify(data)}`;
+                }
                 await refreshPipelineStatus();
             } catch (e) {
                 statusEl.textContent = `Error: ${e.message}`;
