@@ -140,7 +140,7 @@ function ForensicView({
                     </TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>{o.class}</TableCell>
                     <TableCell align="right" sx={{ fontFamily: 'monospace' }}>
-                      {fmtNum(o.iou, 3)}
+                      {fmtNum(o.iou)}
                     </TableCell>
                     <TableCell align="right" sx={{ fontFamily: 'monospace' }}>
                       {fmtNum(o.confidence, 2)}
@@ -335,7 +335,7 @@ export default function ContainersTab({
                     {fmtPct(c.recall)}
                   </TableCell>
                   <TableCell align="right" sx={{ fontFamily: 'monospace' }}>
-                    {fmtNum(c.mean_iou, 3)}
+                    {fmtNum(c.mean_iou)}
                   </TableCell>
                   <TableCell align="right" sx={{ fontFamily: 'monospace', color: c.anomalies > 0 ? '#ec407a' : undefined }}>
                     {c.anomalies}

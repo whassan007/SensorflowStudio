@@ -95,7 +95,7 @@ function QualityByClass({ runId, refreshKey }: { runId: string; refreshKey: numb
                     {fmtPct(rowNum(row, 'f1'))}
                   </TableCell>
                   <TableCell align="right" sx={{ fontFamily: 'monospace' }}>
-                    {fmtNum(rowNum(row, 'mean_iou'), 3)}
+                    {fmtNum(rowNum(row, 'mean_iou'))}
                   </TableCell>
                 </TableRow>
               ))}

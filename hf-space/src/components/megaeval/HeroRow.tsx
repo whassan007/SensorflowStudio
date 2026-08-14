@@ -125,7 +125,7 @@ export default function HeroRow({
           }
         />
         <MetricCard label="F1" value={fmtPct(h.f1)} term="f1" />
-        <MetricCard label="Mean IoU" value={fmtNum(h.mean_iou, 3)} term="iou_3d" />
+        <MetricCard label="Mean IoU" value={fmtNum(h.mean_iou)} term="iou_3d" />
         <MetricCard label="Anomaly rate" value={fmtPct(h.anomaly_rate)} accent="#ffa726" term="anomaly_rate" />
         <MetricCard label="Safety recall" value={fmtPct(h.safety_recall)} accent="#ef5350" term="safety_recall" />
       </Box>

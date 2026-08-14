@@ -50,6 +50,52 @@ document.addEventListener('DOMContentLoaded', () => {
         return dismiss;
     }
 
+    /**
+     * Continuous UI metrics: integers stay whole; non-integers use up to 2 decimals.
+     */
+    function formatNumber(n) {
+        if (n === null || n === undefined || n === '') return '—';
+        const v = typeof n === 'number' ? n : Number(n);
+        if (!Number.isFinite(v)) return String(n);
+        if (Number.isInteger(v)) return String(v);
+        const rounded = Math.round(v * 100) / 100;
+        if (Number.isInteger(rounded)) return String(rounded);
+        return parseFloat(rounded.toFixed(2)).toString();
+    }
+
+    /**
+     * Percentages: prefer one decimal like 10.0%; never more than 2.
+     * Fractions in [-1, 1] are scaled ×100 unless alreadyPercent is set.
+     */
+    function formatPercent(n, opts = {}) {
+        if (n === null || n === undefined || n === '') return '—';
+        let pct = typeof n === 'number' ? n : Number(n);
+        if (!Number.isFinite(pct)) return String(n);
+        const already = opts.alreadyPercent === true || Math.abs(pct) > 1;
+        if (!already) pct *= 100;
+        const digits = opts.digits === 2 ? 2 : 1;
+        const factor = 10 ** digits;
+        return `${(Math.round(pct * factor) / factor).toFixed(digits)}%`;
+    }
+
+    /** Format evidence/console metric values; percent-like keys get formatPercent. */
+    function formatMetricValue(key, value) {
+        if (value === null || value === undefined) return '—';
+        if (typeof value === 'boolean') return value ? 'true' : 'false';
+        if (typeof value === 'object') return JSON.stringify(value);
+        if (typeof value === 'string') {
+            const m = value.trim().match(/^(-?\d+(?:\.\d+)?)\s*%$/);
+            if (m) return formatPercent(Number(m[1]), { alreadyPercent: true });
+            return value;
+        }
+        if (typeof value !== 'number' || !Number.isFinite(value)) return String(value);
+        const k = String(key || '').toLowerCase();
+        if (/(?:^|_)pct(?:_|$)|percent|percentage|_rate$|loaded_pct/.test(k)) {
+            return formatPercent(value, { alreadyPercent: Math.abs(value) > 1 || /_pct|percent/.test(k) });
+        }
+        return formatNumber(value);
+    }
+
     // Stage Navigation
     const navButtons = document.querySelectorAll('.nav-btn');
     const panels = document.querySelectorAll('.stage-panel');
@@ -345,9 +391,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Update progress
-            const pct = Math.min(100, Math.round(status.progress * 100));
+            const pct = Math.min(100, Math.max(0, (status.progress <= 1 ? status.progress * 100 : status.progress)));
             trainProgressBar.style.width = `${pct}%`;
-            progressPercent.textContent = `${pct}%`;
+            progressPercent.textContent = formatPercent(pct, { alreadyPercent: true });
 
             // Draw loss curves if we have values
             if (status.losses && status.losses.length > 0) {
@@ -410,7 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Y label
             ctx.fillStyle = '#6b7280';
             ctx.font = '10px sans-serif';
-            ctx.fillText((maxLoss - (maxLoss / 4) * i).toFixed(2), 10, y + 4);
+            ctx.fillText(formatNumber(maxLoss - (maxLoss / 4) * i), 10, y + 4);
         }
 
         // Draw line
@@ -457,11 +503,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const valInferIou = document.getElementById('val-infer-iou');
 
     document.getElementById('infer-conf').addEventListener('input', (e) => {
-        valInferConf.textContent = e.target.value;
+        valInferConf.textContent = formatNumber(parseFloat(e.target.value));
     });
 
     document.getElementById('infer-iou').addEventListener('input', (e) => {
-        valInferIou.textContent = e.target.value;
+        valInferIou.textContent = formatNumber(parseFloat(e.target.value));
     });
 
     btnRunInfer.addEventListener('click', async () => {
@@ -570,7 +616,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            graderScore.textContent = data.quality_score != null ? Number(data.quality_score).toFixed(1) : '—';
+            graderScore.textContent = data.quality_score != null ? formatNumber(Number(data.quality_score)) : '—';
             statTotalImgs.textContent = data.total_images ?? '—';
             statTotalPreds.textContent = data.total_predictions ?? '—';
 
@@ -825,7 +871,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         setText('ds-kpi-total-rows', meta.total_rows_source);
         setText('ds-kpi-loaded-rows', meta.loaded_rows);
-        setText('ds-kpi-ingest-pct', meta.ingestion_pct);
+        setText('ds-kpi-ingest-pct', meta.ingestion_pct != null ? formatMetricValue('ingestion_pct', meta.ingestion_pct) : '—');
         setText('ds-kpi-total-annotations', meta.total_annotations);
         setText('ds-meta-sensors', meta.sensor_modality);
         setText('ds-meta-geo', meta.geographic_coverage);
@@ -856,7 +902,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 badge.style.color = '#00ffaa';
                 badge.style.border = '1px solid rgba(0, 255, 170, 0.3)';
             } else {
-                badge.textContent = opts.badgeText || `${meta.ingestion_pct || '—'} catalog — not browsable`;
+                badge.textContent = opts.badgeText || `${formatMetricValue('ingestion_pct', meta.ingestion_pct || '—')} catalog — not browsable`;
                 badge.style.background = 'rgba(251, 191, 36, 0.15)';
                 badge.style.color = '#fbbf24';
                 badge.style.border = '1px solid rgba(251, 191, 36, 0.35)';
@@ -1015,9 +1061,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Telemetry
         const t = currentMitlData.telemetry;
         mitlGps.textContent = `${t.lat.toFixed(5)}, ${t.lon.toFixed(5)}`;
-        mitlSpeed.textContent = `${t.speed_kmh} km/h`;
-        mitlAccel.textContent = `${t.accel_mps2} m/s²`;
-        mitlImu.textContent = `Pitch: ${t.imu_pitch}, Roll: ${t.imu_roll}`;
+        mitlSpeed.textContent = `${formatNumber(t.speed_kmh)} km/h`;
+        mitlAccel.textContent = `${formatNumber(t.accel_mps2)} m/s²`;
+        mitlImu.textContent = `Pitch: ${formatNumber(t.imu_pitch)}, Roll: ${formatNumber(t.imu_roll)}`;
 
         // View image
         const activeBtn = document.querySelector('[data-view].active') || cameraButtons[0];
@@ -1228,11 +1274,11 @@ document.addEventListener('DOMContentLoaded', () => {
             tr.innerHTML = `
                 <td style="padding: 10px; font-weight: 500; color: #fff;">${model.name}</td>
                 <td style="padding: 10px;">${model.type}</td>
-                <td style="padding: 10px; font-family: var(--font-mono);">${model.latency_ms} ms</td>
-                <td style="padding: 10px; font-family: var(--font-mono);">${(model.map50 * 100).toFixed(0)}%</td>
-                <td style="padding: 10px; font-family: var(--font-mono);">${(model.risk_weighted_recall * 100).toFixed(0)}%</td>
-                <td style="padding: 10px; font-family: var(--font-mono);">${(model.recall_critical_distance * 100).toFixed(0)}%</td>
-                <td style="padding: 10px; font-family: var(--font-mono);">${(model.vru_recall * 100).toFixed(0)}%</td>
+                <td style="padding: 10px; font-family: var(--font-mono);">${formatNumber(model.latency_ms)} ms</td>
+                <td style="padding: 10px; font-family: var(--font-mono);">${formatPercent(model.map50)}</td>
+                <td style="padding: 10px; font-family: var(--font-mono);">${formatPercent(model.risk_weighted_recall)}</td>
+                <td style="padding: 10px; font-family: var(--font-mono);">${formatPercent(model.recall_critical_distance)}</td>
+                <td style="padding: 10px; font-family: var(--font-mono);">${formatPercent(model.vru_recall)}</td>
                 <td style="padding: 10px; font-size: 11px;">${model.coc_support}</td>
             `;
             benchmarkTableRows.appendChild(tr);
@@ -1698,8 +1744,8 @@ document.addEventListener('DOMContentLoaded', () => {
             ssamMapTooltip.innerHTML = `
                 <strong>${hit.street_name}</strong><br>
                 <span style="color:var(--text-muted)">${hit.county} County</span><br>
-                Type: ${hit.conflict_type} · TTC: ${hit.min_ttc}s<br>
-                Severity: <span style="color:${ssamSeverityColor(hit.severity_label).fill}; font-weight:600;">${hit.severity_label} (${(hit.severity_index * 100).toFixed(0)}%)</span>
+                Type: ${hit.conflict_type} · TTC: ${formatNumber(hit.min_ttc)}s<br>
+                Severity: <span style="color:${ssamSeverityColor(hit.severity_label).fill}; font-weight:600;">${hit.severity_label} (${formatPercent(hit.severity_index)})</span>
             `;
             let tx = mx + 16, ty = my - 10;
             if (tx + 240 > rect.width) tx = mx - 250;
@@ -1762,7 +1808,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // TTC slider
     ssamFilterTtc?.addEventListener('input', () => {
-        ssamTtcVal.textContent = parseFloat(ssamFilterTtc.value).toFixed(1);
+        ssamTtcVal.textContent = formatNumber(parseFloat(ssamFilterTtc.value));
     });
 
     // Build filter query
@@ -1865,10 +1911,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td class="street-name-cell">${row.street_name}</td>
                 <td>${row.county}</td>
                 <td>${row.conflict_type}</td>
-                <td class="mono-cell">${row.min_ttc}s</td>
-                <td class="mono-cell">${row.min_pet}s</td>
-                <td class="mono-cell">${row.max_speed} m/s</td>
-                <td><span class="ssam-severity-badge ${sevClass}">${row.severity_label} ${(row.severity_index * 100).toFixed(0)}%</span></td>
+                <td class="mono-cell">${formatNumber(row.min_ttc)}s</td>
+                <td class="mono-cell">${formatNumber(row.min_pet)}s</td>
+                <td class="mono-cell">${formatNumber(row.max_speed)} m/s</td>
+                <td><span class="ssam-severity-badge ${sevClass}">${row.severity_label} ${formatPercent(row.severity_index)}</span></td>
             `;
             tr.addEventListener('click', () => ssamOpenDrawer(row));
             ssamGridBody.appendChild(tr);
@@ -1939,9 +1985,9 @@ document.addEventListener('DOMContentLoaded', () => {
         ssamDrawerAnnotation.value = row.manual_annotation || '';
         const sevClass = `severity-${row.severity_label.toLowerCase()}`;
         ssamDrawerMetrics.innerHTML = `
-            <div class="ssam-drawer-metric"><span class="metric-val">${row.min_ttc}s</span><span class="metric-lbl">Min TTC</span></div>
-            <div class="ssam-drawer-metric"><span class="metric-val">${row.min_pet}s</span><span class="metric-lbl">Min PET</span></div>
-            <div class="ssam-drawer-metric"><span class="metric-val">${row.max_speed}</span><span class="metric-lbl">Max ΔSpeed (m/s)</span></div>
+            <div class="ssam-drawer-metric"><span class="metric-val">${formatNumber(row.min_ttc)}s</span><span class="metric-lbl">Min TTC</span></div>
+            <div class="ssam-drawer-metric"><span class="metric-val">${formatNumber(row.min_pet)}s</span><span class="metric-lbl">Min PET</span></div>
+            <div class="ssam-drawer-metric"><span class="metric-val">${formatNumber(row.max_speed)}</span><span class="metric-lbl">Max ΔSpeed (m/s)</span></div>
             <div class="ssam-drawer-metric"><span class="metric-val"><span class="ssam-severity-badge ${sevClass}">${row.severity_label}</span></span><span class="metric-lbl">Severity</span></div>
             <div class="ssam-drawer-metric"><span class="metric-val">${row.county}</span><span class="metric-lbl">County</span></div>
             <div class="ssam-drawer-metric"><span class="metric-val">${row.conflict_type}</span><span class="metric-lbl">Conflict Type</span></div>
@@ -2393,7 +2439,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const status = evidence.status || 'NOT_EXECUTED';
         const metrics = evidence.metrics || {};
         const metricRows = Object.entries(metrics).map(([k, v]) => {
-            const val = typeof v === 'object' ? JSON.stringify(v) : v;
+            const val = formatMetricValue(k, v);
             return `<div class="ev-row"><span>${esc(k)}</span><strong>${esc(val)}</strong></div>`;
         }).join('');
         const events = (evidence.events || []).slice(-8).map(ev =>
@@ -2539,14 +2585,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 const loadedEl = document.getElementById('ds-kpi-loaded-rows');
                 const pctEl = document.getElementById('ds-kpi-ingest-pct');
                 if (loadedEl) loadedEl.textContent = m.images_readable ?? 0;
-                if (pctEl) pctEl.textContent = m.loaded_pct_of_discovered != null ? `${m.loaded_pct_of_discovered}% of discovered` : '—';
+                if (pctEl) {
+                    pctEl.textContent = m.loaded_pct_of_discovered != null
+                        ? `${formatPercent(m.loaded_pct_of_discovered, { alreadyPercent: true })} of discovered`
+                        : '—';
+                }
                 if (badge) {
                     if (data.status === 'FAILED' || (m.images_readable ?? 0) === 0) {
                         badge.textContent = 'FAILED — 0 loaded';
                         badge.style.background = 'rgba(255, 68, 68, 0.12)';
                         badge.style.color = '#ff8888';
                     } else {
-                        badge.textContent = `${m.images_readable} loaded (evidence)`;
+                        const pctLabel = m.loaded_pct_of_discovered != null
+                            ? formatPercent(m.loaded_pct_of_discovered, { alreadyPercent: true })
+                            : null;
+                        badge.textContent = pctLabel
+                            ? `${pctLabel} Loaded`
+                            : `${formatNumber(m.images_readable)} loaded (evidence)`;
                         badge.style.background = 'rgba(0, 255, 170, 0.15)';
                         badge.style.color = '#00ffaa';
                     }

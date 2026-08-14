@@ -25,7 +25,7 @@ import {
 import BevFrameCanvas, { CanvasLegend, type HoverInfo, type LayerId } from '../../components/engines/BevFrameCanvas';
 import { DeltaBars, type DeltaBarRow } from '../../components/visual/charts';
 import { ChartSkeleton, IllustratedEmpty, PanelSkeleton, TileSkeleton } from '../../components/visual/Feedback';
-import { ErrorNote, SectionCard, fmtPct } from '../../components/labeleval/shared';
+import { ErrorNote, SectionCard, fmtNum, fmtPct } from '../../components/labeleval/shared';
 import { InfoDot } from '../../components/help/InfoTip';
 import { deltaColor, tokens, verdictColor } from '../../theme';
 
@@ -47,7 +47,7 @@ const METRIC_HELP: Record<string, string> = {
 function DeltaChip({ metric, baseline, candidate, delta, improved }: { metric: string; baseline: number; candidate: number; delta: number; improved: boolean }) {
   const color = improved ? tokens.color.success : tokens.color.danger;
   const pct = !LOWER_IS_BETTER.has(metric) && Math.abs(baseline) <= 1;
-  const fmt = (v: number) => (pct ? fmtPct(v) : v.toFixed(3));
+  const fmt = (v: number) => (pct ? fmtPct(v) : fmtNum(v));
   return (
     <Box
       title={METRIC_HELP[metric] ?? metric}
