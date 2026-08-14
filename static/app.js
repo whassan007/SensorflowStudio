@@ -668,6 +668,7 @@ document.addEventListener('DOMContentLoaded', () => {
     selectDatasetType.addEventListener('change', (e) => {
         const val = e.target.value;
         renderSourceLinks(val);
+        loadCatalogMetadata(val);
         if (val !== 'local') {
             const backendDatasetMap = {
                 waymo: 'physical_ai',
@@ -678,8 +679,66 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    function applyCatalogMetadata(meta, opts = {}) {
+        const badge = document.getElementById('ds-meta-badge');
+        const desc = document.getElementById('ds-meta-desc');
+        const pills = document.getElementById('ds-class-pills');
+        if (!meta) return;
+        const setText = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = val ?? '—';
+        };
+        setText('ds-kpi-total-rows', meta.total_rows_source);
+        setText('ds-kpi-loaded-rows', meta.loaded_rows);
+        setText('ds-kpi-ingest-pct', meta.ingestion_pct);
+        setText('ds-kpi-total-annotations', meta.total_annotations);
+        setText('ds-meta-sensors', meta.sensor_modality);
+        setText('ds-meta-geo', meta.geographic_coverage);
+        setText('ds-meta-weather', meta.weather_conditions);
+        setText('ds-meta-annotator', meta.annotation_tool);
+        setText('ds-meta-footprint', meta.storage_footprint);
+        setText('ds-meta-format', meta.format);
+        setText('ds-meta-license', meta.licensing);
+        setText('ds-meta-type-id', meta.dataset_type);
+        if (pills) {
+            pills.innerHTML = '';
+            const counts = meta.class_counts || {};
+            Object.entries(counts).forEach(([cls, count]) => {
+                const span = document.createElement('span');
+                span.className = 'badge';
+                span.style.cssText = 'background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:4px 8px;font-size:11px;';
+                span.textContent = `${cls}: ${count}`;
+                pills.appendChild(span);
+            });
+        }
+        if (desc && meta.browse_hint) {
+            desc.textContent = meta.browse_hint;
+        }
+        if (badge) {
+            if (opts.browsable) {
+                badge.textContent = opts.badgeText || 'Browsable on disk';
+                badge.style.background = 'rgba(0, 255, 170, 0.15)';
+                badge.style.color = '#00ffaa';
+                badge.style.border = '1px solid rgba(0, 255, 170, 0.3)';
+            } else {
+                badge.textContent = opts.badgeText || `${meta.ingestion_pct || '—'} catalog — not browsable`;
+                badge.style.background = 'rgba(251, 191, 36, 0.15)';
+                badge.style.color = '#fbbf24';
+                badge.style.border = '1px solid rgba(251, 191, 36, 0.35)';
+            }
+        }
+    }
+
+    async function loadCatalogMetadata(datasetType) {
+        try {
+            const res = await fetch(`${API_BASE}/api/dataset/details?type=${encodeURIComponent(datasetType || 'local')}`);
+            const data = await res.json();
+            if (data.status === 'ok') applyCatalogMetadata(data.metadata, { browsable: false });
+        } catch (e) { /* backend offline */ }
+    }
+
     btnPreprocessDataset.addEventListener('click', async () => {
-        btnPreprocessDataset.textContent = 'Preprocessing Dataset...';
+        btnPreprocessDataset.textContent = 'Loading catalog…';
         btnPreprocessDataset.disabled = true;
 
         try {
@@ -690,16 +749,75 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const data = await res.json();
             if (data.status === 'ok') {
+                if (data.metadata) applyCatalogMetadata(data.metadata, { browsable: false });
+                const statusEl = document.getElementById('source-browse-status');
+                if (statusEl) {
+                    statusEl.textContent = data.message || 'Catalog metadata applied (not disk browse).';
+                }
                 pipelineWizardModal.classList.remove('hidden');
             }
         } catch (e) {
             console.error(e);
-            alert('Ingestion & Preprocessing pipeline execution failed.');
+            alert('Catalog metadata load failed.');
         } finally {
-            btnPreprocessDataset.textContent = 'Load & Preprocess Dataset';
+            btnPreprocessDataset.textContent = 'Load Catalog Metadata';
             btnPreprocessDataset.disabled = false;
         }
     });
+
+    const btnBrowseSource = document.getElementById('btn-browse-source');
+    if (btnBrowseSource) {
+        btnBrowseSource.addEventListener('click', async () => {
+            const sourcePath = datasetSourcePath?.value || document.getElementById('input-source')?.value || 'data';
+            const statusEl = document.getElementById('source-browse-status');
+            const gallery = document.getElementById('source-browse-gallery');
+            btnBrowseSource.disabled = true;
+            btnBrowseSource.textContent = 'Scanning…';
+            if (statusEl) statusEl.textContent = `Validating ${sourcePath}…`;
+            try {
+                const res = await fetch(`${API_BASE}/api/dataset/browse?source_path=${encodeURIComponent(sourcePath)}&limit=48`);
+                const data = await res.json();
+                if (gallery) {
+                    gallery.innerHTML = '';
+                    (data.images || []).forEach((img) => {
+                        const el = document.createElement('img');
+                        el.className = 'thumb';
+                        el.src = img.preview_url;
+                        el.title = img.path;
+                        el.alt = img.name;
+                        gallery.appendChild(el);
+                    });
+                }
+                if (statusEl) {
+                    statusEl.textContent = data.browsable
+                        ? `Browsable: ${data.count} image(s) under ${data.source_path}`
+                        : (data.empty_reason || 'Nothing browsable at this path.');
+                }
+                const badge = document.getElementById('ds-meta-badge');
+                if (badge) {
+                    if (data.browsable) {
+                        badge.textContent = `${data.count} images browsable on disk`;
+                        badge.style.background = 'rgba(0, 255, 170, 0.15)';
+                        badge.style.color = '#00ffaa';
+                        badge.style.border = '1px solid rgba(0, 255, 170, 0.3)';
+                        document.getElementById('ds-kpi-loaded-rows').textContent = data.count;
+                    } else {
+                        badge.textContent = 'Not browsable — path empty or missing';
+                        badge.style.background = 'rgba(255, 68, 68, 0.12)';
+                        badge.style.color = '#ff8888';
+                        badge.style.border = '1px solid rgba(255, 68, 68, 0.35)';
+                    }
+                }
+            } catch (e) {
+                if (statusEl) statusEl.textContent = `Browse failed: ${e.message}`;
+            } finally {
+                btnBrowseSource.disabled = false;
+                btnBrowseSource.textContent = 'Validate & Browse Images Path';
+            }
+        });
+    }
+
+    loadCatalogMetadata(selectDatasetType?.value || 'local');
 
     btnWizardSubmit.addEventListener('click', async () => {
         const annotationTool = document.getElementById('wizard-annotation-tool').value;
@@ -1863,6 +1981,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     statusEl.textContent = `Error: ${data.detail || JSON.stringify(data)}`;
                 }
                 await refreshPipelineStatus();
+                await refreshAllOutputBrowsers();
             } catch (e) {
                 statusEl.textContent = `Error: ${e.message}`;
             }
@@ -1894,10 +2013,141 @@ document.addEventListener('DOMContentLoaded', () => {
                     statusEl.textContent = `Error: ${data.detail || JSON.stringify(data)}`;
                 }
                 await refreshPipelineStatus();
+                await refreshAllOutputBrowsers();
             } catch (e) {
                 statusEl.textContent = `Error: ${e.message}`;
             }
         });
+    }
+
+    // --- PIPELINE OUTPUT BROWSER ---
+    function initOutputBrowser(root) {
+        const seqSelect = root.querySelector('.out-seq-select');
+        const frameList = root.querySelector('.out-frame-list');
+        const summary = root.querySelector('.out-summary');
+        const previewImg = root.querySelector('.out-preview-img');
+        const previewMeta = root.querySelector('.out-preview-meta');
+        const proposalsPre = root.querySelector('.out-proposals-json');
+        const refreshBtn = root.querySelector('.out-refresh-btn');
+
+        async function loadSequences(preferredId) {
+            try {
+                const res = await fetch(`${API_BASE}/api/pipeline/sequences`);
+                const data = await res.json();
+                const sequences = data.sequences || [];
+                const previous = preferredId || seqSelect.value || currentSequenceId;
+                seqSelect.innerHTML = '';
+                if (!sequences.length) {
+                    const opt = document.createElement('option');
+                    opt.value = currentSequenceId;
+                    opt.textContent = `${currentSequenceId} (empty)`;
+                    seqSelect.appendChild(opt);
+                } else {
+                    sequences.forEach((s) => {
+                        const opt = document.createElement('option');
+                        opt.value = s.sequence_id;
+                        const stub = s.demo_stub ? ' stub' : '';
+                        opt.textContent = `${s.sequence_id} · ${s.frames ?? 0} frames${stub}`;
+                        seqSelect.appendChild(opt);
+                    });
+                }
+                if ([...seqSelect.options].some((o) => o.value === previous)) {
+                    seqSelect.value = previous;
+                }
+            } catch (e) {
+                if (summary) summary.textContent = `Could not list sequences: ${e.message}`;
+            }
+        }
+
+        async function loadFrames() {
+            const seqId = seqSelect.value || currentSequenceId;
+            currentSequenceId = seqId;
+            if (summary) summary.textContent = `Loading ${seqId}…`;
+            frameList.innerHTML = '';
+            previewImg.style.display = 'none';
+            proposalsPre.style.display = 'none';
+            previewMeta.textContent = 'No frame selected.';
+            try {
+                const res = await fetch(`${API_BASE}/api/pipeline/frames?sequence_id=${encodeURIComponent(seqId)}`);
+                const data = await res.json();
+                if (!data.browsable) {
+                    summary.textContent = data.empty_reason || 'Nothing browsable for this sequence.';
+                    return;
+                }
+                const stub = data.demo_stub ? ' · demo stub' : '';
+                const tracks = data.has_tracks ? ' · tracks.json' : '';
+                summary.textContent =
+                    `${data.frames.length} frame(s) · vendor ${data.vendor || '—'}${stub} · ` +
+                    `${data.proposal_files || 0} proposal file(s)${tracks} · ${data.base_path}`;
+                data.frames.forEach((frame) => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'out-frame-item';
+                    btn.innerHTML = `<div>${frame.frame_id}</div><div class="muted">${frame.proposal_count} proposals · ${frame.cameras?.length || 0} cam</div>`;
+                    btn.addEventListener('click', () => {
+                        frameList.querySelectorAll('.out-frame-item').forEach((el) => el.classList.remove('active'));
+                        btn.classList.add('active');
+                        void showFrame(seqId, frame);
+                    });
+                    frameList.appendChild(btn);
+                });
+            } catch (e) {
+                summary.textContent = `Failed to load frames: ${e.message}`;
+            }
+        }
+
+        async function showFrame(seqId, frameSummary) {
+            previewMeta.textContent = `Loading ${frameSummary.frame_id}…`;
+            try {
+                const res = await fetch(
+                    `${API_BASE}/api/pipeline/frame?sequence_id=${encodeURIComponent(seqId)}&frame_id=${encodeURIComponent(frameSummary.frame_id)}`
+                );
+                const data = await res.json();
+                const url = (data.cameras || []).find((c) => c.preview_url)?.preview_url || frameSummary.preview_url;
+                if (url) {
+                    previewImg.src = url;
+                    previewImg.style.display = 'block';
+                } else {
+                    previewImg.style.display = 'none';
+                }
+                previewMeta.textContent =
+                    `${data.frame_id} · ${data.proposal_count} proposals` +
+                    (data.proposals_path ? ` · ${data.proposals_path}` : ' · no proposals yet');
+                if (data.proposals && (Array.isArray(data.proposals) ? data.proposals.length : true)) {
+                    proposalsPre.style.display = 'block';
+                    proposalsPre.textContent = JSON.stringify(data.proposals, null, 2);
+                } else {
+                    proposalsPre.style.display = 'block';
+                    proposalsPre.textContent = '// No proposals for this frame yet. Run Auto-Label.';
+                }
+            } catch (e) {
+                previewMeta.textContent = `Failed to load frame: ${e.message}`;
+            }
+        }
+
+        seqSelect.addEventListener('change', () => { void loadFrames(); });
+        refreshBtn.addEventListener('click', async () => {
+            await loadSequences(currentSequenceId);
+            await loadFrames();
+        });
+
+        root._refreshOutputs = async () => {
+            await loadSequences(currentSequenceId);
+            await loadFrames();
+        };
+
+        void root._refreshOutputs();
+    }
+
+    const outputBrowsers = [...document.querySelectorAll('.pipeline-output-browser')];
+    outputBrowsers.forEach(initOutputBrowser);
+
+    async function refreshAllOutputBrowsers() {
+        for (const root of outputBrowsers) {
+            if (typeof root._refreshOutputs === 'function') {
+                await root._refreshOutputs();
+            }
+        }
     }
 
     if (btnTrackingRun) {

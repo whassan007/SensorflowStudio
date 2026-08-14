@@ -1,0 +1,66 @@
+{
+  "name": "Sensorflow Studio",
+  "version": "0.5.0",
+  "description": "An autonomous-driving data platform for dataset exploration, perception label evaluation, MITL review, safety/compliance gates, and mega-scale evaluation — served as a React Studio with a FastAPI backend.",
+  "links": {
+    "github": "https://github.com/whassan007/SensorflowStudio",
+    "hf_space": "https://huggingface.co/spaces/whassan/sensorflow-studio"
+  },
+  "releases": [
+    {
+      "version": "0.5.0",
+      "date": "2026-08-13",
+      "title": "About and versioning visibility",
+      "highlights": [
+        "About dialog and Help menu tab listing each notable version with release notes",
+        "Current version chip in the AppBar (and a matching chip at the bottom of the nav drawer)",
+        "Shared releases catalog (JSON) plus CHANGELOG.md; GET /api/about and GET /api/version",
+        "Help chatbot answers for “what version”, “what’s new”, “release notes”, and “about”"
+      ]
+    },
+    {
+      "version": "0.4.0",
+      "date": "2026-08-13",
+      "title": "In-app help chatbot",
+      "highlights": [
+        "Help menu: How it works, Glossary, Pages, Tips, and Docs tabs",
+        "Per-page “About this page” guides plus a floating Q&A chatbot",
+        "CPU-friendly FAQ matcher with optional Ollama enrichment (PR #3)"
+      ]
+    },
+    {
+      "version": "0.3.0",
+      "date": "2026-08-13",
+      "title": "Closed-loop, governance, hardening, and ROTR",
+      "highlights": [
+        "Next-gen closed-loop evaluation with counterfactuals, causal replay, and a launch gauntlet (/api/nextgen)",
+        "Studio 2.0 control-plane registry, composed release gate, hardware gate matrix, and observability funnel (/api/studio2)",
+        "Production hardening audit: 30 findings, surgical fixes, contracts, HITL prioritization, and a readiness scorecard (/api/hardening)",
+        "ROTR (right-of-the-road) violation platform: rule engine, causal attribution, consequence replay, and training flywheel (/api/rotr)"
+      ]
+    },
+    {
+      "version": "0.2.0",
+      "date": "2026-08-12",
+      "title": "L4 Studio platform, perception engines, and safety suite",
+      "highlights": [
+        "Automated 3D perception pipeline and Phase 1 population-scale evaluation foundation (PR #2)",
+        "BEV-Fusion perception engine with masklet temporal propagation and self-evaluation (/api/bevfusion)",
+        "L4 label-evaluation + aggregate-first megaeval backends, unified React app shell, Hugging Face Space deploy",
+        "Safety & compliance: ODD coverage, release gates, SSAM, calibration, discrepancy mining, scenario DB (/api/safety)",
+        "Sequential regression (seqeval), RCA workbench, rare-event miner, Vitis HIL, Hill Climbing EM, retrospective analyzer, agentic launch readiness, and visual Studio UX"
+      ]
+    },
+    {
+      "version": "0.1.0",
+      "date": "2026-07-26",
+      "title": "Initial auto-labeler and comparative dashboard",
+      "highlights": [
+        "YOLO auto-labeler framework for detection labeling and quality evaluation",
+        "Crash analysis and data extraction toolkits",
+        "Comparative analytics dashboard visualization layer",
+        "CC BY-NC-SA 4.0 license and DGX Spark deployment prep"
+      ]
+    }
+  ]
+}

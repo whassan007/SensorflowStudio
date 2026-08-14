@@ -1405,3 +1405,40 @@ body {
     color: var(--text-dim);
     letter-spacing: 0.3px;
 }
+
+/* Pipeline / dataset output browser */
+.output-browse-gallery {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.output-browse-gallery .thumb {
+    width: 96px;
+    height: 72px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: #04060b;
+}
+.out-frame-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 8px 10px;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    background: transparent;
+    color: var(--fg);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+}
+.out-frame-item:hover,
+.out-frame-item.active {
+    background: rgba(0, 255, 170, 0.08);
+    color: #00ffaa;
+}
+.out-frame-item .muted {
+    color: var(--text-muted);
+    font-size: 10px;
+}

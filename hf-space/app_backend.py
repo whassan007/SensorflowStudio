@@ -823,7 +823,15 @@ DATASET_METADATA_STORE = {
 
 @app.get("/api/dataset/details")
 def get_dataset_details(type: str = "local"):
-    metadata = DATASET_METADATA_STORE.get(type, DATASET_METADATA_STORE["local"])
+    metadata = dict(DATASET_METADATA_STORE.get(type, DATASET_METADATA_STORE["local"]))
+    # Catalog KPIs are reference stats for the selected dataset type — not proof that
+    # frames are on disk or browsable in Studio.
+    metadata["browsable"] = False
+    metadata["catalog_only"] = True
+    metadata["browse_hint"] = (
+        "These percentages are catalog estimates. Use Validate & Browse Images Path "
+        "or run 3D Ingest, then open Pipeline Outputs to view real frames."
+    )
     return {"status": "ok", "metadata": metadata}
 
 @app.post("/api/dataset/preprocess")
@@ -832,13 +840,23 @@ def preprocess_dataset(params: dict):
     import time
     time.sleep(0.3)
     
-    meta = DATASET_METADATA_STORE.get(dataset_type, DATASET_METADATA_STORE["local"])
+    meta = dict(DATASET_METADATA_STORE.get(dataset_type, DATASET_METADATA_STORE["local"]))
+    meta["browsable"] = False
+    meta["catalog_only"] = True
+    meta["browse_hint"] = (
+        "Preprocess updates catalog metadata only. Browse real frames via "
+        "Validate & Browse Images Path or Pipeline Outputs after ingest."
+    )
     
     return {
         "status": "ok",
-        "message": f"Dataset {meta['name']} loaded and preprocessed successfully.",
+        "message": (
+            f"Catalog metadata for {meta['name']} applied — not the same as loading "
+            f"browsable frames onto disk."
+        ),
         "dataset_type": dataset_type,
         "total_frames": meta["loaded_rows"],
+        "browsable": False,
         "metadata": meta
     }
 
@@ -1537,6 +1555,53 @@ def pipeline_status(sequence_id: str = "seq_001"):
         "demo_stub": demo_stub,
         "state": seq_state,
     }
+
+
+@app.get("/api/pipeline/sequences")
+def pipeline_sequences():
+    from sensorflow import pipeline_artifacts as artifacts
+    return {"status": "ok", "sequences": artifacts.list_sequences()}
+
+
+@app.get("/api/pipeline/artifacts")
+def pipeline_artifacts(sequence_id: str = "seq_001"):
+    from sensorflow import pipeline_artifacts as artifacts
+    return {"status": "ok", **artifacts.artifacts_summary(sequence_id)}
+
+
+@app.get("/api/pipeline/frames")
+def pipeline_frames(sequence_id: str = "seq_001"):
+    from sensorflow import pipeline_artifacts as artifacts
+    return artifacts.list_frames(sequence_id)
+
+
+@app.get("/api/pipeline/frame")
+def pipeline_frame(sequence_id: str, frame_id: str):
+    from sensorflow import pipeline_artifacts as artifacts
+    try:
+        return artifacts.get_frame(sequence_id, frame_id)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.get("/api/pipeline/file")
+def pipeline_file(path: str):
+    """Serve a local run/data artifact with path-traversal protection."""
+    from sensorflow import pipeline_artifacts as artifacts
+    try:
+        file_path, media_type = artifacts.resolve_file(path)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return FileResponse(file_path, media_type=media_type)
+
+
+@app.get("/api/dataset/browse")
+def dataset_browse(source_path: str = "data", limit: int = 48):
+    """Validate Images Path by listing browsable local frames."""
+    from sensorflow import pipeline_artifacts as artifacts
+    return artifacts.scan_source_images(source_path, limit=limit)
 
 
 @app.get("/api/mitl/queue")
