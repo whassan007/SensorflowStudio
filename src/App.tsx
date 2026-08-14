@@ -94,6 +94,7 @@ import ProductionReadinessPage from './pages/hardening/ProductionReadinessPage';
 import RotrControlCenterPage from './pages/rotr/RotrControlCenterPage';
 import PageIntro from './components/help/PageIntro';
 import HelpMenu from './components/help/HelpMenu';
+import HelpChatbot from './components/help/HelpChatbot';
 
 const DRAWER_WIDTH = 230;
 
@@ -211,6 +212,7 @@ export default function App() {
   const [page, setPage] = useState<PageId>(initial.page);
   const [entityId, setEntityId] = useState<string | null>(initial.entityId);
   const [activeDatasetId, setActiveDatasetId] = useState<string | null>(null);
+  const [helpChatOpen, setHelpChatOpen] = useState(false);
   const stream = useStream();
 
   const navigate = useCallback((nextPage: PageId, nextEntityId?: string | null) => {
@@ -314,7 +316,7 @@ export default function App() {
                 sx={{ ml: 1, bgcolor: '#232a31', fontFamily: 'monospace', fontSize: 11 }}
               />
             ) : null}
-            <HelpMenu />
+            <HelpMenu onOpenChat={() => setHelpChatOpen(true)} />
           </Toolbar>
         </AppBar>
 
@@ -455,6 +457,7 @@ export default function App() {
             </Box>
           )}
         </Box>
+        <HelpChatbot open={helpChatOpen} onOpenChange={setHelpChatOpen} />
       </Box>
     </LabelEvalContext.Provider>
   );

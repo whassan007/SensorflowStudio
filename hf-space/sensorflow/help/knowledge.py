@@ -351,7 +351,42 @@ def _version_faqs() -> List[Dict[str, str]]:
                 f"GitHub: {links['github']}. Hugging Face Space: {links['hf_space']}."
             ),
         },
-    ]
+    
+    {
+        "id": "faq-load-dataset",
+        "title": "How do I load a dataset?",
+        "question": "how do i load a dataset ingest select yaml source path browse catalog configuration",
+        "answer": (
+            "Legacy Studio: open Dataset Configuration, pick a dataset type (or Local), set the source path / "
+            "data YAML, then Save. For the 3D pipeline, use Ingest & Fusion with Local and/or vendor stubs "
+            "(Alpamayo, Waymo, A2D2), set a sequence id, and run ingest — then browse frames in the pipeline viewer. "
+            "React Sensorflow Studio: open Datasets to ingest or select the active dataset (AppBar chip), or on "
+            "Overview click “Generate synthetic dataset & run pipeline” when counters are empty."
+        ),
+    },
+    {
+        "id": "faq-strict-execution",
+        "title": "What is Strict Execution Mode?",
+        "question": "what is strict execution mode strict mode ledger evidence verified succeeded refuse incomplete",
+        "answer": (
+            "Strict Execution Mode refuses to treat a Studio op as SUCCEEDED when evidence is incomplete. "
+            "Ops (load, train, infer, grade, auto-label, pipeline stages) write a persistent execution ledger "
+            "under runs/executions/. UI PASS badges are not proof — use Evidence cards and the Global Execution "
+            "Console. When Strict Mode is on, SUCCEEDED requires verified artifacts; otherwise the run is marked "
+            "failed/incomplete even if a process exited 0."
+        ),
+    },
+    {
+        "id": "faq-pipeline-stages",
+        "title": "How do pipeline stages work?",
+        "question": "pipeline stages ingest perception tracking quality gate launch how to use stages workflow",
+        "answer": (
+            "Typical 3D flow: Ingest & Fusion → Perception (SAM proposals) → Tracking → Quality Gate → Launch Gate. "
+            "Each stage writes sequence artifacts under runs/pipeline/. Catalog “100% loaded” is not the same as "
+            "browsable frames — use the pipeline frame browser after ingest. Gates can block export when thresholds fail."
+        ),
+    },
+]
 
 
 STATIC_FAQS.extend(_version_faqs())
@@ -367,8 +402,17 @@ class KnowledgeDoc:
 
 
 def _docs_root() -> Path:
-    # sensorflow/help/ → hf-space/
-    return Path(__file__).resolve().parents[2] / "docs"
+    # Prefer hf-space/docs when present; fall back to repo-root docs/.
+    here = Path(__file__).resolve()
+    candidates = [
+        here.parents[2] / "docs",  # hf-space/docs or repo/docs depending on install path
+        here.parents[2] / "hf-space" / "docs",  # root sensorflow/help → hf-space/docs
+    ]
+    for path in candidates:
+        if path.is_dir():
+            return path
+    return candidates[0]
+
 
 
 def _snippet_from_markdown(path: Path, max_chars: int = 900) -> str:
