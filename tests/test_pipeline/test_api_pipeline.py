@@ -54,8 +54,9 @@ def test_full_pipeline(client):
     seq_id = "full_pipeline"
     ingest = client.post(
         "/api/dataset/ingest",
-        json={"vendors": ["alpamayo", "waymo"], "sequence_id": seq_id},
+        json={"vendors": ["alpamayo", "waymo"], "sequence_id": seq_id, "allow_mix": True},
     )
+    assert ingest.status_code == 200
     assert ingest.json()["frames"] == 6
     assert ingest.json()["demo_stub"] is True
     label = client.post("/api/perception/auto-label", json={"sequence_id": seq_id, "no_sam": True})
@@ -75,3 +76,12 @@ def test_full_pipeline(client):
     assert status["tracking_complete"] is True
     assert status["frames_ingested"] == 6
     assert status["demo_stub"] is True
+
+
+def test_ingest_rejects_mix_without_flag(client):
+    res = client.post(
+        "/api/dataset/ingest",
+        json={"vendors": ["alpamayo", "waymo"], "sequence_id": "no_mix"},
+    )
+    assert res.status_code == 400
+    assert "allow_mix" in str(res.json()["detail"]).lower() or "Multiple vendors" in str(res.json()["detail"])

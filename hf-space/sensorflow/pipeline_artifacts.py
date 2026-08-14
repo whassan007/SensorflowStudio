@@ -111,6 +111,34 @@ def _image_url(image_path: str) -> Optional[str]:
     return f"/api/pipeline/file?path={quote(image_path, safe='')}"
 
 
+def _local_image_exists(image_path: Optional[str]) -> bool:
+    if not image_path or str(image_path).startswith("http"):
+        return False
+    raw = Path(image_path)
+    candidate = raw if raw.is_absolute() else Path.cwd() / raw
+    try:
+        return candidate.is_file()
+    except OSError:
+        return False
+
+
+def _camera_preview(cam_name: str, cam: Any) -> Dict[str, Any]:
+    img = cam.get("image_path") if isinstance(cam, dict) else None
+    exists = _local_image_exists(img) if img and not str(img).startswith("http") else bool(img)
+    preview = _image_url(img) if img and exists else None
+    # Remote http(s) URLs are treated as available for preview.
+    if img and str(img).startswith("http"):
+        preview = _image_url(img)
+        exists = True
+    return {
+        "name": cam_name,
+        "image_path": img,
+        "preview_url": preview,
+        "local_file": bool(img and not str(img).startswith("http")),
+        "available": bool(preview),
+    }
+
+
 def _proposal_count(sequence_id: str, frame_id: str) -> int:
     prop_path = PIPELINE_ROOT / sequence_id / "proposals" / f"{frame_id}.json"
     if not prop_path.exists():
@@ -143,18 +171,11 @@ def list_frames(sequence_id: str) -> Dict[str, Any]:
     frames_out: List[Dict[str, Any]] = []
     for frame in data.get("frames", []):
         cameras = frame.get("cameras") or {}
-        camera_previews = []
-        for cam_name, cam in cameras.items():
-            img = cam.get("image_path") if isinstance(cam, dict) else None
-            camera_previews.append(
-                {
-                    "name": cam_name,
-                    "image_path": img,
-                    "preview_url": _image_url(img) if img else None,
-                    "local_file": bool(img and not str(img).startswith("http")),
-                }
-            )
+        camera_previews = [
+            _camera_preview(cam_name, cam) for cam_name, cam in cameras.items()
+        ]
         primary = next((c for c in camera_previews if c.get("preview_url")), None)
+        available_cams = [c for c in camera_previews if c.get("available")]
         fid = frame.get("frame_id", "")
         frames_out.append(
             {
@@ -162,6 +183,7 @@ def list_frames(sequence_id: str) -> Dict[str, Any]:
                 "timestamp_us": frame.get("timestamp_us"),
                 "cameras": camera_previews,
                 "preview_url": primary["preview_url"] if primary else None,
+                "available_camera_count": len(available_cams),
                 "proposal_count": _proposal_count(sequence_id, fid),
                 "gt_count": len(frame.get("ground_truth") or []),
             }
@@ -192,16 +214,10 @@ def get_frame(sequence_id: str, frame_id: str) -> Dict[str, Any]:
         raise FileNotFoundError(f"Frame {frame_id} not found in sequence {sequence_id}")
 
     cameras = frame.get("cameras") or {}
-    camera_previews = []
-    for cam_name, cam in cameras.items():
-        img = cam.get("image_path") if isinstance(cam, dict) else None
-        camera_previews.append(
-            {
-                "name": cam_name,
-                "image_path": img,
-                "preview_url": _image_url(img) if img else None,
-            }
-        )
+    camera_previews = [
+        _camera_preview(cam_name, cam) for cam_name, cam in cameras.items()
+    ]
+    primary = next((c for c in camera_previews if c.get("preview_url")), None)
 
     proposals: Any = []
     prop_path = PIPELINE_ROOT / sequence_id / "proposals" / f"{frame_id}.json"
@@ -218,6 +234,7 @@ def get_frame(sequence_id: str, frame_id: str) -> Dict[str, Any]:
         "frame_id": frame_id,
         "frame": frame,
         "cameras": camera_previews,
+        "preview_url": primary["preview_url"] if primary else None,
         "proposals": proposals,
         "proposal_count": len(proposals) if isinstance(proposals, list) else 0,
         "proposals_path": str(prop_path) if prop_path.exists() else None,

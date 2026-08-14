@@ -9,6 +9,7 @@ from typing import Any, Dict, List
 import numpy as np
 
 from sensorflow.adapters.base import VendorAdapter
+from sensorflow.adapters.stub_images import stub_camera_path, write_stub_camera_png
 from sensorflow.schemas.taxonomy_axes import assign_taxonomy_axes
 from sensorflow.schemas.unified_frame import (
     CameraView,
@@ -83,16 +84,42 @@ def _write_synthetic_lidar(path: Path, num_points: int, labels: List[Dict]) -> N
 
 class WaymoAdapter(VendorAdapter):
     def load(self, source: Dict[str, Any], sequence_id: str) -> UnifiedSequence:
+        from sensorflow.adapters.vendor_media import (
+            frames_from_media_root,
+            media_available,
+            resolve_vendor_root,
+        )
+
+        root = resolve_vendor_root(source or {}, "source_path", "root", "path", "tfrecord")
+        # Directory of images/video → real load; single .tfrecord handled below.
+        if root is not None and root.is_dir() and media_available(root):
+            frames = frames_from_media_root(
+                sequence_id=sequence_id,
+                vendor="waymo",
+                root=root,
+                max_frames=source.get("max_frames") if source else None,
+            )
+            return UnifiedSequence(
+                sequence_id=sequence_id,
+                vendor="waymo",
+                frames=frames,
+                taxonomy_manifest={
+                    "source_path": str(root.resolve()),
+                    "demo_stub": False,
+                    "total_frames": len(frames),
+                },
+            )
+
         shard_dir = Path("runs/pipeline/waymo_shards")
-        shard_path = shard_dir / f"{source.get('shard_id', 'default')}.json"
+        shard_path = shard_dir / f"{(source or {}).get('shard_id', 'default')}.json"
         used_builtin_stub = False
 
-        if source.get("frames"):
+        if source and source.get("frames"):
             shards = source["frames"]
         elif shard_path.exists():
             with open(shard_path) as f:
                 shards = json.load(f)
-            used_builtin_stub = len(shards) <= 3 and not source.get("tfrecord")
+            used_builtin_stub = len(shards) <= 3 and not (source or {}).get("tfrecord")
         else:
             shards = _default_waymo_shard()
             used_builtin_stub = True
@@ -126,16 +153,27 @@ class WaymoAdapter(VendorAdapter):
                     taxonomy_axes=axes,
                 ))
 
+            image_path = shard.get("image_path") or ""
+            if not image_path or str(image_path).startswith("http"):
+                # Demo stubs (and shards without local media) get a real PNG under the run.
+                cam_file = stub_camera_path(sequence_id, frame_id, "front")
+                write_stub_camera_png(
+                    cam_file,
+                    seed=sum(ord(c) for c in frame_id) % 997,
+                    label=f"waymo:{frame_id}",
+                )
+                image_path = str(cam_file)
+
             frames.append(FusedFrame(
                 frame_id=frame_id,
                 timestamp_us=shard.get("timestamp_us", 0),
                 lidar=LidarData(path=str(lidar_path), num_points=num_points),
-                cameras={"front": CameraView(image_path=shard.get("image_path", ""))},
+                cameras={"front": CameraView(image_path=image_path)},
                 ego_pose=EgoPose(speed_kmh=speed),
                 ground_truth=gt,
             ))
 
-        demo_stub = bool(source.get("demo_stub", used_builtin_stub))
+        demo_stub = bool((source or {}).get("demo_stub", used_builtin_stub))
         manifest: Dict[str, Any] = {
             "shard": str(shard_path),
             "demo_stub": demo_stub,
@@ -144,7 +182,7 @@ class WaymoAdapter(VendorAdapter):
         if demo_stub:
             manifest["stub_note"] = (
                 "Built-in Waymo sample (~3 frames), not a full AV video lake. "
-                "Enable Local frames/video on Ingest and set Images Path to load a real sequence."
+                "Set waymo_root to a folder of frames (or TFRecord when SDK is available)."
             )
 
         return UnifiedSequence(

@@ -2082,15 +2082,44 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnLaunchGateRun = document.getElementById('btn-launch-gate-run');
 
     if (btnIngestRun) {
+        const vendorIds = [
+            'ingest-vendor-local',
+            'ingest-vendor-alpamayo',
+            'ingest-vendor-waymo',
+            'ingest-vendor-a2d2',
+        ];
+        const mixToggle = document.getElementById('ingest-mix-vendors');
+
+        function enforceSingleVendor(changedId) {
+            if (mixToggle?.checked) return;
+            const changed = document.getElementById(changedId);
+            if (!changed?.checked) return;
+            vendorIds.forEach((id) => {
+                if (id === changedId) return;
+                const el = document.getElementById(id);
+                if (el) el.checked = false;
+            });
+        }
+
+        vendorIds.forEach((id) => {
+            document.getElementById(id)?.addEventListener('change', () => enforceSingleVendor(id));
+        });
+
         btnIngestRun.addEventListener('click', async () => {
             const vendors = [];
             if (document.getElementById('ingest-vendor-local')?.checked) vendors.push('local');
             if (document.getElementById('ingest-vendor-alpamayo')?.checked) vendors.push('alpamayo');
             if (document.getElementById('ingest-vendor-waymo')?.checked) vendors.push('waymo');
             if (document.getElementById('ingest-vendor-a2d2')?.checked) vendors.push('a2d2');
+            const allowMix = !!mixToggle?.checked;
             if (!vendors.length) {
                 document.getElementById('ingest-status').textContent =
-                    'Select at least one vendor (Local for real sequences, or Alpamayo/Waymo/A2D2 demo stubs).';
+                    'Select at least one vendor (Local for real sequences, or one Alpamayo/Waymo/A2D2 demo stub).';
+                return;
+            }
+            if (vendors.length > 1 && !allowMix) {
+                document.getElementById('ingest-status').textContent =
+                    'Multiple vendors selected. Enable “Mix vendors” or keep a single dataset selected.';
                 return;
             }
             currentSequenceId = document.getElementById('ingest-sequence-id')?.value || 'seq_001';
@@ -2107,6 +2136,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         vendors,
+                        allow_mix: allowMix,
                         sequence_id: currentSequenceId,
                         source_path: sourcePath,
                         max_frames: Number.isFinite(maxFrames) ? maxFrames : undefined,
@@ -2120,6 +2150,60 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     statusEl.textContent = `Error: ${data.detail || JSON.stringify(data)}`;
                 }
+                await refreshPipelineStatus();
+                await refreshAllOutputBrowsers();
+            } catch (e) {
+                statusEl.textContent = `Error: ${e.message}`;
+            }
+        });
+    }
+
+    const btnLoadAllDatasets = document.getElementById('btn-load-all-datasets');
+    if (btnLoadAllDatasets) {
+        btnLoadAllDatasets.addEventListener('click', async () => {
+            const statusEl = document.getElementById('ingest-status');
+            const prefix = document.getElementById('ingest-sequence-id')?.value || 'seq_001';
+            const sourcePath = document.getElementById('ingest-source-path')?.value
+                || document.getElementById('dataset-source-path')?.value || 'data';
+            const maxFramesRaw = document.getElementById('ingest-max-frames')?.value;
+            const maxFrames = maxFramesRaw ? Number(maxFramesRaw) : undefined;
+            const allowStub = !!document.getElementById('ingest-allow-stub')?.checked;
+            const vendors = [];
+            if (document.getElementById('ingest-vendor-local')?.checked) vendors.push('local');
+            if (document.getElementById('ingest-vendor-alpamayo')?.checked) vendors.push('alpamayo');
+            if (document.getElementById('ingest-vendor-waymo')?.checked) vendors.push('waymo');
+            if (document.getElementById('ingest-vendor-a2d2')?.checked) vendors.push('a2d2');
+            // Load-all defaults to all four when nothing selected so "all datasets" means all.
+            const body = {
+                sequence_prefix: prefix,
+                vendors: vendors.length ? vendors : ['local', 'alpamayo', 'waymo', 'a2d2'],
+                source_path: sourcePath,
+                waymo_root: document.getElementById('ingest-waymo-root')?.value || undefined,
+                alpamayo_root: document.getElementById('ingest-alpamayo-root')?.value || undefined,
+                a2d2_root: document.getElementById('ingest-a2d2-root')?.value || undefined,
+                allow_stub: allowStub,
+                max_frames: Number.isFinite(maxFrames) ? maxFrames : undefined,
+            };
+            statusEl.textContent = 'Loading configured datasets into pipeline runs…';
+            try {
+                const res = await fetch(`${API_BASE}/api/dataset/load-all`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    statusEl.textContent = `Error: ${data.detail || JSON.stringify(data)}`;
+                    return;
+                }
+                const lines = (data.results || []).map((r) => {
+                    const tag = r.status === 'ok'
+                        ? (r.demo_stub ? 'STUB' : 'LOADED')
+                        : 'NOT_EXECUTED';
+                    return `${tag} ${r.vendor}: ${r.frames || 0} frames → ${r.sequence_id || '—'} (${r.message || ''})`;
+                });
+                if (data.active_sequence_id) currentSequenceId = data.active_sequence_id;
+                statusEl.textContent = `${data.message || data.status}\n${lines.join('\n')}`;
                 await refreshPipelineStatus();
                 await refreshAllOutputBrowsers();
             } catch (e) {
@@ -2189,6 +2273,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const frameList = root.querySelector('.out-frame-list');
         const summary = root.querySelector('.out-summary');
         const previewImg = root.querySelector('.out-preview-img');
+        const cameraEmpty = root.querySelector('.out-camera-empty');
         const previewMeta = root.querySelector('.out-preview-meta');
         const proposalsPre = root.querySelector('.out-proposals-json');
         const refreshBtn = root.querySelector('.out-refresh-btn');
@@ -2228,6 +2313,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (summary) summary.textContent = `Loading ${seqId}…`;
             frameList.innerHTML = '';
             previewImg.style.display = 'none';
+            previewImg.removeAttribute('src');
+            if (cameraEmpty) cameraEmpty.style.display = 'none';
             proposalsPre.style.display = 'none';
             previewMeta.textContent = 'No frame selected.';
             try {
@@ -2246,7 +2333,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const btn = document.createElement('button');
                     btn.type = 'button';
                     btn.className = 'out-frame-item';
-                    btn.innerHTML = `<div>${frame.frame_id}</div><div class="muted">${frame.proposal_count} proposals · ${frame.cameras?.length || 0} cam</div>`;
+                    const camCount = frame.available_camera_count ?? frame.cameras?.filter((c) => c.preview_url || c.available)?.length ?? frame.cameras?.length ?? 0;
+                    btn.innerHTML = `<div>${frame.frame_id}</div><div class="muted">${frame.proposal_count} proposals · ${camCount} cam</div>`;
                     btn.addEventListener('click', () => {
                         frameList.querySelectorAll('.out-frame-item').forEach((el) => el.classList.remove('active'));
                         btn.classList.add('active');
@@ -2261,26 +2349,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
         async function showFrame(seqId, frameSummary) {
             previewMeta.textContent = `Loading ${frameSummary.frame_id}…`;
+            previewImg.style.display = 'none';
+            previewImg.removeAttribute('src');
+            if (cameraEmpty) cameraEmpty.style.display = 'none';
             try {
                 const res = await fetch(
                     `${API_BASE}/api/pipeline/frame?sequence_id=${encodeURIComponent(seqId)}&frame_id=${encodeURIComponent(frameSummary.frame_id)}`
                 );
                 const data = await res.json();
-                const url = (data.cameras || []).find((c) => c.preview_url)?.preview_url || frameSummary.preview_url;
+                // Camera image is primary; proposals (or lack thereof) never hide it.
+                const url =
+                    data.preview_url ||
+                    (data.cameras || []).find((c) => c.preview_url)?.preview_url ||
+                    frameSummary.preview_url;
                 if (url) {
-                    previewImg.src = url;
+                    previewImg.onload = () => {
+                        previewImg.style.display = 'block';
+                        if (cameraEmpty) cameraEmpty.style.display = 'none';
+                    };
+                    previewImg.onerror = () => {
+                        previewImg.style.display = 'none';
+                        if (cameraEmpty) {
+                            cameraEmpty.textContent = 'Camera path present but image failed to load.';
+                            cameraEmpty.style.display = 'block';
+                        }
+                    };
+                    previewImg.src = url.startsWith('http') || url.startsWith('/')
+                        ? url
+                        : `${API_BASE}${url}`;
+                    // Show immediately; onload still confirms.
                     previewImg.style.display = 'block';
-                } else {
-                    previewImg.style.display = 'none';
+                } else if (cameraEmpty) {
+                    cameraEmpty.textContent = 'No camera image for this frame.';
+                    cameraEmpty.style.display = 'block';
                 }
                 previewMeta.textContent =
                     `${data.frame_id} · ${data.proposal_count} proposals` +
                     (data.proposals_path ? ` · ${data.proposals_path}` : ' · no proposals yet');
+                // Proposals JSON is secondary — always show status, never replace the camera.
+                proposalsPre.style.display = 'block';
                 if (data.proposals && (Array.isArray(data.proposals) ? data.proposals.length : true)) {
-                    proposalsPre.style.display = 'block';
                     proposalsPre.textContent = JSON.stringify(data.proposals, null, 2);
                 } else {
-                    proposalsPre.style.display = 'block';
                     proposalsPre.textContent = '// No proposals for this frame yet. Run Auto-Label.';
                 }
             } catch (e) {

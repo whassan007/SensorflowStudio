@@ -35,9 +35,13 @@ class StudioConfig(BaseModel):
     model_type: str = "yolov8"
     pipeline_mode: str = "3d"
     sam_checkpoint: str = "models/sam_vit_b.pth"
-    vendors: List[str] = ["alpamayo", "waymo", "a2d2"]
+    vendors: List[str] = ["alpamayo"]
     gate_thresholds_path: str = "runs/pipeline/gate_thresholds.json"
     sequence_id: str = "seq_001"
+    waymo_root: Optional[str] = None
+    alpamayo_root: Optional[str] = None
+    a2d2_root: Optional[str] = None
+    allow_stub: bool = True
 
 class TrainParams(BaseModel):
     model: str = "yolov8n.pt"
@@ -1813,10 +1817,24 @@ def annotate_street(req: AnnotateStreetRequest):
 # -----------------------------------------------------------------------
 
 class IngestParams(BaseModel):
-    vendors: List[str] = ["alpamayo", "waymo", "a2d2"]
+    vendors: List[str] = ["alpamayo"]
     sequence_id: str = "seq_001"
     source_path: Optional[str] = None
     max_frames: Optional[int] = None
+    allow_mix: bool = False
+
+
+class LoadAllDatasetsParams(BaseModel):
+    """Load each selected vendor into its own homogeneous pipeline sequence."""
+    sequence_prefix: str = "seq_001"
+    vendors: Optional[List[str]] = None
+    source_path: Optional[str] = None
+    waymo_root: Optional[str] = None
+    alpamayo_root: Optional[str] = None
+    a2d2_root: Optional[str] = None
+    allow_stub: bool = True
+    max_frames: Optional[int] = None
+
 
 class AutoLabelParams(BaseModel):
     sequence_id: str = "seq_001"
@@ -1839,10 +1857,21 @@ def ingest_dataset(params: IngestParams):
     from sensorflow.dataset_fusion_engine import DatasetFusionEngine
     config = load_config()
     source_path = params.source_path if params.source_path is not None else config.source_path
+    vendors = [v.lower().strip() for v in (params.vendors or []) if v and str(v).strip()]
+    if not vendors:
+        raise HTTPException(status_code=400, detail="Select at least one vendor.")
+    if len(vendors) > 1 and not params.allow_mix:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Multiple vendors selected without allow_mix. "
+                "Ingest one vendor (or Local only), or set allow_mix=true to fuse stubs."
+            ),
+        )
     try:
         engine = DatasetFusionEngine()
         sequence = engine.ingest(
-            params.vendors,
+            vendors,
             params.sequence_id,
             source_path=source_path,
             max_frames=params.max_frames,
@@ -1854,7 +1883,7 @@ def ingest_dataset(params: IngestParams):
         raise HTTPException(status_code=500, detail=f"Ingest failed: {str(e)}")
 
     config.sequence_id = params.sequence_id
-    config.vendors = params.vendors
+    config.vendors = vendors
     if params.source_path is not None:
         config.source_path = params.source_path
     with open(CONFIG_PATH, "w") as f:
@@ -1869,6 +1898,8 @@ def ingest_dataset(params: IngestParams):
         "frames": frame_count,
         "demo_stub": demo_stub,
         "vendor": sequence.vendor,
+        "vendors": vendors,
+        "allow_mix": params.allow_mix,
         "source_path": source_path,
         "message": (
             f"demo stub: {frame_count} frames"
@@ -1876,6 +1907,51 @@ def ingest_dataset(params: IngestParams):
             else f"ingested {frame_count} frames from {source_path}"
         ),
     }
+
+
+@app.post("/api/dataset/load-all")
+def load_all_datasets(params: LoadAllDatasetsParams):
+    """
+    Register Local + AV vendors as separate sequences under runs/pipeline/<prefix>_<vendor>/.
+
+    Homogeneous frame IDs per sequence. Missing lakes → demo stub (allow_stub=true) or
+    NOT_EXECUTED with path hints (allow_stub=false). Never claims catalog KPIs are disk loads.
+    """
+    from sensorflow.dataset_load_service import DatasetLoadService
+
+    config = load_config()
+    source_path = params.source_path if params.source_path is not None else config.source_path
+    waymo_root = params.waymo_root if params.waymo_root is not None else config.waymo_root
+    alpamayo_root = params.alpamayo_root if params.alpamayo_root is not None else config.alpamayo_root
+    a2d2_root = params.a2d2_root if params.a2d2_root is not None else config.a2d2_root
+    allow_stub = params.allow_stub if params.allow_stub is not None else config.allow_stub
+
+    service = DatasetLoadService()
+    result = service.load_all(
+        sequence_prefix=params.sequence_prefix,
+        vendors=params.vendors,
+        source_path=source_path,
+        waymo_root=waymo_root,
+        alpamayo_root=alpamayo_root,
+        a2d2_root=a2d2_root,
+        allow_stub=allow_stub,
+        max_frames=params.max_frames,
+    )
+
+    if result.get("active_sequence_id"):
+        config.sequence_id = result["active_sequence_id"]
+    config.source_path = source_path or config.source_path
+    if waymo_root is not None:
+        config.waymo_root = waymo_root
+    if alpamayo_root is not None:
+        config.alpamayo_root = alpamayo_root
+    if a2d2_root is not None:
+        config.a2d2_root = a2d2_root
+    config.allow_stub = allow_stub
+    with open(CONFIG_PATH, "w") as f:
+        json.dump(config.model_dump(), f, indent=2)
+
+    return result
 
 
 @app.get("/api/dataset/ingest/status")
