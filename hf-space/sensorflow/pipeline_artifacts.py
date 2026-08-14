@@ -253,9 +253,19 @@ def resolve_file(path_str: str) -> Tuple[Path, str]:
     return resolved, media_type or "application/octet-stream"
 
 
-def scan_source_images(source_path: str, limit: int = 48) -> Dict[str, Any]:
-    """List local images under Dataset Configuration Images Path for validation."""
+def scan_source_images(
+    source_path: str,
+    limit: int = 48,
+    *,
+    dataset_type: Optional[str] = None,
+) -> Dict[str, Any]:
+    """List local driving-relevant images under Dataset Configuration Images Path."""
+    from sensorflow.av_media_filter import OFFICIAL_AV_DATASETS, scan_driving_media
+
     path = Path(source_path)
+    if not path.is_absolute():
+        path = Path.cwd() / path
+
     if not path.exists():
         return {
             "status": "ok",
@@ -264,19 +274,13 @@ def scan_source_images(source_path: str, limit: int = 48) -> Dict[str, Any]:
             "browsable": False,
             "count": 0,
             "images": [],
+            "excluded_count": 0,
+            "excluded": [],
+            "excluded_by_reason": {},
             "empty_reason": f"Path does not exist: {source_path}",
         }
 
-    images: List[Path] = []
-    if path.is_file() and path.suffix.lower() in IMAGE_EXTS:
-        images = [path]
-    elif path.is_dir():
-        for p in sorted(path.rglob("*")):
-            if p.is_file() and p.suffix.lower() in IMAGE_EXTS:
-                images.append(p)
-                if len(images) >= max(limit, 1):
-                    break
-    else:
+    if path.is_file() and path.suffix.lower() not in IMAGE_EXTS:
         return {
             "status": "ok",
             "source_path": source_path,
@@ -284,22 +288,47 @@ def scan_source_images(source_path: str, limit: int = 48) -> Dict[str, Any]:
             "browsable": False,
             "count": 0,
             "images": [],
-            "empty_reason": "Not an image file or directory of images.",
+            "excluded_count": 0,
+            "excluded": [],
+            "excluded_by_reason": {},
+            "empty_reason": "Not an image file or directory of driving media.",
         }
 
-    # Full count for directories (cap walk cost for huge trees by reusing discovered list when small)
-    total = len(images)
-    if path.is_dir() and total >= limit:
-        total = sum(1 for p in path.rglob("*") if p.is_file() and p.suffix.lower() in IMAGE_EXTS)
+    scan = scan_driving_media(
+        path,
+        dataset_type=dataset_type,
+        allow_videos=False,
+    )
+    accepted = scan["accepted"]
+    excluded = scan["excluded"]
+    total = scan["count"]
+    dtype = (dataset_type or "local").lower()
 
     previews = []
-    for img in images[:limit]:
+    for img in accepted[:limit]:
         previews.append(
             {
                 "name": img.name,
                 "path": str(img),
                 "preview_url": _image_url(str(img.resolve())),
             }
+        )
+
+    empty_reason = None
+    if total == 0:
+        if excluded:
+            empty_reason = (
+                f"No driving-relevant images found under {source_path} "
+                f"({len(excluded)} file(s) excluded as non-AV media)."
+            )
+        else:
+            empty_reason = "No driving-relevant images found under this path."
+
+    warnings: List[str] = []
+    if dtype in OFFICIAL_AV_DATASETS and excluded:
+        warnings.append(
+            f"Browsed path does not match typical {dtype} layout; "
+            "point Images Path at downloaded camera frames or enable Local ingest."
         )
 
     return {
@@ -309,5 +338,9 @@ def scan_source_images(source_path: str, limit: int = 48) -> Dict[str, Any]:
         "browsable": total > 0,
         "count": total,
         "images": previews,
-        "empty_reason": None if total else "No images found under this path.",
+        "excluded_count": scan["excluded_count"],
+        "excluded": excluded[:200],
+        "excluded_by_reason": scan["excluded_by_reason"],
+        "warnings": warnings,
+        "empty_reason": empty_reason,
     }

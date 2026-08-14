@@ -23,29 +23,49 @@ VIDEO_EXTS = {".mp4", ".avi", ".mov", ".mkv", ".webm", ".m4v"}
 DEFAULT_MAX_FRAMES = 10_000
 
 
-def discover_media(path: Path) -> Tuple[List[Path], List[Path]]:
+def discover_media(
+    path: Path,
+    *,
+    dataset_type: Optional[str] = None,
+) -> Tuple[List[Path], List[Path]]:
     """Return (image_files, video_files) under path (file or directory)."""
+    from sensorflow.av_media_filter import (
+        IMAGE_EXTS as AV_IMAGE_EXTS,
+        VIDEO_EXTS as AV_VIDEO_EXTS,
+        partition_media_files,
+    )
+
     if path.is_file():
         ext = path.suffix.lower()
-        if ext in IMAGE_EXTS:
-            return [path], []
-        if ext in VIDEO_EXTS:
-            return [], [path]
+        if ext in AV_IMAGE_EXTS:
+            images, _ = partition_media_files([path], root=path.parent, dataset_type=dataset_type)
+            return images, []
+        if ext in AV_VIDEO_EXTS:
+            _, excluded = partition_media_files([path], root=path.parent, dataset_type=dataset_type, allow_videos=True)
+            return [], [] if excluded else [path]
         return [], []
 
     if not path.is_dir():
         return [], []
 
-    images: List[Path] = []
-    videos: List[Path] = []
+    raw_images: List[Path] = []
+    raw_videos: List[Path] = []
     for p in sorted(path.rglob("*")):
         if not p.is_file():
             continue
         ext = p.suffix.lower()
-        if ext in IMAGE_EXTS:
-            images.append(p)
-        elif ext in VIDEO_EXTS:
-            videos.append(p)
+        if ext in AV_IMAGE_EXTS:
+            raw_images.append(p)
+        elif ext in AV_VIDEO_EXTS:
+            raw_videos.append(p)
+
+    images, _ = partition_media_files(raw_images, root=path, dataset_type=dataset_type)
+    videos, _ = partition_media_files(
+        raw_videos,
+        root=path,
+        dataset_type=dataset_type,
+        allow_videos=True,
+    )
     return images, videos
 
 
@@ -111,7 +131,7 @@ class LocalSequenceAdapter(VendorAdapter):
                 "or a video file, then re-run ingest with Local enabled."
             )
 
-        images, videos = discover_media(path)
+        images, videos = discover_media(path, dataset_type=source.get("dataset_type"))
         frame_images = list(images)
 
         decode_dir = Path("runs/pipeline") / sequence_id / "decoded_frames"

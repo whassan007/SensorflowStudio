@@ -22,8 +22,15 @@ def _resolve(path: str | Path) -> Path:
     return p
 
 
-def discover_images(source_path: str, *, max_scan: int = 100_000) -> Dict[str, Any]:
-    """Discover images under a path; report corrupt/unreadable files."""
+def discover_images(
+    source_path: str,
+    *,
+    max_scan: int = 100_000,
+    dataset_type: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Discover driving-relevant images under a path; report corrupt/unreadable files."""
+    from sensorflow.av_media_filter import partition_media_files
+
     root = _resolve(source_path)
     result: Dict[str, Any] = {
         "source_path": str(root),
@@ -32,6 +39,9 @@ def discover_images(source_path: str, *, max_scan: int = 100_000) -> Dict[str, A
         "images_discovered": 0,
         "images_readable": 0,
         "images_corrupt": 0,
+        "images_excluded": 0,
+        "excluded_by_reason": {},
+        "excluded_samples": [],
         "annotations_discovered": 0,
         "annotation_objects": 0,
         "class_ids": [],
@@ -45,11 +55,11 @@ def discover_images(source_path: str, *, max_scan: int = 100_000) -> Dict[str, A
         result["errors"].append(f"Path does not exist: {source_path}")
         return result
 
-    images: List[Path] = []
+    raw_images: List[Path] = []
     labels: List[Path] = []
     if root.is_file():
         if root.suffix.lower() in IMAGE_EXTS:
-            images = [root]
+            raw_images = [root]
         elif root.suffix.lower() in LABEL_EXTS:
             labels = [root]
         else:
@@ -61,14 +71,31 @@ def discover_images(source_path: str, *, max_scan: int = 100_000) -> Dict[str, A
                 continue
             suf = p.suffix.lower()
             if suf in IMAGE_EXTS:
-                images.append(p)
+                raw_images.append(p)
             elif suf in LABEL_EXTS:
                 labels.append(p)
-            if len(images) + len(labels) >= max_scan:
+            if len(raw_images) + len(labels) >= max_scan:
                 result["warnings"].append(f"Scan capped at {max_scan} files")
                 break
 
-    images = sorted(images)
+    scan_root = root if root.is_dir() else root.parent
+    images, excluded = partition_media_files(
+        raw_images,
+        root=scan_root,
+        dataset_type=dataset_type,
+        allow_videos=False,
+    )
+    result["images_excluded"] = len(excluded)
+    result["excluded_by_reason"] = {
+        reason: sum(1 for e in excluded if e.get("reason") == reason)
+        for reason in sorted({e.get("reason", "excluded_path") for e in excluded})
+    }
+    result["excluded_samples"] = excluded[:50]
+    if excluded:
+        result["warnings"].append(
+            f"{len(excluded)} file(s) excluded as non-driving media "
+            f"({', '.join(f'{k}: {v}' for k, v in result['excluded_by_reason'].items())})"
+        )
     labels = sorted(labels)
     result["images_discovered"] = len(images)
     result["annotations_discovered"] = len(labels)
@@ -158,6 +185,9 @@ def write_load_manifest(discovery: Dict[str, Any], dest_dir: Path) -> Path:
         "images_discovered": discovery.get("images_discovered"),
         "images_readable": discovery.get("images_readable"),
         "images_corrupt": discovery.get("images_corrupt"),
+        "images_excluded": discovery.get("images_excluded"),
+        "excluded_by_reason": discovery.get("excluded_by_reason"),
+        "excluded_samples": discovery.get("excluded_samples"),
         "annotations_discovered": discovery.get("annotations_discovered"),
         "annotation_objects": discovery.get("annotation_objects"),
         "class_ids": discovery.get("class_ids"),
@@ -175,7 +205,7 @@ def load_and_preprocess(
     dataset_type: str = "local",
 ) -> Dict[str, Any]:
     """Real Load & Preprocess: discovery + optional YAML semantic checks."""
-    discovery = discover_images(source_path)
+    discovery = discover_images(source_path, dataset_type=dataset_type)
     yaml_report = None
     if yaml_path:
         ypath = Path(yaml_path)
@@ -230,6 +260,8 @@ def load_and_preprocess(
             "images_discovered": discovery["images_discovered"],
             "images_readable": discovery["images_readable"],
             "images_corrupt": discovery["images_corrupt"],
+            "images_excluded": discovery.get("images_excluded", 0),
+            "excluded_by_reason": discovery.get("excluded_by_reason", {}),
             "annotations_discovered": discovery["annotations_discovered"],
             "annotation_objects": discovery["annotation_objects"],
             "loaded_pct_of_discovered": loaded_pct,

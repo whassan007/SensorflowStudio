@@ -2447,10 +2447,16 @@ def pipeline_file(path: str):
 
 
 @app.get("/api/dataset/browse")
-def dataset_browse(source_path: str = "data", limit: int = 48):
-    """Validate Images Path by listing browsable local frames."""
+def dataset_browse(
+    source_path: str = "data",
+    limit: int = 48,
+    dataset_type: Optional[str] = None,
+):
+    """Validate Images Path by listing browsable local driving-relevant frames."""
     from sensorflow import pipeline_artifacts as artifacts
-    return artifacts.scan_source_images(source_path, limit=limit)
+
+    dtype = dataset_type or load_config().dataset_type
+    return artifacts.scan_source_images(source_path, limit=limit, dataset_type=dtype)
 
 
 @app.get("/api/mitl/queue")

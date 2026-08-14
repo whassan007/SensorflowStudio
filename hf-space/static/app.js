@@ -922,13 +922,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnBrowseSource) {
         btnBrowseSource.addEventListener('click', async () => {
             const sourcePath = datasetSourcePath?.value || document.getElementById('input-source')?.value || 'data';
+            const datasetType = selectDatasetType?.value || 'local';
             const statusEl = document.getElementById('source-browse-status');
+            const excludedEl = document.getElementById('source-browse-excluded');
             const gallery = document.getElementById('source-browse-gallery');
             btnBrowseSource.disabled = true;
             btnBrowseSource.textContent = 'Scanning…';
             if (statusEl) statusEl.textContent = `Validating ${sourcePath}…`;
+            if (excludedEl) {
+                excludedEl.style.display = 'none';
+                excludedEl.innerHTML = '';
+            }
             try {
-                const res = await fetch(`${API_BASE}/api/dataset/browse?source_path=${encodeURIComponent(sourcePath)}&limit=48`);
+                const res = await fetch(
+                    `${API_BASE}/api/dataset/browse?source_path=${encodeURIComponent(sourcePath)}`
+                    + `&limit=48&dataset_type=${encodeURIComponent(datasetType)}`
+                );
                 const data = await res.json();
                 if (gallery) {
                     gallery.innerHTML = '';
@@ -942,20 +951,53 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 }
                 if (statusEl) {
-                    statusEl.textContent = data.browsable
-                        ? `Browsable: ${data.count} image(s) under ${data.source_path}`
+                    let msg = data.browsable
+                        ? `Browsable: ${data.count} driving-relevant image(s) under ${data.source_path}`
                         : (data.empty_reason || 'Nothing browsable at this path.');
+                    if (Array.isArray(data.warnings) && data.warnings.length) {
+                        msg += ` — ${data.warnings[0]}`;
+                    }
+                    statusEl.textContent = msg;
+                }
+                if (excludedEl && data.excluded_count > 0) {
+                    excludedEl.style.display = 'block';
+                    const summary = document.createElement('div');
+                    summary.textContent = `${data.excluded_count} file(s) excluded (not driving media)`;
+                    const toggle = document.createElement('button');
+                    toggle.type = 'button';
+                    toggle.className = 'btn btn-secondary';
+                    toggle.style.marginTop = '8px';
+                    toggle.style.fontSize = '12px';
+                    toggle.textContent = 'Show excluded files';
+                    const list = document.createElement('ul');
+                    list.style.display = 'none';
+                    list.style.marginTop = '8px';
+                    list.style.fontSize = '12px';
+                    list.style.color = 'var(--text-muted)';
+                    (data.excluded || []).forEach((item) => {
+                        const li = document.createElement('li');
+                        li.textContent = `${item.name || item.path} (${item.reason || 'excluded'})`;
+                        list.appendChild(li);
+                    });
+                    toggle.addEventListener('click', () => {
+                        const open = list.style.display === 'none';
+                        list.style.display = open ? 'block' : 'none';
+                        toggle.textContent = open ? 'Hide excluded files' : 'Show excluded files';
+                    });
+                    excludedEl.appendChild(summary);
+                    excludedEl.appendChild(toggle);
+                    excludedEl.appendChild(list);
                 }
                 const badge = document.getElementById('ds-meta-badge');
                 if (badge) {
                     if (data.browsable) {
-                        badge.textContent = `${data.count} images browsable on disk`;
+                        badge.textContent = `${data.count} driving images browsable on disk`;
                         badge.style.background = 'rgba(0, 255, 170, 0.15)';
                         badge.style.color = '#00ffaa';
                         badge.style.border = '1px solid rgba(0, 255, 170, 0.3)';
                         document.getElementById('ds-kpi-loaded-rows').textContent = data.count;
                     } else {
-                        badge.textContent = 'Not browsable — path empty or missing';
+                        badge.textContent = 'Not browsable — no driving media at path';
                         badge.style.background = 'rgba(255, 68, 68, 0.12)';
                         badge.style.color = '#ff8888';
                         badge.style.border = '1px solid rgba(255, 68, 68, 0.35)';

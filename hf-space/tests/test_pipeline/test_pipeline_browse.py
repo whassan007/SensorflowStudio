@@ -6,6 +6,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 
+def _large_png_bytes(min_bytes: int = 11 * 1024) -> bytes:
+    base = bytes.fromhex(
+        "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
+        "0000000a49444154789c63000100000500010d0a2db40000000049454e44ae426082"
+    )
+    return base if len(base) >= min_bytes else base + b"\x00" * (min_bytes - len(base))
+
+
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
@@ -118,14 +126,10 @@ def test_load_all_not_executed_without_stub(client, tmp_path):
 
 
 def test_load_all_local_real_when_path_has_images(client, tmp_path):
-    data_dir = tmp_path / "data"
-    data_dir.mkdir()
-    (data_dir / "a.png").write_bytes(
-        bytes.fromhex(
-            "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
-            "0000000a49444154789c63000100000500010d0a2db40000000049454e44ae426082"
-        )
-    )
+    data_dir = tmp_path / "data" / "images" / "train"
+    data_dir.mkdir(parents=True)
+    png = _large_png_bytes()
+    (data_dir / "a.png").write_bytes(png)
     res = client.post(
         "/api/dataset/load-all",
         json={
@@ -174,14 +178,9 @@ def test_pipeline_file_blocks_path_traversal(client, tmp_path):
 
 
 def test_dataset_browse_lists_images(client, tmp_path):
-    data_dir = tmp_path / "data"
-    data_dir.mkdir()
-    (data_dir / "a.png").write_bytes(
-        bytes.fromhex(
-            "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
-            "0000000a49444154789c63000100000500010d0a2db40000000049454e44ae426082"
-        )
-    )
+    data_dir = tmp_path / "data" / "camera" / "front"
+    data_dir.mkdir(parents=True)
+    (data_dir / "a.png").write_bytes(_large_png_bytes())
     res = client.get("/api/dataset/browse?source_path=data")
     assert res.status_code == 200
     body = res.json()
