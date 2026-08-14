@@ -93,6 +93,8 @@ export default function OverviewPage() {
                   startIcon={bootstrapping ? <CircularProgress size={18} color="inherit" /> : <Rocket size={18} />}
                   disabled={bootstrapping}
                   onClick={() => void bootstrap()}
+                  title="Create a small synthetic multi-sensor dataset and run the full label-evaluation pipeline"
+                  aria-label="Generate synthetic dataset and run pipeline"
                 >
                   {bootstrapping ? 'Generating & starting…' : 'Generate synthetic dataset & run pipeline'}
                 </Button>
@@ -164,6 +166,8 @@ export default function OverviewPage() {
                         variant="outlined"
                         endIcon={<ArrowRight size={14} />}
                         onClick={() => navigate(resolvePageId(a.evidence_link.page), a.evidence_link.id)}
+                        title={`Open ${a.evidence_link.page} with this alert’s evidence selected`}
+                        aria-label="Open alert evidence"
                       >
                         Evidence
                       </Button>

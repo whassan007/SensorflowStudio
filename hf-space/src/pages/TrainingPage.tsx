@@ -198,6 +198,8 @@ export default function TrainingPage() {
                 startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : <Rocket size={16} />}
                 disabled={submitting}
                 onClick={() => void submit()}
+                title="Start a training job on the selected verified dataset (unverified labels are excluded)"
+                aria-label="Start training job"
               >
                 {submitting ? 'Starting…' : 'Start Training'}
               </Button>
