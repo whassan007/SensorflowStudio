@@ -190,8 +190,9 @@ sudo systemctl restart sensorflow-studio accident-analysis
 
 ## License
 
-This project is released under **CC BY-NC-SA 4.0**.
-See LICENSE file for details.
+This project is released under the **PolyForm Noncommercial License 1.0.0**
+(source-available / non-commercial; not OSI Open Source).
+See `LICENSE` and `NOTICE` for details. Commercial use requires a separate license.
 
 ## Support
 
